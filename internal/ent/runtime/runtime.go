@@ -762,8 +762,6 @@ func init() {
 	user.NameValidator = userDescName.Validators[0].(func(string) error)
 	// userDescAccount is the schema descriptor for account field.
 	userDescAccount := userFields[2].Descriptor()
-	// user.DefaultAccount holds the default value on creation for the account field.
-	user.DefaultAccount = userDescAccount.Default.(string)
 	// user.AccountValidator is a validator for the "account" field. It is called by the builders before save.
 	user.AccountValidator = userDescAccount.Validators[0].(func(string) error)
 	// userDescEmail is the schema descriptor for email field.

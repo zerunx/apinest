@@ -48,14 +48,6 @@ func (_c *UserCreate) SetAccount(v string) *UserCreate {
 	return _c
 }
 
-// SetNillableAccount sets the "account" field if the given value is not nil.
-func (_c *UserCreate) SetNillableAccount(v *string) *UserCreate {
-	if v != nil {
-		_c.SetAccount(*v)
-	}
-	return _c
-}
-
 // SetEmail sets the "email" field.
 func (_c *UserCreate) SetEmail(v string) *UserCreate {
 	_c.mutation.SetEmail(v)
@@ -363,10 +355,6 @@ func (_c *UserCreate) defaults() error {
 	if _, ok := _c.mutation.Name(); !ok {
 		v := user.DefaultName
 		_c.mutation.SetName(v)
-	}
-	if _, ok := _c.mutation.Account(); !ok {
-		v := user.DefaultAccount
-		_c.mutation.SetAccount(v)
 	}
 	if _, ok := _c.mutation.Email(); !ok {
 		v := user.DefaultEmail

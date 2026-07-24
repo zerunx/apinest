@@ -160,8 +160,6 @@ var (
 	DefaultName string
 	// NameValidator is a validator for the "name" field. It is called by the builders before save.
 	NameValidator func(string) error
-	// DefaultAccount holds the default value on creation for the "account" field.
-	DefaultAccount string
 	// AccountValidator is a validator for the "account" field. It is called by the builders before save.
 	AccountValidator func(string) error
 	// DefaultEmail holds the default value on creation for the "email" field.

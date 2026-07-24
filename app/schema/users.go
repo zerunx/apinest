@@ -39,7 +39,7 @@ func (User) Fields() []ent.Field {
 
 		field.String("account").
 			MaxLen(50).
-			Default("").
+			Unique().
 			Comment("登录账号"),
 
 		field.String("email").

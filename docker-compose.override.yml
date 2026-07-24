@@ -1,20 +1,27 @@
 services:
   nest:
-    build:
-      context: .
-      dockerfile: Dockerfile.dev
-    image: nest:dev
+    image: golang:1.26.3-trixie
+    working_dir: /app
     ports:
-      - "3000:3000"
+      - 3000
     environment:
       TZ: Asia/Shanghai
       GIN_MODE: debug
+      LOG_TO_CONSOLE: "true"
+      LOG_TO_FILE: "false"
     volumes:
-      - D:\data\nest\runtime:/app/runtime
+      - .:/app
+      - mod-cache:/go/pkg/mod
+      - build-cache:/root/.cache/go-build
+    command: go run cmd/api/main.go
     restart: unless-stopped
     networks:
       - default
       - common-network
+
+volumes:
+  mod-cache:
+  build-cache:
 
 networks:
   default:
