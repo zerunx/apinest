@@ -25,7 +25,17 @@ export type TreeItem =
 export type EnvironmentRow = {
   id: number
   name: string
+  remark?: string
   is_default: boolean
+}
+
+export type EnvironmentVariableRow = {
+  id: number
+  environment_id: number
+  key: string
+  value: string
+  description: string
+  enabled: boolean
 }
 
 export type HeaderPair = {

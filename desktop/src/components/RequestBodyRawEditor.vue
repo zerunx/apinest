@@ -30,6 +30,7 @@
           @keyup="scheduleSelectionUpdate"
           @select="scheduleSelectionUpdate"
           @mousedown="onMouseDown"
+          @dblclick.prevent="onDblClick"
           @blur="onBlur"
         />
       </div>
@@ -40,7 +41,11 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { diagnoseRawJson, highlightRawContent } from '../utils/raw-editor-highlight'
-import { applyJsonEnter, formatJsonLenient } from '../utils/raw-json-utils'
+import {
+  applyJsonEnter,
+  findJsonTokenRangeAt,
+  formatJsonLenient,
+} from '../utils/raw-json-utils'
 
 type LineRect = {
   top: number
@@ -49,15 +54,19 @@ type LineRect = {
   height: number
 }
 
+type RawContentType = 'JSON' | 'Text'
+
 const props = withDefaults(
   defineProps<{
     modelValue: string
     readonly?: boolean
     placeholder?: string
+    contentType?: RawContentType
   }>(),
   {
     readonly: false,
     placeholder: '',
+    contentType: 'JSON',
   },
 )
 
@@ -77,6 +86,7 @@ let lineHeightPx = 20
 let rafId = 0
 let pointerDown = false
 let pointerDragged = false
+let pendingTokenSelect: { start: number; end: number } | null = null
 let selectAnchor = 0
 let dragSelStart = 0
 let dragSelEnd = 0
@@ -95,7 +105,7 @@ let spaceWidthPx = 8
 let selectionEndsWithNewline = false
 let cachedLineStarts: number[] = [0]
 let cachedLineStartsFor = ''
-const SEL_RADIUS = 4
+const SEL_RADIUS = 5
 const DRAG_THRESHOLD_PX = 3
 
 watch(
@@ -114,13 +124,15 @@ watch(localRaw, (value) => {
   void nextTick(() => {
     lastSelStart = -1
     lastSelEnd = -1
-    cachedContentRects = []
+    cachedLineRects = []
     mirrorText = ''
     scheduleSelectionUpdate()
   })
 })
 
-const jsonError = computed(() => diagnoseRawJson(localRaw.value))
+const jsonError = computed(() =>
+  props.contentType === 'JSON' ? diagnoseRawJson(localRaw.value) : null,
+)
 const errorLine = computed(() => jsonError.value?.line ?? null)
 
 const lineNumbers = computed(() => {
@@ -129,7 +141,12 @@ const lineNumbers = computed(() => {
 })
 
 const highlightedContent = computed(() =>
-  highlightRawContent(localRaw.value, 'JSON', 'raw', jsonError.value?.index ?? null),
+  highlightRawContent(
+    localRaw.value,
+    props.contentType,
+    'raw',
+    jsonError.value?.index ?? null,
+  ),
 )
 
 watch(highlightedContent, () => {
@@ -158,23 +175,50 @@ function onBlur() {
     textareaRef.value?.focus({ preventScroll: true })
     return
   }
-  clearSelectionUi()
+  collapseAndClearSelection()
 }
 
 function clearSelectionUi() {
   lastSelStart = -1
   lastSelEnd = -1
-  lastDotStart = -1
-  lastDotEnd = -1
   cachedLineRects = []
   selectionPathD.value = ''
   selectionEndsWithNewline = false
   syncSpaceDots(0, 0)
+  document.removeEventListener('mousedown', onDocMouseDownOutside, true)
+}
+
+function collapseAndClearSelection() {
+  const textarea = textareaRef.value
+  if (textarea && textarea.selectionStart !== textarea.selectionEnd) {
+    const cursor = textarea.selectionEnd
+    try {
+      textarea.setSelectionRange(cursor, cursor)
+    } catch {
+      /* ignore */
+    }
+  }
+  dragSelStart = dragSelEnd = selectAnchor
+  clearSelectionUi()
+}
+
+function onDocMouseDownOutside(event: MouseEvent) {
+  if (pointerDown) return
+  const wrap = textareaRef.value?.closest('.interface-body-raw__code-wrap')
+  const target = event.target as Node | null
+  if (wrap && target && wrap.contains(target)) return
+  collapseAndClearSelection()
+  document.removeEventListener('mousedown', onDocMouseDownOutside, true)
 }
 
 function detachDocListeners() {
   document.removeEventListener('mousemove', onDocMouseMove, true)
   document.removeEventListener('mouseup', onDocMouseUp, true)
+}
+
+function attachOutsideClearListener() {
+  document.removeEventListener('mousedown', onDocMouseDownOutside, true)
+  document.addEventListener('mousedown', onDocMouseDownOutside, true)
 }
 
 function setDocUserSelect(locked: boolean) {
@@ -237,8 +281,28 @@ function flushPendingMove() {
   scheduleSelectionUpdate()
 }
 
+function applyRangeSelection(textarea: HTMLTextAreaElement, start: number, end: number) {
+  dragSelStart = start
+  dragSelEnd = end
+  selectAnchor = start
+  try {
+    textarea.setSelectionRange(start, end)
+  } catch {
+    /* ignore */
+  }
+  lastSelStart = -1
+  lastSelEnd = -1
+  scheduleSelectionUpdate()
+  if (start !== end) attachOutsideClearListener()
+}
+
+function selectTokenAtPoint(textarea: HTMLTextAreaElement, clientX: number, clientY: number) {
+  const caret = caretIndexAtClientPoint(textarea, clientX, clientY)
+  return findJsonTokenRangeAt(textarea.value, caret)
+}
+
 function onMouseDown(event: MouseEvent) {
-  if (props.readonly || event.button !== 0) return
+  if (event.button !== 0) return
   const textarea = textareaRef.value
   if (!textarea) return
 
@@ -246,25 +310,48 @@ function onMouseDown(event: MouseEvent) {
 
   pointerDown = true
   pointerDragged = false
+  pendingTokenSelect = null
   downClientX = event.clientX
   downClientY = event.clientY
+
+  if (event.detail >= 2) {
+    pendingTokenSelect = selectTokenAtPoint(textarea, event.clientX, event.clientY)
+  }
+
   selectAnchor = caretIndexAtClientPoint(textarea, event.clientX, event.clientY)
   dragSelStart = selectAnchor
   dragSelEnd = selectAnchor
 
   setDocUserSelect(true)
   textarea.focus({ preventScroll: true })
-  try {
-    textarea.setSelectionRange(selectAnchor, selectAnchor)
-  } catch {
-    /* ignore */
+
+  if (pendingTokenSelect) {
+    applyRangeSelection(textarea, pendingTokenSelect.start, pendingTokenSelect.end)
+    selectAnchor = pendingTokenSelect.start
+    dragSelStart = pendingTokenSelect.start
+    dragSelEnd = pendingTokenSelect.end
+  } else {
+    try {
+      textarea.setSelectionRange(selectAnchor, selectAnchor)
+    } catch {
+      /* ignore */
+    }
+    lastSelStart = -1
+    lastSelEnd = -1
+    clearSelectionUi()
   }
-  lastSelStart = -1
-  lastSelEnd = -1
-  clearSelectionUi()
 
   document.addEventListener('mousemove', onDocMouseMove, true)
   document.addEventListener('mouseup', onDocMouseUp, true)
+}
+
+function onDblClick(event: MouseEvent) {
+  const textarea = textareaRef.value
+  if (!textarea) return
+  event.preventDefault()
+  const range = selectTokenAtPoint(textarea, event.clientX, event.clientY)
+  if (!range) return
+  applyRangeSelection(textarea, range.start, range.end)
 }
 
 function onDocMouseMove(event: MouseEvent) {
@@ -293,6 +380,8 @@ function onDocMouseUp(event: MouseEvent) {
   if (textarea) {
     if (pointerDragged) {
       applyPointerSelection(textarea, event.clientX, event.clientY)
+    } else if (pendingTokenSelect) {
+      applyRangeSelection(textarea, pendingTokenSelect.start, pendingTokenSelect.end)
     } else {
       dragSelStart = selectAnchor
       dragSelEnd = selectAnchor
@@ -307,6 +396,7 @@ function onDocMouseUp(event: MouseEvent) {
 
   pointerDown = false
   pointerDragged = false
+  pendingTokenSelect = null
   setDocUserSelect(false)
   if (moveRafId) {
     cancelAnimationFrame(moveRafId)
@@ -314,6 +404,9 @@ function onDocMouseUp(event: MouseEvent) {
   }
   detachDocListeners()
   scheduleSelectionUpdate()
+  if (textarea && dragSelStart !== dragSelEnd) {
+    attachOutsideClearListener()
+  }
 }
 
 function scheduleSelectionUpdate() {
@@ -321,13 +414,37 @@ function scheduleSelectionUpdate() {
   rafId = requestAnimationFrame(() => {
     rafId = 0
     updateSelection()
+    const textarea = textareaRef.value
+    if (
+      textarea &&
+      document.activeElement === textarea &&
+      (pointerDown ? dragSelStart !== dragSelEnd : textarea.selectionStart !== textarea.selectionEnd)
+    ) {
+      attachOutsideClearListener()
+    }
   })
 }
 
 function syncSpaceDots(start: number, end: number) {
-  if (start === lastDotStart && end === lastDotEnd) return
   const root = highlightRef.value
-  if (!root) return
+  if (!root) {
+    lastDotStart = start
+    lastDotEnd = end
+    return
+  }
+
+  // Clearing must force-remove classes; lastDot* may already be reset.
+  if (start >= end) {
+    const lit = root.querySelectorAll<HTMLElement>('.raw-hl-ws.raw-hl-space, .raw-hl-ws.raw-hl-tab')
+    for (const el of lit) {
+      el.classList.remove('raw-hl-space', 'raw-hl-tab')
+    }
+    lastDotStart = 0
+    lastDotEnd = 0
+    return
+  }
+
+  if (start === lastDotStart && end === lastDotEnd) return
 
   const nodes = root.querySelectorAll<HTMLElement>('.raw-hl-ws')
   const oldStart = lastDotStart
@@ -338,7 +455,7 @@ function syncSpaceDots(start: number, end: number) {
   for (const el of nodes) {
     const i = Number(el.dataset.i)
     const was = oldStart < oldEnd && i >= oldStart && i < oldEnd
-    const now = start < end && i >= start && i < end
+    const now = i >= start && i < end
     if (was === now) continue
     const isTab = el.textContent === '\t'
     el.classList.toggle('raw-hl-space', now && !isTab)
@@ -484,7 +601,9 @@ function mergeLineRects(rects: DOMRect[]): LineRect[] {
     }
   }
 
-  const padX = 2
+  // Keep horizontal padding tight so selection doesn't bleed onto neighboring
+  // chars (e.g. JSON quotes around a dblclicked key/value).
+  const padX = 0
   const lh = lineHeightPx
   const spaceW = spaceWidthPx * 0.6
   const lines = merged
@@ -521,78 +640,126 @@ function mergeLineRects(rects: DOMRect[]): LineRect[] {
   return lines
 }
 
-/** Postman-style stepped selection with outward fillets on the right edge. */
+/** Postman-style stepped selection: outer corners rounded, step joints use concave fillets. */
 function buildSelectionPathD(lines: LineRect[], scrollTop: number, scrollLeft: number): string {
   const n = lines.length
   if (n === 0) return ''
-  const r = SEL_RADIUS
 
   const L = (i: number) => lines[i].left - scrollLeft
   const R = (i: number) => lines[i].left + lines[i].width - scrollLeft
   const T = (i: number) => lines[i].top - scrollTop
-  const B = (i: number) => T(i) + lh
+  const B = (i: number) => T(i) + lines[i].height
+  const rad = (...sizes: number[]) => {
+    const min = Math.min(...sizes)
+    if (!(min > 0)) return 0
+    return Math.min(SEL_RADIUS, min / 2)
+  }
 
   const p: string[] = []
+  const rTop = rad(R(0) - L(0), B(0) - T(0))
 
-  p.push(`M ${L(0) + r} ${T(0)}`)
-  p.push(`H ${R(0) - r}`)
-  p.push(`Q ${R(0)} ${T(0)} ${R(0)} ${T(0) + r}`)
+  // Top edge → top-right outer corner
+  p.push(`M ${L(0) + rTop} ${T(0)}`)
+  p.push(`H ${R(0) - rTop}`)
+  if (rTop > 0) p.push(`Q ${R(0)} ${T(0)} ${R(0)} ${T(0) + rTop}`)
+  else p.push(`L ${R(0)} ${T(0)}`)
 
+  // Right edge (top → bottom)
   for (let i = 0; i < n; i += 1) {
     const Ri = R(i)
     const Bi = B(i)
-    const isLast = i === n - 1
+    const wi = Ri - L(i)
+    const hi = Bi - T(i)
 
-    if (isLast) {
+    if (i === n - 1) {
+      const r = rad(wi, hi)
       p.push(`V ${Bi - r}`)
-      p.push(`Q ${Ri} ${Bi} ${Ri - r} ${Bi}`)
+      if (r > 0) p.push(`Q ${Ri} ${Bi} ${Ri - r} ${Bi}`)
+      else p.push(`L ${Ri} ${Bi}`)
       break
     }
 
     const R2 = R(i + 1)
     const T2 = T(i + 1)
+    const w2 = R2 - L(i + 1)
+    const h2 = B(i + 1) - T2
+    const gap = Math.abs(Ri - R2)
 
-    if (Ri > R2 + 1) {
-      p.push(`V ${Bi - r}`)
-      p.push(`Q ${Ri} ${Bi} ${Ri - r} ${Bi}`)
-      p.push(`H ${R2 + r}`)
-      p.push(`Q ${R2 + r} ${Bi} ${R2} ${T2 + r}`)
-    } else if (R2 > Ri + 1) {
-      p.push(`V ${Bi - r}`)
-      p.push(`Q ${Ri} ${Bi} ${Ri - r} ${Bi}`)
-      p.push(`Q ${R2} ${Bi} ${R2} ${T2 + r}`)
+    if (gap < 1) continue
+
+    if (Ri > R2) {
+      // Next line shorter: outer corner then concave into next
+      const rOuter = rad(wi, hi, gap)
+      const rInner = rad(w2, h2, gap)
+      p.push(`V ${Bi - rOuter}`)
+      if (rOuter > 0) p.push(`Q ${Ri} ${Bi} ${Ri - rOuter} ${Bi}`)
+      else p.push(`L ${Ri} ${Bi}`)
+      p.push(`H ${R2 + rInner}`)
+      if (rInner > 0) p.push(`Q ${R2} ${Bi} ${R2} ${T2 + rInner}`)
+      else p.push(`L ${R2} ${T2}`)
     } else {
-      p.push(`V ${T2 + r}`)
+      // Next line longer: concave fillet then outer corner
+      const rInner = rad(wi, hi, gap)
+      const rOuter = rad(w2, h2, gap)
+      p.push(`V ${Bi - rInner}`)
+      if (rInner > 0) p.push(`Q ${Ri} ${Bi} ${Ri + rInner} ${Bi}`)
+      else p.push(`L ${Ri} ${Bi}`)
+      p.push(`H ${R2 - rOuter}`)
+      if (rOuter > 0) p.push(`Q ${R2} ${Bi} ${R2} ${T2 + rOuter}`)
+      else p.push(`L ${R2} ${T2}`)
     }
   }
 
+  // Bottom edge → bottom-left outer corner
   const last = n - 1
-  p.push(`H ${L(last) + r}`)
-  p.push(`Q ${L(last)} ${B(last)} ${L(last)} ${B(last) - r}`)
+  const rBot = rad(R(last) - L(last), B(last) - T(last))
+  p.push(`H ${L(last) + rBot}`)
+  if (rBot > 0) p.push(`Q ${L(last)} ${B(last)} ${L(last)} ${B(last) - rBot}`)
+  else p.push(`L ${L(last)} ${B(last)}`)
 
+  // Left edge (bottom → top)
   for (let i = n - 1; i >= 0; i -= 1) {
     const Li = L(i)
     const Ti = T(i)
+    const wi = R(i) - Li
+    const hi = B(i) - Ti
+
     if (i === 0) {
+      const r = rad(wi, hi)
       p.push(`V ${Ti + r}`)
-      p.push(`Q ${Li} ${Ti} ${Li + r} ${Ti}`)
+      if (r > 0) p.push(`Q ${Li} ${Ti} ${Li + r} ${Ti}`)
+      else p.push(`L ${Li} ${Ti}`)
       break
     }
+
     const Lprev = L(i - 1)
     const Tprev = T(i - 1)
+    const wPrev = R(i - 1) - Lprev
+    const hPrev = B(i - 1) - Tprev
+    const gap = Math.abs(Li - Lprev)
 
-    if (Math.abs(Li - Lprev) < 2) {
-      p.push(`V ${Tprev + r}`)
-      continue
-    }
+    if (gap < 1) continue
+
     if (Li > Lprev) {
-      p.push(`V ${Ti + r}`)
-      p.push(`Q ${Li} ${Ti} ${Li + r} ${Ti}`)
-      p.push(`H ${Lprev + r}`)
-      p.push(`Q ${Lprev} ${Ti} ${Lprev} ${Ti + r}`)
+      // Line above extends further left
+      const rInner = rad(wi, hi, gap)
+      const rOuter = rad(wPrev, hPrev, gap)
+      p.push(`V ${Ti + rInner}`)
+      if (rInner > 0) p.push(`Q ${Li} ${Ti} ${Li - rInner} ${Ti}`)
+      else p.push(`L ${Li} ${Ti}`)
+      p.push(`H ${Lprev + rOuter}`)
+      if (rOuter > 0) p.push(`Q ${Lprev} ${Ti} ${Lprev} ${Ti - rOuter}`)
+      else p.push(`L ${Lprev} ${Tprev}`)
     } else {
-      p.push(`V ${Tprev + r}`)
-      p.push(`Q ${Lprev} ${Ti} ${Lprev + r} ${Ti}`)
+      // Line above is more indented
+      const rOuter = rad(wi, hi, gap)
+      const rInner = rad(wPrev, hPrev, gap)
+      p.push(`V ${Ti + rOuter}`)
+      if (rOuter > 0) p.push(`Q ${Li} ${Ti} ${Li + rOuter} ${Ti}`)
+      else p.push(`L ${Li} ${Ti}`)
+      p.push(`H ${Lprev - rInner}`)
+      if (rInner > 0) p.push(`Q ${Lprev} ${Ti} ${Lprev} ${Ti - rInner}`)
+      else p.push(`L ${Lprev} ${Tprev}`)
     }
   }
 
@@ -690,8 +857,106 @@ function setTextAndCursor(text: string, cursor: number) {
   })
 }
 
+function setTextAndSelection(text: string, start: number, end: number) {
+  localRaw.value = text
+  emit('update:modelValue', text)
+  void nextTick(() => {
+    const el = textareaRef.value
+    if (!el) return
+    applyRangeSelection(el, start, end)
+  })
+}
+
+function duplicateLines(direction: 'up' | 'down') {
+  const el = textareaRef.value
+  if (!el || props.readonly) return
+  const value = el.value
+  const selStart = el.selectionStart
+  const selEnd = el.selectionEnd
+
+  const start = value.lastIndexOf('\n', selStart - 1) + 1
+  let end: number
+  if (selEnd > selStart && value[selEnd - 1] === '\n') {
+    end = selEnd
+  } else {
+    const nl = value.indexOf('\n', selEnd)
+    end = nl === -1 ? value.length : nl + 1
+  }
+
+  const rawBlock = value.slice(start, end)
+  const block = rawBlock.endsWith('\n') ? rawBlock : `${rawBlock}\n`
+
+  if (direction === 'up') {
+    const newValue = value.slice(0, start) + block + value.slice(start)
+    setTextAndSelection(newValue, start, start + block.length - 1)
+    return
+  }
+
+  if (!rawBlock.endsWith('\n') && end === value.length) {
+    const newValue = `${value}\n${rawBlock}`
+    const ns = value.length + 1
+    setTextAndSelection(newValue, ns, ns + rawBlock.length)
+    return
+  }
+
+  const newValue = value.slice(0, end) + block + value.slice(end)
+  setTextAndSelection(newValue, end, end + block.length - 1)
+}
+
+/** With a selection, typing " or ' wraps the selection instead of replacing it. */
+function tryWrapSelectionWithQuote(quote: string): boolean {
+  const el = textareaRef.value
+  if (!el || props.readonly) return false
+  const start = pointerDown ? dragSelStart : el.selectionStart
+  const end = pointerDown ? dragSelEnd : el.selectionEnd
+  if (start === end) return false
+
+  const value = el.value
+  // Already has matching quotes outside (typical after dblclick on a string) →
+  // expand selection to include those quotes ("wrap" the content with quotes).
+  if (start > 0 && end < value.length && value[start - 1] === quote && value[end] === quote) {
+    applyRangeSelection(el, start - 1, end + 1)
+    return true
+  }
+
+  const next = value.slice(0, start) + quote + value.slice(start, end) + quote + value.slice(end)
+  setTextAndSelection(next, start + 1, end + 1)
+  return true
+}
+
 function onKeydown(event: KeyboardEvent) {
-  if (props.readonly) return
+  if (
+    event.altKey &&
+    event.shiftKey &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    !event.isComposing &&
+    (event.key === 'ArrowUp' || event.key === 'ArrowDown')
+  ) {
+    if (!props.readonly) {
+      event.preventDefault()
+      duplicateLines(event.key === 'ArrowUp' ? 'up' : 'down')
+    }
+    return
+  }
+
+  if (props.readonly) {
+    scheduleSelectionUpdate()
+    return
+  }
+
+  if (
+    (event.key === '"' || event.key === "'") &&
+    !event.isComposing &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    !event.altKey
+  ) {
+    if (tryWrapSelectionWithQuote(event.key)) {
+      event.preventDefault()
+      return
+    }
+  }
 
   if (event.key === 'Enter' && !event.isComposing && !event.ctrlKey && !event.metaKey && !event.altKey) {
     const el = textareaRef.value
@@ -724,6 +989,7 @@ onBeforeUnmount(() => {
   pointerDragged = false
   setDocUserSelect(false)
   detachDocListeners()
+  document.removeEventListener('mousedown', onDocMouseDownOutside, true)
   mirrorEl?.remove()
   mirrorEl = null
 })

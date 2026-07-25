@@ -6,7 +6,21 @@
           <div class="interface-url-bar__method-wrap">
             <MethodPicker v-model="method" class="interface-url-bar__method" />
           </div>
-          <input v-model="displayUrl" class="interface-url-bar__url native-input" placeholder="" />
+          <div class="interface-url-bar__url-wrap">
+            <div
+              ref="urlHighlightRef"
+              class="interface-url-bar__url-highlight"
+              aria-hidden="true"
+              v-html="highlightedUrlHtml"
+            />
+            <input
+              v-model="displayUrl"
+              class="interface-url-bar__url native-input"
+              placeholder=""
+              spellcheck="false"
+              @scroll="syncUrlHighlightScroll"
+            />
+          </div>
         </div>
         <div class="interface-url-actions">
           <button
@@ -78,7 +92,7 @@
           <div v-if="requestTab === 'params'" class="param-table param-table--resizable-wrap">
             <ParamTableColumnResizer
               :columns="paramGridColumns"
-              :handles="[false, 'key', 'value', 'desc', false]"
+              :handles="[false, 'key', false, false, false]"
               @resize="startTableColResize"
             />
             <div
@@ -128,6 +142,7 @@
                   v-model="authType"
                   compact
                   class="auth-pane__type"
+                  :menu-width="168"
                   :options="authTypeOptions"
                 />
                 <p v-if="authType !== 'none'" class="auth-pane__hint muted">{{ authTypeHint }}</p>
@@ -168,7 +183,7 @@
           <div v-else-if="requestTab === 'headers'" class="param-table param-table--resizable-wrap">
             <ParamTableColumnResizer
               :columns="paramGridColumns"
-              :handles="[false, 'key', 'value', 'desc', false]"
+              :handles="[false, 'key', false, false, false]"
               @resize="startTableColResize"
             />
             <div
@@ -248,7 +263,7 @@
             <div v-else-if="bodyFormat === 'form-data'" class="param-table param-table--resizable-wrap">
               <ParamTableColumnResizer
                 :columns="paramGridColumns"
-                :handles="[false, 'key', 'value', 'desc', false]"
+                :handles="[false, 'key', false, false, false]"
                 @resize="startTableColResize"
               />
               <div
@@ -356,22 +371,44 @@
               </span>
             </button>
           </div>
-          <div v-if="response" class="interface-response-meta">
-            <span class="interface-response-meta__status" :class="responseStatusClass">
-              {{ response.status }} {{ response.status_text }}
-            </span>
-            <span class="interface-response-meta__sep" aria-hidden="true" />
-            <span class="interface-response-meta__item">{{ response.duration_ms }} ms</span>
-            <span class="interface-response-meta__sep" aria-hidden="true" />
-            <span class="interface-response-meta__item">{{ responseBodySize }}</span>
+          <div v-if="response && !sending" class="interface-response-bar__right">
+            <div
+              v-if="responseTab === 'body'"
+              class="body-format-switch interface-response-type-switch"
+            >
+              <button
+                v-for="fmt in responseBodyTypes"
+                :key="fmt.value"
+                type="button"
+                class="body-format-switch__btn"
+                :class="{ 'body-format-switch__btn--active': responseBodyType === fmt.value }"
+                @click="responseBodyType = fmt.value"
+              >
+                {{ fmt.label }}
+              </button>
+            </div>
+            <div class="interface-response-meta">
+              <span class="interface-response-meta__status" :class="responseStatusClass">
+                {{ response.status }} {{ response.status_text }}
+              </span>
+              <span class="interface-response-meta__sep" aria-hidden="true" />
+              <span class="interface-response-meta__item">{{ response.duration_ms }} ms</span>
+              <span class="interface-response-meta__sep" aria-hidden="true" />
+              <span class="interface-response-meta__item">{{ responseBodySize }}</span>
+            </div>
           </div>
         </div>
 
         <div class="interface-response-content">
-          <template v-if="response">
+          <div v-if="sending" class="interface-response-loading" role="status" aria-live="polite">
+            <div class="interface-response-loading__spinner" aria-hidden="true" />
+            <p class="interface-response-loading__text">{{ t('request.sending') }}</p>
+          </div>
+          <template v-else-if="response">
             <RequestBodyRawEditor
               v-if="responseTab === 'body'"
               :model-value="responseDisplayBody"
+              :content-type="responseBodyType"
               readonly
               class="interface-response-raw"
             />
@@ -418,6 +455,9 @@ import ComboInput from './ComboInput.vue'
 import ParamTableColumnResizer from './ParamTableColumnResizer.vue'
 import RequestBodyRawEditor from './RequestBodyRawEditor.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
+import { formatJsonLenient } from '../utils/raw-json-utils'
+import { useToast } from '../composables/useToast'
+import { useWorkspaceContext } from '../composables/useWorkspaceContext'
 import type { SendResponse } from '../types'
 
 export type FolderOption = { id: number; name: string; parent_id: number; label: string }
@@ -450,7 +490,68 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
-const folderOptions = computed(() => folders.value.map((f) => ({ value: f.id, label: f.label })))
+const { showToast } = useToast()
+const { environmentId, envVarsRevision } = useWorkspaceContext()
+const folderOptions = computed(() => [
+  { value: 0, label: t('create.noFolder') },
+  ...folders.value.map((f) => ({ value: f.id, label: f.label })),
+])
+const envVarKeys = ref<Set<string>>(new Set())
+const envVarMap = ref<Record<string, string>>({})
+const urlHighlightRef = ref<HTMLElement | null>(null)
+
+const ENV_VAR_RE = /\{\{\s*([^{}]+?)\s*\}\}/g
+
+function escapeHtml(text: string) {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+function applyEnvVars(input: string, vars: Record<string, string>) {
+  let out = input
+  for (const [k, v] of Object.entries(vars)) {
+    out = out.split(`{{${k}}}`).join(v)
+  }
+  return out
+}
+
+function syncUrlHighlightScroll(e: Event) {
+  const el = e.target as HTMLInputElement
+  if (urlHighlightRef.value) {
+    urlHighlightRef.value.scrollLeft = el.scrollLeft
+  }
+}
+
+async function refreshEnvVars() {
+  if (!environmentId.value) {
+    envVarKeys.value = new Set()
+    envVarMap.value = {}
+    return
+  }
+  try {
+    const rows = await invoke<[string, string][]>('get_env_vars', {
+      environmentId: environmentId.value,
+    })
+    const map: Record<string, string> = {}
+    const keys = new Set<string>()
+    for (const [k, v] of rows) {
+      keys.add(k)
+      map[k] = v
+    }
+    envVarKeys.value = keys
+    envVarMap.value = map
+  } catch {
+    envVarKeys.value = new Set()
+    envVarMap.value = {}
+  }
+}
+
+watch([environmentId, envVarsRevision], () => {
+  void refreshEnvVars()
+})
 
 const requestTabs = [
   { id: 'params', labelKey: 'request.params' },
@@ -532,14 +633,13 @@ const {
   widths: tableColWidths,
   start: startTableColResize,
 } = useColumnResize(
-  'request_table_col_widths',
-  { key: 120, value: 160, desc: 180 },
-  { key: 64, value: 80, desc: 80 },
+  'request_table_col_widths_v4',
+  { key: 280 },
+  { key: 160 },
 )
 
 const paramGridColumns = computed(
-  () =>
-    `40px minmax(0, ${tableColWidths.value.key}px) minmax(0, ${tableColWidths.value.value}px) minmax(0, 1fr) 36px`,
+  () => `40px ${tableColWidths.value.key}px minmax(160px, 1fr) minmax(160px, 1fr) 36px`,
 )
 
 const requestHeaders = ref<HeaderRow[]>([defaultHeaderRow()])
@@ -563,16 +663,39 @@ const authTypeHint = computed(() => {
   return t('request.authNoneHint')
 })
 
+type ResponseBodyType = 'JSON' | 'Text'
+
 const response = ref<SendResponse | null>(null)
 const responseTab = ref<'body' | 'headers'>('body')
+const responseBodyType = ref<ResponseBodyType>('JSON')
+const responseBodyTypes = computed(() => [
+  { value: 'JSON' as const, label: t('response.bodyJson') },
+  { value: 'Text' as const, label: t('response.bodyText') },
+])
 
-const responseDisplayBody = computed(() => response.value?.body ?? '')
+const responseDisplayBody = computed(() => {
+  const raw = response.value?.body ?? ''
+  if (responseBodyType.value !== 'JSON') return raw
+  return formatJsonLenient(raw.trim()) ?? raw
+})
 
 const responseBodySize = computed(() => {
   const bytes = new TextEncoder().encode(response.value?.body ?? '').length
   if (bytes < 1024) return `${bytes} B`
   return `${(bytes / 1024).toFixed(1)} KB`
 })
+
+function detectResponseBodyType(body: string): ResponseBodyType {
+  const trimmed = body.trim()
+  if (!trimmed) return 'Text'
+  if (
+    (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+    (trimmed.startsWith('[') && trimmed.endsWith(']'))
+  ) {
+    if (formatJsonLenient(trimmed)) return 'JSON'
+  }
+  return 'Text'
+}
 
 const responseStatusClass = computed(() => {
   const s = response.value?.status ?? 0
@@ -753,6 +876,25 @@ const displayUrl = computed({
   },
 })
 
+const highlightedUrlHtml = computed(() => {
+  const raw = displayUrl.value
+  if (!raw) return ''
+  let html = ''
+  let last = 0
+  ENV_VAR_RE.lastIndex = 0
+  let match: RegExpExecArray | null
+  while ((match = ENV_VAR_RE.exec(raw))) {
+    html += escapeHtml(raw.slice(last, match.index))
+    const full = match[0]
+    const key = match[1].trim()
+    const ok = envVarKeys.value.has(key)
+    html += `<span class="url-var ${ok ? 'url-var--ok' : 'url-var--missing'}">${escapeHtml(full)}</span>`
+    last = match.index + full.length
+  }
+  html += escapeHtml(raw.slice(last))
+  return html || '&nbsp;'
+})
+
 function clearQueryParams() {
   queryParams.value = [emptyParamRow()]
   normalizeQueryParams()
@@ -808,8 +950,8 @@ function parseUrlInput(raw: string) {
   normalizeQueryParams()
 }
 
-function resolveRequestUrl(): string | null {
-  const raw = displayUrl.value.trim()
+function resolveRequestUrl(rawInput?: string): string | null {
+  const raw = (rawInput ?? displayUrl.value).trim()
   if (!raw) return null
   if (/^https?:\/\//i.test(raw)) {
     try {
@@ -926,7 +1068,7 @@ function applyInitial(resetUi = false) {
   folderId.value =
     fromInitFolder ??
     (Number.isFinite(fromDetailFolder) ? fromDetailFolder : null) ??
-    (props.mode === 'create' ? (folders.value[0]?.id ?? null) : null)
+    (props.mode === 'create' ? 0 : null)
   response.value = null
   if (resetUi) {
     responseTab.value = 'body'
@@ -1045,7 +1187,7 @@ async function loadFolders() {
       projectId: props.projectId,
     })
     if (folderId.value == null && props.mode === 'create') {
-      folderId.value = folders.value[0]?.id ?? null
+      folderId.value = 0
     }
   } catch {
     folders.value = []
@@ -1053,23 +1195,29 @@ async function loadFolders() {
 }
 
 async function onSend() {
-  const url = resolveRequestUrl()
+  await refreshEnvVars()
+  const substituted = applyEnvVars(displayUrl.value.trim(), envVarMap.value)
+  const url = resolveRequestUrl(substituted)
   if (!url) {
-    showValidation('', t('request.invalidUrl'))
+    showToast(t('request.invalidUrl'), 1500, 'warning')
     return
   }
   sending.value = true
+  response.value = null
+  responseTab.value = 'body'
   try {
-    response.value = await invoke<SendResponse>('send_http_request', {
+    const result = await invoke<SendResponse>('send_http_request', {
       args: {
         method: method.value,
         url,
         headers: buildSendHeaders(),
         body: buildRequestBodyForSend(),
         interface_id: props.interfaceId ?? null,
-        variables: null,
+        variables: Object.keys(envVarMap.value).length ? envVarMap.value : null,
       },
     })
+    response.value = result
+    responseBodyType.value = detectResponseBodyType(result.body ?? '')
     responseTab.value = 'body'
   } catch (e) {
     alert(String(e))
@@ -1121,11 +1269,9 @@ function isDirty() {
 }
 
 async function onSave(): Promise<boolean> {
-  if (folderId.value == null || folderId.value === '') {
-    showValidation(t('create.folderRequired'))
-    return false
-  }
-  const folderIdNum = Number(folderId.value)
+  // Local folder ids are negative (next_local_id); 0 means project root.
+  const folderIdNum =
+    folderId.value == null || folderId.value === '' ? 0 : Number(folderId.value)
   if (!Number.isFinite(folderIdNum)) {
     showValidation(t('create.folderRequired'))
     return false
@@ -1213,7 +1359,7 @@ const contentSnapshot = computed(() => getSnapshot())
 onMounted(async () => {
   editorAlive = true
   baselineSnapshot.value = ''
-  await loadFolders()
+  await Promise.all([loadFolders(), refreshEnvVars()])
   if (!editorAlive) return
   applyInitial(true)
   clampResponseHeight()
@@ -1272,7 +1418,7 @@ watch(
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
   overflow: hidden;
 }
 
@@ -1295,7 +1441,7 @@ watch(
   background: transparent;
   appearance: none;
   color: var(--color-text-secondary);
-  padding: 6px 0;
+  padding: 3px 0;
   font-size: 13px;
   line-height: 1.2;
   cursor: pointer;
@@ -1310,10 +1456,10 @@ watch(
   display: inline-flex;
   align-self: flex-start;
   flex-shrink: 0;
-  padding: 3px;
+  padding: 2px;
   gap: 2px;
   border: 1px solid var(--color-interface-bar-border);
-  border-radius: 8px;
+  border-radius: 7px;
   background: color-mix(in srgb, var(--color-interface-bar-border) 28%, transparent);
 }
 
@@ -1321,8 +1467,8 @@ watch(
   border: 0;
   background: transparent;
   color: var(--color-text-secondary);
-  padding: 6px 16px;
-  border-radius: 6px;
+  padding: 4px 14px;
+  border-radius: 5px;
   font-size: 13px;
   line-height: 1.2;
   cursor: pointer;
@@ -1341,6 +1487,15 @@ watch(
   background: var(--color-workspace-content);
   color: var(--color-interface-field-text);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.interface-response-type-switch {
+  flex-shrink: 0;
+}
+
+.interface-response-type-switch .body-format-switch__btn {
+  padding: 3px 10px;
+  font-size: 12px;
 }
 
 .body-none-hint {
@@ -1587,7 +1742,7 @@ watch(
 }
 
 .auth-pane__left {
-  width: 220px;
+  width: 280px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -1596,7 +1751,8 @@ watch(
 }
 
 .auth-pane__type {
-  width: 100%;
+  width: 200px;
+  max-width: 100%;
   flex-shrink: 0;
 }
 
@@ -1615,6 +1771,7 @@ watch(
 .auth-pane__right {
   flex: 1;
   min-width: 0;
+  max-width: 520px;
   display: flex;
   flex-direction: column;
   gap: 8px;

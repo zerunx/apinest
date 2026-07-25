@@ -1,6 +1,11 @@
 <template>
   <Teleport to="body">
-    <div v-if="open" class="overlay" @click.self="onCancel">
+    <div
+      v-if="open"
+      class="overlay"
+      @mousedown="onOverlayMouseDown"
+      @mouseup="onOverlayMouseUp"
+    >
       <div ref="dialogRef" class="dialog" :style="dialogStyle" role="dialog" aria-modal="true">
         <h3>{{ title }}</h3>
         <p v-if="message" class="message">{{ message }}</p>
@@ -27,6 +32,7 @@ import { computed, onMounted, onUnmounted, toRef, watch } from 'vue'
 import { useI18n } from '../i18n'
 import type { DialogAnchor } from '../composables/useDialogAnchor'
 import { useAnchoredDialog } from '../composables/useAnchoredDialog'
+import { useOverlayDismiss } from '../composables/useOverlayDismiss'
 
 const props = withDefaults(
   defineProps<{
@@ -57,6 +63,12 @@ const openRef = toRef(props, 'open')
 const anchorRef = computed(() => props.anchor)
 const { dialogRef, dialogStyle, placeDialog, onReposition } = useAnchoredDialog(openRef, anchorRef)
 
+function onCancel() {
+  emit('update:open', false)
+}
+
+const { onOverlayMouseDown, onOverlayMouseUp } = useOverlayDismiss(openRef, onCancel)
+
 watch(
   () => props.open,
   (visible) => {
@@ -70,10 +82,6 @@ watch(
     if (props.open) void placeDialog()
   },
 )
-
-function onCancel() {
-  emit('update:open', false)
-}
 
 function onConfirm() {
   emit('confirm')
@@ -97,34 +105,35 @@ onUnmounted(() => {
 .overlay {
   position: fixed;
   inset: 0;
-  z-index: 90;
-  background: rgba(0, 0, 0, 0.5);
+  z-index: 1100;
+  background: rgba(0, 0, 0, 0.45);
 }
 
 .dialog {
   position: fixed;
-  width: min(360px, calc(100vw - 24px));
+  width: min(380px, calc(100vw - 24px));
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: 10px;
+  border-radius: 12px;
   box-shadow: var(--shadow-dialog);
-  padding: 20px 20px 16px;
+  padding: 22px 22px 18px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .dialog h3 {
   margin: 0;
   font-size: 16px;
   font-weight: 600;
+  letter-spacing: 0.01em;
   color: var(--color-text);
 }
 
 .message {
   margin: 0;
-  font-size: 14px;
-  line-height: 1.5;
+  font-size: 13px;
+  line-height: 1.55;
   color: var(--color-text-secondary);
 }
 
@@ -132,7 +141,7 @@ onUnmounted(() => {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  margin-top: 4px;
+  margin-top: 8px;
 }
 
 .btn-danger-solid {

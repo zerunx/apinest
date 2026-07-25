@@ -1,6 +1,11 @@
 ﻿<template>
   <Teleport to="body">
-    <div v-if="settingsOpen" class="overlay" @click.self="closeSettings">
+    <div
+      v-if="settingsOpen"
+      class="overlay"
+      @mousedown="onOverlayMouseDown"
+      @mouseup="onOverlayMouseUp"
+    >
       <div class="dialog" role="dialog" aria-modal="true">
         <button type="button" class="close-btn" :title="t('common.close')" @click="closeSettings">
           ×
@@ -191,24 +196,35 @@
         </section>
       </div>
     </div>
+
+    <ConfirmDialog
+      v-model:open="clearConfirmOpen"
+      :title="t('settings.clearCache')"
+      :message="t('settings.clearHint')"
+      :confirm-label="t('settings.clearCache')"
+      variant="danger"
+      @confirm="confirmClearCache"
+    />
   </Teleport>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
 import { invoke } from '@tauri-apps/api/core'
 import { useI18n } from '../i18n'
 import { useAppUi } from '../composables/useAppUi'
 import { useTheme } from '../composables/useTheme'
 import { useWorkspaceContext } from '../composables/useWorkspaceContext'
+import { useOverlayDismiss } from '../composables/useOverlayDismiss'
+import ConfirmDialog from './ConfirmDialog.vue'
 import type { SyncResult } from '../types'
 
 type MenuId = 'general' | 'themes' | 'data' | 'proxy' | 'update' | 'about'
 
 const { t, locale, setLocale } = useI18n()
-const router = useRouter()
-const { settingsOpen, closeSettings, session, refreshSession } = useAppUi()
+const { settingsOpen, closeSettings, session, refreshSession, openLogin } = useAppUi()
+const { onOverlayMouseDown, onOverlayMouseUp } = useOverlayDismiss(settingsOpen, closeSettings)
+const clearConfirmOpen = ref(false)
 const { theme, setTheme } = useTheme()
 const { workspaceId, refreshAfterSync } = useWorkspaceContext()
 
@@ -293,7 +309,7 @@ watch(settingsOpen, async (open) => {
 
 function goLoginFromSettings() {
   closeSettings()
-  router.push({ name: 'login' })
+  openLogin()
 }
 
 async function saveTimeout() {
@@ -344,13 +360,15 @@ async function onSync() {
   }
 }
 
-async function onClear() {
-  if (!confirm(t('settings.clearHint'))) return
+function onClear() {
+  clearConfirmOpen.value = true
+}
+
+async function confirmClearCache() {
   message.value = ''
   try {
     await invoke('clear_local_cache')
     await refreshAfterSync()
-    message.value = 'local cache cleared'
     lastSync.value = ''
   } catch (e) {
     message.value = String(e)

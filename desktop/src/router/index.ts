@@ -9,9 +9,10 @@ const router = createRouter({
       component: () => import('../views/MainView.vue'),
     },
     {
+      // Kept for old links; login is a dialog on the main shell.
       path: '/login',
       name: 'login',
-      component: () => import('../views/LoginView.vue'),
+      redirect: { name: 'main' },
     },
     {
       path: '/settings',

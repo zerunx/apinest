@@ -8,7 +8,12 @@ const environments = ref<EnvironmentRow[]>([])
 const workspaceId = ref<number | null>(null)
 const projectId = ref<number | null>(null)
 const environmentId = ref<number | null>(null)
+const envVarsRevision = ref(0)
 const ready = ref(false)
+
+function bumpEnvVarsRevision() {
+  envVarsRevision.value += 1
+}
 
 const currentWorkspace = computed(
   () => workspaces.value.find((w) => w.id === workspaceId.value) ?? null,
@@ -166,6 +171,7 @@ export function useWorkspaceContext() {
     workspaceId,
     projectId,
     environmentId,
+    envVarsRevision,
     currentWorkspace,
     ready,
     loadWorkspaces,
@@ -177,5 +183,6 @@ export function useWorkspaceContext() {
     initWorkspaceContext,
     refreshAfterSync,
     persistContext,
+    bumpEnvVarsRevision,
   }
 }

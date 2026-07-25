@@ -105,7 +105,7 @@
       <div class="win-controls">
         <button type="button" class="win-btn" :title="t('window.minimize')" @click="minimize">
           <svg class="win-icon" viewBox="0 0 16 16" aria-hidden="true">
-            <rect x="3" y="7" width="10" height="2" fill="currentColor" />
+            <path d="M3.5 8h9" />
           </svg>
         </button>
         <button
@@ -115,44 +115,16 @@
           @click="toggleMaximize"
         >
           <svg v-if="!maximized" class="win-icon" viewBox="0 0 16 16" aria-hidden="true">
-            <rect
-              x="3.5"
-              y="3.5"
-              width="9"
-              height="9"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.25"
-            />
+            <rect x="3.5" y="3.5" width="9" height="9" />
           </svg>
           <svg v-else class="win-icon" viewBox="0 0 16 16" aria-hidden="true">
-            <path
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.25"
-              stroke-linejoin="miter"
-              d="M3.5 9.5V3.5H9.5"
-            />
-            <rect
-              x="5.5"
-              y="5.5"
-              width="7"
-              height="7"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.25"
-            />
+            <path d="M5 6.5V3.5h7v7H9.5" />
+            <rect x="3.5" y="5.5" width="7" height="7" />
           </svg>
         </button>
         <button type="button" class="win-btn win-btn-close" :title="t('window.close')" @click="close">
           <svg class="win-icon" viewBox="0 0 16 16" aria-hidden="true">
-            <path
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.25"
-              stroke-linecap="square"
-              d="M3.75 3.75 12.25 12.25M12.25 3.75 3.75 12.25"
-            />
+            <path d="M4.25 4.25l7.5 7.5M11.75 4.25l-7.5 7.5" />
           </svg>
         </button>
       </div>
@@ -171,7 +143,6 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { invoke } from '@tauri-apps/api/core'
 import { useI18n } from '../i18n'
@@ -180,10 +151,10 @@ import { useWorkspaceContext } from '../composables/useWorkspaceContext'
 import SettingsDialog from './SettingsDialog.vue'
 import NameDialog from './NameDialog.vue'
 import { anchorFromEvent, type DialogAnchor } from '../composables/useDialogAnchor'
+import { bindOutsidePointerDismiss } from '../composables/useOverlayDismiss'
 
 const { t } = useI18n()
-const router = useRouter()
-const { session, refreshSession, openSettings } = useAppUi()
+const { session, refreshSession, openSettings, openLogin } = useAppUi()
 const { workspaces, workspaceId, currentWorkspace, selectWorkspace, loadWorkspaces } =
   useWorkspaceContext()
 
@@ -197,6 +168,7 @@ const wsDialogOpen = ref(false)
 const wsDialogAnchor = ref<DialogAnchor | null>(null)
 
 let unlistenResize: (() => void) | undefined
+let unbindOutside: (() => void) | undefined
 
 function getAppWindow() {
   try {
@@ -230,19 +202,20 @@ onMounted(async () => {
       // browser preview without Tauri window
     }
   }
-  document.addEventListener('click', onDocClick)
+  unbindOutside = bindOutsidePointerDismiss(
+    () => wsOpen.value || avatarOpen.value,
+    () => [wsWrapRef.value, avatarWrapRef.value],
+    () => {
+      wsOpen.value = false
+      avatarOpen.value = false
+    },
+  )
 })
 
 onUnmounted(() => {
   unlistenResize?.()
-  document.removeEventListener('click', onDocClick)
+  unbindOutside?.()
 })
-
-function onDocClick(e: MouseEvent) {
-  const target = e.target as Node
-  if (wsWrapRef.value && !wsWrapRef.value.contains(target)) wsOpen.value = false
-  if (avatarWrapRef.value && !avatarWrapRef.value.contains(target)) avatarOpen.value = false
-}
 
 function toggleWs() {
   avatarOpen.value = false
@@ -277,9 +250,9 @@ async function confirmCreateWorkspace(name: string) {
   }
 }
 
-async function goLogin() {
+function goLogin() {
   avatarOpen.value = false
-  router.push({ name: 'login' })
+  openLogin()
 }
 
 async function onLogout() {
@@ -455,7 +428,8 @@ async function close() {
 }
 
 .ws-empty {
-  margin: 8px 4px;
+  margin: 4px 0;
+  padding: 8px 10px;
   font-size: 13px;
 }
 
@@ -574,33 +548,37 @@ async function close() {
 
 .win-controls {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   height: 100%;
-  margin-right: -4px;
-  --win-icon-color: var(--color-text);
+  margin: 0;
+  flex-shrink: 0;
+  --win-icon-color: var(--color-text-secondary);
 }
 
 :root[data-theme='dark'] .win-controls {
-  --win-icon-color: #ffffff;
+  --win-icon-color: #c4c4c4;
 }
 
 .win-btn {
-  width: 40px;
+  width: 46px;
   height: 100%;
   border: 0;
   background: transparent;
   color: var(--win-icon-color);
-  display: grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 0;
-}
-
-.win-btn .win-icon {
-  color: inherit;
+  line-height: 0;
 }
 
 .win-btn:hover {
   background: var(--color-win-hover);
+  color: var(--color-text);
+}
+
+:root[data-theme='dark'] .win-btn:hover {
+  color: #ececec;
 }
 
 .win-btn-close:hover {
@@ -609,10 +587,21 @@ async function close() {
 }
 
 .win-icon {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   display: block;
   flex-shrink: 0;
-  shape-rendering: geometricPrecision;
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: square;
+  stroke-linejoin: miter;
+  color: inherit;
+}
+
+/* Diagonals read thinner optically — match min/max weight. */
+.win-btn-close .win-icon {
+  stroke-width: 1.85;
 }
 </style>

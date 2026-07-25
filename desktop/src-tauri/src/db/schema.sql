@@ -96,8 +96,10 @@ CREATE TABLE IF NOT EXISTS environments (
   workspace_id INTEGER NOT NULL,
   project_id INTEGER NOT NULL,
   name TEXT NOT NULL,
+  remark TEXT NOT NULL DEFAULT '',
   is_default INTEGER NOT NULL DEFAULT 0,
   synced_at TEXT NOT NULL,
+  is_local INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (server_id, id)
 );
 
@@ -107,8 +109,10 @@ CREATE TABLE IF NOT EXISTS environment_variables (
   environment_id INTEGER NOT NULL,
   key TEXT NOT NULL,
   value TEXT NOT NULL DEFAULT '',
+  description TEXT NOT NULL DEFAULT '',
   enabled INTEGER NOT NULL DEFAULT 1,
   synced_at TEXT NOT NULL,
+  is_local INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (server_id, id)
 );
 

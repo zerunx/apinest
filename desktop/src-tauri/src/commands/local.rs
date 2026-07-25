@@ -4,7 +4,9 @@ use serde_json::Value;
 use tauri::State;
 
 use crate::commands::auth::current_server_id;
-use crate::commands::catalog::{InterfaceRow, ProjectRow, WorkspaceRow};
+use crate::commands::catalog::{
+    EnvironmentRow, EnvironmentVariableRow, InterfaceRow, ProjectRow, WorkspaceRow,
+};
 use crate::db::{ensure_catalog_server, next_local_id, now_iso, Db};
 use crate::error::{AppError, AppResult};
 
@@ -148,9 +150,6 @@ pub fn create_local_interface(
     let name = args.name.trim().to_string();
     if name.is_empty() {
         return Err(AppError::msg("接口名称不能为空"));
-    }
-    if args.folder_id == 0 {
-        return Err(AppError::msg("请选择文件夹"));
     }
     let method = args.method.trim().to_uppercase();
     let url = if args.url.trim().is_empty() {
@@ -435,6 +434,292 @@ pub fn delete_local_interface(db: State<'_, Db>, interface_id: i64) -> AppResult
         )?;
         if n == 0 {
             return Err(AppError::msg("接口不存在"));
+        }
+        Ok(())
+    })
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateEnvironmentArgs {
+    pub workspace_id: i64,
+    pub project_id: i64,
+    pub name: String,
+    pub remark: Option<String>,
+    pub is_default: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateEnvironmentArgs {
+    pub id: i64,
+    pub workspace_id: i64,
+    pub project_id: i64,
+    pub name: String,
+    pub remark: Option<String>,
+    pub is_default: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateVariableArgs {
+    pub environment_id: i64,
+    pub key: String,
+    pub value: Option<String>,
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateVariableArgs {
+    pub id: i64,
+    pub environment_id: i64,
+    pub key: String,
+    pub value: Option<String>,
+    pub description: Option<String>,
+}
+
+#[tauri::command]
+pub fn create_local_environment(
+    db: State<'_, Db>,
+    args: CreateEnvironmentArgs,
+) -> AppResult<EnvironmentRow> {
+    let name = args.name.trim().to_string();
+    if name.is_empty() {
+        return Err(AppError::msg("环境名称不能为空"));
+    }
+    let remark = args.remark.unwrap_or_default().trim().to_string();
+    let is_default = args.is_default.unwrap_or(false);
+    let server_id = current_server_id(&db)?;
+    db.with_conn(|conn| {
+        let id = next_local_id(conn)?;
+        let now = now_iso();
+        if is_default {
+            conn.execute(
+                "UPDATE environments SET is_default = 0
+                 WHERE server_id = ?1 AND workspace_id = ?2 AND project_id = ?3",
+                params![server_id, args.workspace_id, args.project_id],
+            )?;
+        }
+        conn.execute(
+            "INSERT INTO environments(
+               id, server_id, workspace_id, project_id, name, remark, is_default, synced_at, is_local
+             ) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,1)",
+            params![
+                id,
+                server_id,
+                args.workspace_id,
+                args.project_id,
+                name,
+                remark,
+                if is_default { 1 } else { 0 },
+                now
+            ],
+        )?;
+        Ok(EnvironmentRow {
+            id,
+            name,
+            remark,
+            is_default,
+        })
+    })
+}
+
+#[tauri::command]
+pub fn update_local_environment(
+    db: State<'_, Db>,
+    args: UpdateEnvironmentArgs,
+) -> AppResult<EnvironmentRow> {
+    let name = args.name.trim().to_string();
+    if name.is_empty() {
+        return Err(AppError::msg("环境名称不能为空"));
+    }
+    let remark = args.remark.unwrap_or_default().trim().to_string();
+    let is_default = args.is_default.unwrap_or(false);
+    let server_id = current_server_id(&db)?;
+    db.with_conn(|conn| {
+        let now = now_iso();
+        if is_default {
+            conn.execute(
+                "UPDATE environments SET is_default = 0
+                 WHERE server_id = ?1 AND workspace_id = ?2 AND project_id = ?3 AND id != ?4",
+                params![server_id, args.workspace_id, args.project_id, args.id],
+            )?;
+        }
+        let n = conn.execute(
+            "UPDATE environments SET
+               name = ?1, remark = ?2, is_default = ?3, synced_at = ?4, is_local = 1
+             WHERE server_id = ?5 AND id = ?6",
+            params![
+                name,
+                remark,
+                if is_default { 1 } else { 0 },
+                now,
+                server_id,
+                args.id
+            ],
+        )?;
+        if n == 0 {
+            return Err(AppError::msg("环境不存在"));
+        }
+        Ok(EnvironmentRow {
+            id: args.id,
+            name,
+            remark,
+            is_default,
+        })
+    })
+}
+
+#[tauri::command]
+pub fn delete_local_environment(
+    db: State<'_, Db>,
+    workspace_id: i64,
+    project_id: i64,
+    environment_id: i64,
+) -> AppResult<()> {
+    let server_id = current_server_id(&db)?;
+    db.with_conn(|conn| {
+        let exists: bool = conn
+            .query_row(
+                "SELECT 1 FROM environments
+                 WHERE server_id = ?1 AND workspace_id = ?2 AND project_id = ?3 AND id = ?4",
+                params![server_id, workspace_id, project_id, environment_id],
+                |_| Ok(true),
+            )
+            .unwrap_or(false);
+        if !exists {
+            return Err(AppError::msg("环境不存在"));
+        }
+        conn.execute(
+            "DELETE FROM environment_variables WHERE server_id = ?1 AND environment_id = ?2",
+            params![server_id, environment_id],
+        )?;
+        conn.execute(
+            "DELETE FROM environments WHERE server_id = ?1 AND id = ?2",
+            params![server_id, environment_id],
+        )?;
+        Ok(())
+    })
+}
+
+#[tauri::command]
+pub fn create_local_variable(
+    db: State<'_, Db>,
+    args: CreateVariableArgs,
+) -> AppResult<EnvironmentVariableRow> {
+    let key = args.key.trim().to_string();
+    if key.is_empty() {
+        return Err(AppError::msg("变量名不能为空"));
+    }
+    let value = args.value.unwrap_or_default();
+    let description = args.description.unwrap_or_default().trim().to_string();
+    let server_id = current_server_id(&db)?;
+    db.with_conn(|conn| {
+        let exists: bool = conn
+            .query_row(
+                "SELECT 1 FROM environments WHERE server_id = ?1 AND id = ?2",
+                params![server_id, args.environment_id],
+                |_| Ok(true),
+            )
+            .unwrap_or(false);
+        if !exists {
+            return Err(AppError::msg("环境不存在"));
+        }
+        let dup: bool = conn
+            .query_row(
+                "SELECT 1 FROM environment_variables
+                 WHERE server_id = ?1 AND environment_id = ?2 AND key = ?3",
+                params![server_id, args.environment_id, key],
+                |_| Ok(true),
+            )
+            .unwrap_or(false);
+        if dup {
+            return Err(AppError::msg("变量名已存在"));
+        }
+        let id = next_local_id(conn)?;
+        let now = now_iso();
+        conn.execute(
+            "INSERT INTO environment_variables(
+               id, server_id, environment_id, key, value, description, enabled, synced_at, is_local
+             ) VALUES(?1,?2,?3,?4,?5,?6,1,?7,1)",
+            params![id, server_id, args.environment_id, key, value, description, now],
+        )?;
+        Ok(EnvironmentVariableRow {
+            id,
+            environment_id: args.environment_id,
+            key,
+            value,
+            description,
+            enabled: true,
+        })
+    })
+}
+
+#[tauri::command]
+pub fn update_local_variable(
+    db: State<'_, Db>,
+    args: UpdateVariableArgs,
+) -> AppResult<EnvironmentVariableRow> {
+    let key = args.key.trim().to_string();
+    if key.is_empty() {
+        return Err(AppError::msg("变量名不能为空"));
+    }
+    let value = args.value.unwrap_or_default();
+    let description = args.description.unwrap_or_default().trim().to_string();
+    let server_id = current_server_id(&db)?;
+    db.with_conn(|conn| {
+        let dup: bool = conn
+            .query_row(
+                "SELECT 1 FROM environment_variables
+                 WHERE server_id = ?1 AND environment_id = ?2 AND key = ?3 AND id != ?4",
+                params![server_id, args.environment_id, key, args.id],
+                |_| Ok(true),
+            )
+            .unwrap_or(false);
+        if dup {
+            return Err(AppError::msg("变量名已存在"));
+        }
+        let now = now_iso();
+        let n = conn.execute(
+            "UPDATE environment_variables SET
+               key = ?1, value = ?2, description = ?3, synced_at = ?4, is_local = 1
+             WHERE server_id = ?5 AND id = ?6 AND environment_id = ?7",
+            params![
+                key,
+                value,
+                description,
+                now,
+                server_id,
+                args.id,
+                args.environment_id
+            ],
+        )?;
+        if n == 0 {
+            return Err(AppError::msg("变量不存在"));
+        }
+        Ok(EnvironmentVariableRow {
+            id: args.id,
+            environment_id: args.environment_id,
+            key,
+            value,
+            description,
+            enabled: true,
+        })
+    })
+}
+
+#[tauri::command]
+pub fn delete_local_variable(
+    db: State<'_, Db>,
+    environment_id: i64,
+    variable_id: i64,
+) -> AppResult<()> {
+    let server_id = current_server_id(&db)?;
+    db.with_conn(|conn| {
+        let n = conn.execute(
+            "DELETE FROM environment_variables
+             WHERE server_id = ?1 AND environment_id = ?2 AND id = ?3",
+            params![server_id, environment_id, variable_id],
+        )?;
+        if n == 0 {
+            return Err(AppError::msg("变量不存在"));
         }
         Ok(())
     })

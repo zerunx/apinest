@@ -48,6 +48,7 @@
 
 <script setup lang="ts">
 import { nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { bindOutsidePointerDismiss } from '../composables/useOverlayDismiss'
 
 defineProps<{
   modelValue: string
@@ -88,23 +89,25 @@ function pick(m: string) {
   open.value = false
 }
 
-function onDocClick(e: MouseEvent) {
-  const target = e.target as Node
-  if (rootRef.value?.contains(target) || menuRef.value?.contains(target)) return
-  open.value = false
-}
-
 function onReposition() {
   if (open.value) placeMenu()
 }
 
+let unbindOutside: (() => void) | null = null
+
 onMounted(() => {
-  document.addEventListener('click', onDocClick)
+  unbindOutside = bindOutsidePointerDismiss(
+    () => open.value,
+    () => [rootRef.value, menuRef.value],
+    () => {
+      open.value = false
+    },
+  )
   window.addEventListener('resize', onReposition)
   window.addEventListener('scroll', onReposition, true)
 })
 onUnmounted(() => {
-  document.removeEventListener('click', onDocClick)
+  unbindOutside?.()
   window.removeEventListener('resize', onReposition)
   window.removeEventListener('scroll', onReposition, true)
 })

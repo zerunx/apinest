@@ -4,6 +4,7 @@ import type { SessionInfo } from '../types'
 
 const session = ref<SessionInfo | null>(null)
 const settingsOpen = ref(false)
+const loginOpen = ref(false)
 
 async function refreshSession() {
   try {
@@ -17,12 +18,19 @@ export function useAppUi() {
   return {
     session,
     settingsOpen,
+    loginOpen,
     refreshSession,
     openSettings() {
       settingsOpen.value = true
     },
     closeSettings() {
       settingsOpen.value = false
+    },
+    openLogin() {
+      loginOpen.value = true
+    },
+    closeLogin() {
+      loginOpen.value = false
     },
   }
 }

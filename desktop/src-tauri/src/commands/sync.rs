@@ -68,9 +68,13 @@ pub fn sync_now(db: State<'_, Db>, args: SyncArgs) -> AppResult<SyncResult> {
                 "DELETE FROM workspaces WHERE server_id = ?1 AND IFNULL(is_local, 0) = 0",
                 params![server_id],
             )?;
-            tx.execute("DELETE FROM environments WHERE server_id = ?1", params![server_id])?;
             tx.execute(
-                "DELETE FROM environment_variables WHERE server_id = ?1",
+                "DELETE FROM environment_variables
+                 WHERE server_id = ?1 AND IFNULL(is_local, 0) = 0",
+                params![server_id],
+            )?;
+            tx.execute(
+                "DELETE FROM environments WHERE server_id = ?1 AND IFNULL(is_local, 0) = 0",
                 params![server_id],
             )?;
         } else if let Some(wid) = args.workspace_id {
@@ -159,14 +163,15 @@ pub fn sync_now(db: State<'_, Db>, args: SyncArgs) -> AppResult<SyncResult> {
                 for env in &envs {
                     conn.execute(
                         "INSERT INTO environments(
-                           id, server_id, workspace_id, project_id, name, is_default, synced_at
-                         ) VALUES(?1,?2,?3,?4,?5,?6,?7)
+                           id, server_id, workspace_id, project_id, name, remark, is_default, synced_at, is_local
+                         ) VALUES(?1,?2,?3,?4,?5,'',?6,?7,0)
                          ON CONFLICT(server_id, id) DO UPDATE SET
                            workspace_id = excluded.workspace_id,
                            project_id = excluded.project_id,
                            name = excluded.name,
                            is_default = excluded.is_default,
-                           synced_at = excluded.synced_at",
+                           synced_at = excluded.synced_at,
+                           is_local = 0",
                         params![
                             env.id,
                             server_id,
@@ -182,13 +187,14 @@ pub fn sync_now(db: State<'_, Db>, args: SyncArgs) -> AppResult<SyncResult> {
                     for v in vars {
                         conn.execute(
                             "INSERT INTO environment_variables(
-                               id, server_id, environment_id, key, value, enabled, synced_at
-                             ) VALUES(?1,?2,?3,?4,?5,1,?6)
+                               id, server_id, environment_id, key, value, description, enabled, synced_at, is_local
+                             ) VALUES(?1,?2,?3,?4,?5,'',1,?6,0)
                              ON CONFLICT(server_id, id) DO UPDATE SET
                                environment_id = excluded.environment_id,
                                key = excluded.key,
                                value = excluded.value,
-                               synced_at = excluded.synced_at",
+                               synced_at = excluded.synced_at,
+                               is_local = 0",
                             params![v.id, server_id, env.id, v.key, v.value, synced_at],
                         )?;
                     }
@@ -232,13 +238,15 @@ pub fn sync_now(db: State<'_, Db>, args: SyncArgs) -> AppResult<SyncResult> {
 
 fn clear_workspace_cache(conn: &Connection, server_id: i64, workspace_id: i64) -> AppResult<()> {
     conn.execute(
-        "DELETE FROM environment_variables WHERE server_id = ?1 AND environment_id IN (
+        "DELETE FROM environment_variables
+         WHERE server_id = ?1 AND IFNULL(is_local, 0) = 0 AND environment_id IN (
            SELECT id FROM environments WHERE server_id = ?1 AND workspace_id = ?2
          )",
         params![server_id, workspace_id],
     )?;
     conn.execute(
-        "DELETE FROM environments WHERE server_id = ?1 AND workspace_id = ?2",
+        "DELETE FROM environments
+         WHERE server_id = ?1 AND workspace_id = ?2 AND IFNULL(is_local, 0) = 0",
         params![server_id, workspace_id],
     )?;
     conn.execute(

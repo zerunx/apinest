@@ -42,6 +42,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { bindOutsidePointerDismiss } from '../composables/useOverlayDismiss'
 
 export type MenuOption = { value: string | number | null; label: string }
 
@@ -55,6 +56,7 @@ const props = withDefaults(
     dense?: boolean
     stretch?: boolean
     menuMinWidth?: number
+    menuWidth?: number
     menuAlign?: 'left' | 'right'
   }>(),
   {
@@ -64,6 +66,7 @@ const props = withDefaults(
     dense: false,
     stretch: false,
     menuMinWidth: 0,
+    menuWidth: 0,
     menuAlign: 'left',
   },
 )
@@ -92,6 +95,14 @@ function placeMenu() {
   if (!el) return
   const rect = el.getBoundingClientRect()
   menuStyle.top = `${rect.bottom + 4}px`
+  if (props.menuWidth > 0) {
+    const width = props.menuWidth
+    menuStyle.minWidth = `${width}px`
+    menuStyle.width = `${width}px`
+    menuStyle.left =
+      props.menuAlign === 'right' ? `${rect.right - width}px` : `${rect.left}px`
+    return
+  }
   if (props.fitMenu) {
     const width = Math.max(rect.width, props.menuMinWidth)
     menuStyle.minWidth = `${width}px`
@@ -119,23 +130,25 @@ function pick(value: string | number | null) {
   open.value = false
 }
 
-function onDocClick(e: MouseEvent) {
-  const target = e.target as Node
-  if (rootRef.value?.contains(target) || menuRef.value?.contains(target)) return
-  open.value = false
-}
-
 function onReposition() {
   if (open.value) placeMenu()
 }
 
+let unbindOutside: (() => void) | null = null
+
 onMounted(() => {
-  document.addEventListener('click', onDocClick)
+  unbindOutside = bindOutsidePointerDismiss(
+    () => open.value,
+    () => [rootRef.value, menuRef.value],
+    () => {
+      open.value = false
+    },
+  )
   window.addEventListener('resize', onReposition)
   window.addEventListener('scroll', onReposition, true)
 })
 onUnmounted(() => {
-  document.removeEventListener('click', onDocClick)
+  unbindOutside?.()
   window.removeEventListener('resize', onReposition)
   window.removeEventListener('scroll', onReposition, true)
 })

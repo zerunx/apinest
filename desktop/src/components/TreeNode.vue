@@ -80,7 +80,9 @@
       @click="$emit('select', item.id)"
     >
       <span class="expand-zone leaf" :style="expandZoneStyle" />
-      <span class="method" :class="item.method.toLowerCase()">{{ item.method }}</span>
+      <span class="method-wrap">
+        <span class="method" :class="item.method.toLowerCase()">{{ item.method }}</span>
+      </span>
       <span class="name">{{ item.name }}</span>
       <div class="row-menu" ref="menuRef" @click.stop>
         <button
@@ -116,6 +118,7 @@
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
 import type { TreeItem } from '../types'
 import type { DialogAnchor } from '../composables/useDialogAnchor'
+import { bindOutsidePointerDismiss } from '../composables/useOverlayDismiss'
 import { useI18n } from '../i18n'
 
 export type TreeAction =
@@ -159,8 +162,12 @@ const menuStyle = reactive({
   left: '0px',
 })
 
+/** Keep in sync with web AppContextPanel: 12 + depth*16 + 16 */
+const INDENT_STEP = 16
+const EXPAND_BASE = 28
+
 const expandZoneStyle = computed(() => ({
-  width: `${12 + props.depth * 16 + 16}px`,
+  width: `${EXPAND_BASE + props.depth * INDENT_STEP}px`,
 }))
 
 function placeMenu() {
@@ -226,23 +233,25 @@ function emitAction(action: TreeAction['action']) {
   }
 }
 
-function onDocClick(e: MouseEvent) {
-  const target = e.target as Node
-  if (menuRef.value?.contains(target) || menuPopRef.value?.contains(target)) return
-  menuOpen.value = false
-}
-
 function onReposition() {
   if (menuOpen.value) placeMenu()
 }
 
+let unbindOutside: (() => void) | null = null
+
 onMounted(() => {
-  document.addEventListener('click', onDocClick)
+  unbindOutside = bindOutsidePointerDismiss(
+    () => menuOpen.value,
+    () => [menuRef.value, menuPopRef.value],
+    () => {
+      menuOpen.value = false
+    },
+  )
   window.addEventListener('resize', onReposition)
   window.addEventListener('scroll', onReposition, true)
 })
 onUnmounted(() => {
-  document.removeEventListener('click', onDocClick)
+  unbindOutside?.()
   window.removeEventListener('resize', onReposition)
   window.removeEventListener('scroll', onReposition, true)
 })
@@ -270,7 +279,7 @@ export default {
   height: 30px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   border: 0;
   background: transparent;
   text-align: left;
@@ -281,15 +290,32 @@ export default {
   position: relative;
 }
 
-.row.api .method {
+.row.folder {
+  gap: 4px;
+}
+
+.method-wrap {
   box-sizing: border-box;
-  width: 40px;
-  min-width: 40px;
-  max-width: 40px;
+  width: 44px;
+  min-width: 44px;
+  max-width: 44px;
+  height: 100%;
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  overflow: hidden;
+}
+
+.row.api .method {
+  display: block;
+  width: 100%;
+  min-width: 0;
   overflow: hidden;
   text-align: left;
-  margin-left: 0px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
 }
 
 .row:hover,
@@ -303,11 +329,13 @@ export default {
 
 .expand-zone {
   flex-shrink: 0;
-  height: 34px;
+  height: 30px;
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
   color: var(--color-text-secondary);
+  padding-right: 2px;
+  box-sizing: border-box;
 }
 
 .expand-zone.leaf {
@@ -326,7 +354,6 @@ export default {
 
 .folder-icon {
   flex-shrink: 0;
-  margin-left: -4px;
   color: var(--color-text-secondary);
 }
 

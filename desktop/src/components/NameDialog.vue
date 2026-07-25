@@ -1,6 +1,11 @@
 <template>
   <Teleport to="body">
-    <div v-if="open" class="overlay" @click.self="onCancel">
+    <div
+      v-if="open"
+      class="overlay"
+      @mousedown="onOverlayMouseDown"
+      @mouseup="onOverlayMouseUp"
+    >
       <div ref="dialogRef" class="dialog" :style="dialogStyle" role="dialog" aria-modal="true">
         <h3>{{ title }}</h3>
         <p v-if="hint" class="muted hint">{{ hint }}</p>
@@ -32,6 +37,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, toRef, watch } from 'v
 import { useI18n } from '../i18n'
 import type { DialogAnchor } from '../composables/useDialogAnchor'
 import { useAnchoredDialog } from '../composables/useAnchoredDialog'
+import { useOverlayDismiss } from '../composables/useOverlayDismiss'
 
 const props = defineProps<{
   open: boolean
@@ -56,6 +62,12 @@ const openRef = toRef(props, 'open')
 const anchorRef = computed(() => props.anchor)
 const { dialogRef, dialogStyle, placeDialog, onReposition } = useAnchoredDialog(openRef, anchorRef)
 
+function onCancel() {
+  emit('update:open', false)
+}
+
+const { onOverlayMouseDown, onOverlayMouseUp } = useOverlayDismiss(openRef, onCancel)
+
 watch(
   () => props.open,
   async (v) => {
@@ -76,10 +88,6 @@ watch(
     if (props.open) void placeDialog()
   },
 )
-
-function onCancel() {
-  emit('update:open', false)
-}
 
 function onConfirm() {
   const trimmed = name.value.trim()
@@ -105,7 +113,7 @@ onUnmounted(() => {
 .overlay {
   position: fixed;
   inset: 0;
-  z-index: 80;
+  z-index: 1050;
   background: rgba(0, 0, 0, 0.45);
 }
 
@@ -114,9 +122,9 @@ onUnmounted(() => {
   width: min(420px, calc(100vw - 24px));
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: 10px;
+  border-radius: 12px;
   box-shadow: var(--shadow-dialog);
-  padding: 20px;
+  padding: 22px;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -125,6 +133,7 @@ onUnmounted(() => {
 .dialog h3 {
   margin: 0;
   font-size: 16px;
+  font-weight: 600;
 }
 
 .hint {

@@ -5,7 +5,7 @@
         <SelectPicker
           :model-value="projectId"
           :items="projects"
-          :placeholder="t('project.label')"
+          :placeholder="t('project.empty')"
           :search-placeholder="t('project.search')"
           :empty-result="t('project.none')"
           :create-label="t('project.label')"
@@ -92,9 +92,11 @@
             :empty-result="t('env.none')"
             :allow-empty="true"
             :empty-label="t('env.noneSelected')"
+            :manage-label="t('env.manage')"
             variant="env"
             align="right"
             @update:model-value="onPickEnv"
+            @manage="envManageOpen = true"
           />
         </div>
       </div>
@@ -165,6 +167,7 @@
       @confirm="confirmSaveBeforeClose"
       @update:open="onSaveBeforeCloseOpenChange"
     />
+    <EnvironmentManageDialog v-model:open="envManageOpen" />
 
     <Teleport to="body">
       <div
@@ -215,7 +218,9 @@ import TreeList from '../components/TreeList.vue'
 import SelectPicker from '../components/SelectPicker.vue'
 import NameDialog from '../components/NameDialog.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
+import EnvironmentManageDialog from '../components/EnvironmentManageDialog.vue'
 import InterfaceEditor from '../components/InterfaceEditor.vue'
+import { useToast } from '../composables/useToast'
 import type { TreeAction } from '../components/TreeNode.vue'
 import type { HeaderPair, InterfaceRow, TreeItem } from '../types'
 import { useSaveShortcut } from '../composables/useSaveShortcut'
@@ -248,6 +253,7 @@ type RequestTab = {
 }
 
 const { t } = useI18n()
+const { showToast } = useToast()
 const {
   size: sidebarWidth,
   dragging: sidebarDragging,
@@ -276,6 +282,7 @@ const search = ref('')
 const activeInterfaceId = ref<number | null>(null)
 const tabsEl = ref<HTMLElement | null>(null)
 const projectDialogOpen = ref(false)
+const envManageOpen = ref(false)
 const folderDialogOpen = ref(false)
 const folderParentId = ref(0)
 const folderDialogTitle = ref('')
@@ -391,16 +398,16 @@ function createApiTab(folderId?: number): RequestTab {
     headers: defaultHeaders(),
     body: '',
   }
-  const detail = folderId != null ? { folder_id: folderId } : null
+  const resolvedFolderId = folderId ?? 0
   return {
     id: `tab-${tabSeq++}`,
     interfaceId: null,
-    folderId: folderId ?? null,
+    folderId: resolvedFolderId,
     ...data,
     dirty: false,
     snapshot: '',
     mode: 'create',
-    detail,
+    detail: { folder_id: resolvedFolderId },
   }
 }
 
@@ -573,7 +580,7 @@ function setDialogAnchor(event?: MouseEvent, anchor?: DialogAnchor | null) {
 
 function openCreateProject(event: MouseEvent) {
   if (!workspaceId.value) {
-    alert(t('create.needWorkspaceFirst'))
+    showToast(t('create.needWorkspaceFirst'), 1500, 'warning')
     return
   }
   setDialogAnchor(event)
@@ -582,7 +589,7 @@ function openCreateProject(event: MouseEvent) {
 
 function openCreateFolder(parentId = 0, event?: MouseEvent) {
   if (!workspaceId.value || !projectId.value) {
-    alert(t('create.needProjectFirst'))
+    showToast(t('create.needProjectFirst'), 1500, 'warning')
     return
   }
   setDialogAnchor(event)
@@ -596,26 +603,11 @@ function openCreateFolder(parentId = 0, event?: MouseEvent) {
 
 async function openCreateApi(folderId?: number) {
   if (!workspaceId.value || !projectId.value) {
-    alert(t('create.needProjectFirst'))
+    showToast(t('create.needProjectFirst'), 1500, 'warning')
     return
   }
-  let targetFolderId = folderId ?? null
-  if (targetFolderId == null) {
-    try {
-      const folders = await invoke<{ id: number }[]>('list_local_folders', {
-        workspaceId: workspaceId.value,
-        projectId: projectId.value,
-      })
-      if (!folders.length) {
-        alert(t('create.needFolderFirst'))
-        return
-      }
-      targetFolderId = folders[0].id
-    } catch {
-      alert(t('create.needFolderFirst'))
-      return
-    }
-  }
+  // folderId 0 / omitted = project root (no folder required)
+  const targetFolderId = folderId ?? 0
   persistActiveTab()
   const tab = createApiTab(targetFolderId)
   tabs.value.push(tab)

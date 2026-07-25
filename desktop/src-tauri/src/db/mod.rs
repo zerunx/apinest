@@ -75,10 +75,31 @@ fn ensure_is_local_column(conn: &Connection, table: &str) -> AppResult<()> {
     Ok(())
 }
 
+fn ensure_text_column(conn: &Connection, table: &str, column: &str, default: &str) -> AppResult<()> {
+    if !column_exists(conn, table, column)? {
+        conn.execute(
+            &format!(
+                "ALTER TABLE {table} ADD COLUMN {column} TEXT NOT NULL DEFAULT '{default}'"
+            ),
+            [],
+        )?;
+    }
+    Ok(())
+}
+
 fn migrate(conn: &Connection) -> AppResult<()> {
-    for table in ["workspaces", "projects", "folders", "interfaces"] {
+    for table in [
+        "workspaces",
+        "projects",
+        "folders",
+        "interfaces",
+        "environments",
+        "environment_variables",
+    ] {
         ensure_is_local_column(conn, table)?;
     }
+    ensure_text_column(conn, "environments", "remark", "")?;
+    ensure_text_column(conn, "environment_variables", "description", "")?;
     Ok(())
 }
 

@@ -57,12 +57,21 @@
       >
         + {{ createLabel }}
       </button>
+      <button
+        v-if="manageLabel"
+        type="button"
+        class="picker-item picker-manage"
+        @click="onManage($event)"
+      >
+        {{ manageLabel }}
+      </button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { bindOutsidePointerDismiss } from '../composables/useOverlayDismiss'
 
 export type PickerItem = { id: number; name: string }
 
@@ -78,6 +87,7 @@ const props = withDefaults(
     variant?: 'project' | 'env'
     align?: 'left' | 'right'
     createLabel?: string
+    manageLabel?: string
   }>(),
   {
     allowEmpty: false,
@@ -85,12 +95,14 @@ const props = withDefaults(
     variant: 'project',
     align: 'left',
     createLabel: '',
+    manageLabel: '',
   },
 )
 
 const emit = defineEmits<{
   'update:modelValue': [number | null]
   create: [MouseEvent]
+  manage: [MouseEvent]
 }>()
 
 const open = ref(false)
@@ -132,14 +144,25 @@ function onCreate(event: MouseEvent) {
   emit('create', event)
 }
 
-function onDocClick(e: MouseEvent) {
-  if (rootRef.value && !rootRef.value.contains(e.target as Node)) {
-    open.value = false
-  }
+function onManage(event: MouseEvent) {
+  open.value = false
+  emit('manage', event)
 }
 
-onMounted(() => document.addEventListener('click', onDocClick))
-onUnmounted(() => document.removeEventListener('click', onDocClick))
+let unbindOutside: (() => void) | null = null
+
+onMounted(() => {
+  unbindOutside = bindOutsidePointerDismiss(
+    () => open.value,
+    () => [rootRef.value],
+    () => {
+      open.value = false
+    },
+  )
+})
+onUnmounted(() => {
+  unbindOutside?.()
+})
 </script>
 
 <style scoped>
@@ -247,7 +270,8 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
 }
 
 .picker-empty {
-  margin: 8px 4px;
+  margin: 4px 0;
+  padding: 8px 10px;
   font-size: 13px;
 }
 
@@ -261,5 +285,19 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
 
 .picker-create:hover {
   background: var(--color-menu-hover);
+}
+
+.picker-manage {
+  margin-top: 4px;
+  border-top: 1px solid var(--color-border);
+  border-radius: 6px;
+  color: var(--color-text-secondary);
+  font-weight: 600;
+  justify-content: center;
+}
+
+.picker-manage:hover {
+  background: var(--color-menu-hover);
+  color: var(--color-text);
 }
 </style>

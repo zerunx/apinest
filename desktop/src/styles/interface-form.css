@@ -98,8 +98,19 @@
 
 .interface-response-tabs {
   display: flex;
+  align-items: center;
   gap: 2px;
   flex-shrink: 0;
+  min-width: 0;
+}
+
+.interface-response-bar__right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  margin-left: auto;
+  margin-right: 10px;
 }
 
 .interface-request-tabs__tab,
@@ -132,7 +143,7 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  padding-top: 10px;
+  padding-top: 8px;
   overflow-x: hidden;
   overflow-y: auto;
 }
@@ -321,6 +332,37 @@
   font-size: 13px;
 }
 
+.interface-response-loading {
+  flex: 1;
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--color-text-secondary);
+}
+
+.interface-response-loading__spinner {
+  width: 28px;
+  height: 28px;
+  border: 2.5px solid color-mix(in srgb, var(--color-interface-accent) 22%, transparent);
+  border-top-color: var(--color-interface-accent);
+  border-radius: 50%;
+  animation: interface-response-spin 0.75s linear infinite;
+}
+
+.interface-response-loading__text {
+  margin: 0;
+  font-size: 13px;
+}
+
+@keyframes interface-response-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .interface-url-row {
   display: flex;
   align-items: stretch;
@@ -421,9 +463,55 @@
   height: 100%;
 }
 
-.interface-url-bar__url {
+.interface-url-bar__url-wrap {
+  position: relative;
   flex: 1;
   min-width: 0;
+  display: flex;
+  align-items: stretch;
+}
+
+.interface-url-bar__url-highlight {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  margin: 0;
+  padding: 0 10px;
+  overflow: hidden;
+  white-space: nowrap;
+  pointer-events: none;
+  color: var(--color-interface-field-text);
+  font: inherit;
+  font-size: inherit;
+  line-height: 34px;
+  letter-spacing: inherit;
+  box-sizing: border-box;
+}
+
+.interface-url-bar__url-highlight .url-var--ok {
+  color: #49cc90;
+}
+
+.interface-url-bar__url-highlight .url-var--missing {
+  color: #f56c6c;
+}
+
+.interface-url-bar__url {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  color: transparent !important;
+  caret-color: var(--color-interface-field-text);
+  background: transparent !important;
+  -webkit-text-fill-color: transparent;
+}
+
+.interface-url-bar__url::selection {
+  background: color-mix(in srgb, var(--color-interface-accent) 28%, transparent);
+  color: transparent;
+  -webkit-text-fill-color: transparent;
 }
 
 .interface-meta-row {

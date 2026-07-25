@@ -12,9 +12,14 @@ const messages: Record<Locale, Record<string, string>> = {
 }
 
 const locale = ref<Locale>('zh-CN')
+/** Bumps on every locale change so UI that captured strings can refresh. */
+const localeVersion = ref(0)
 
-export function t(key: string, params?: Record<string, string | number>) {
-  let text = messages[locale.value][key] ?? messages['en-US'][key] ?? key
+function translate(key: string, params?: Record<string, string | number>) {
+  // Explicit dependency for Vue render tracking
+  const loc = locale.value
+  void localeVersion.value
+  let text = messages[loc][key] ?? messages['en-US'][key] ?? key
   if (params) {
     for (const [k, v] of Object.entries(params)) {
       text = text.replace(`{${k}}`, String(v))
@@ -23,14 +28,25 @@ export function t(key: string, params?: Record<string, string | number>) {
   return text
 }
 
+/** @deprecated Prefer useI18n().t inside components for reactivity. */
+export const t = translate
+
 export function useI18n() {
   return {
     locale: computed(() => locale.value),
-    t,
+    localeVersion: computed(() => localeVersion.value),
+    t: translate,
     async setLocale(next: Locale) {
-      locale.value = next
+      if (locale.value !== next) {
+        locale.value = next
+        localeVersion.value += 1
+      }
       document.documentElement.lang = next === 'zh-CN' ? 'zh' : 'en'
-      await invoke('set_setting_value', { key: 'locale', value: next })
+      try {
+        await invoke('set_setting_value', { key: 'locale', value: next })
+      } catch {
+        // browser preview without tauri
+      }
     },
   }
 }
@@ -40,10 +56,11 @@ export async function setupI18n(app: App) {
     const saved = await invoke<string | null>('get_setting_value', { key: 'locale' })
     if (saved === 'zh-CN' || saved === 'en-US') {
       locale.value = saved
+      localeVersion.value += 1
     }
   } catch {
     // browser-only vite preview without tauri
   }
   document.documentElement.lang = locale.value === 'zh-CN' ? 'zh' : 'en'
-  app.config.globalProperties.$t = t
+  app.config.globalProperties.$t = translate
 }

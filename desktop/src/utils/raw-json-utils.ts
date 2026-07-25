@@ -226,6 +226,45 @@ export function isJsonKeyAt(text: string, index: number): boolean {
   return text[skipWs(text, end)] === ':'
 }
 
+/** Selectable JSON token (key / value) range under caret for double-click. */
+export function findJsonTokenRangeAt(
+  text: string,
+  index: number,
+): { start: number; end: number } | null {
+  if (!text) return null
+  const caret = Math.max(0, Math.min(index, text.length))
+  const tokens = tokenizeJson(text)
+
+  for (const token of tokens) {
+    if (token.kind === 'punct') continue
+    const end = token.start + token.text.length
+    if (caret < token.start || caret > end) continue
+
+    // String keys/values: select inner content only (exclude surrounding quotes).
+    if (
+      token.kind === 'string' &&
+      token.text.length >= 2 &&
+      token.text.startsWith('"') &&
+      token.text.endsWith('"')
+    ) {
+      return { start: token.start + 1, end: end - 1 }
+    }
+    return { start: token.start, end }
+  }
+
+  // Fallback: bare word (partial / invalid JSON)
+  const isWord = (ch: string) => /[A-Za-z0-9_\u4e00-\u9fff$]/.test(ch)
+  let i = Math.min(caret, Math.max(0, text.length - 1))
+  if (i < 0) return null
+  if (!isWord(text[i]) && i > 0 && isWord(text[i - 1])) i -= 1
+  if (!isWord(text[i])) return null
+  let start = i
+  let end = i + 1
+  while (start > 0 && isWord(text[start - 1])) start -= 1
+  while (end < text.length && isWord(text[end])) end += 1
+  return { start, end }
+}
+
 export type JsonSyntaxError = {
   index: number
   line: number

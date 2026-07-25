@@ -1,19 +1,25 @@
 <template>
-  <div class="app-root">
+  <div class="app-root" :data-locale="locale">
     <TitleBar />
     <div class="app-body">
       <router-view />
     </div>
+    <LoginDialog />
+    <AppToast />
   </div>
 </template>
 
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import TitleBar from './components/TitleBar.vue'
+import LoginDialog from './components/LoginDialog.vue'
+import AppToast from './components/AppToast.vue'
+import { useI18n } from './i18n'
 import { initTheme } from './composables/useTheme'
 import { useAppUi } from './composables/useAppUi'
 import { usePreventReload } from './composables/usePreventReload'
 
+const { locale } = useI18n()
 const { refreshSession } = useAppUi()
 
 usePreventReload()

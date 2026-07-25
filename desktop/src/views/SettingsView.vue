@@ -72,12 +72,22 @@
         <code class="path">{{ dbPath }}</code>
       </section>
     </div>
+
+    <ConfirmDialog
+      v-model:open="clearConfirmOpen"
+      :title="t('settings.clearCache')"
+      :message="t('settings.clearHint')"
+      :confirm-label="t('settings.clearCache')"
+      variant="danger"
+      @confirm="confirmClearCache"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import ConfirmDialog from '../components/ConfirmDialog.vue'
 import { invoke } from '@tauri-apps/api/core'
 import { useI18n } from '../i18n'
 import type { SessionInfo, SyncResult } from '../types'
@@ -136,12 +146,16 @@ async function onSync() {
   }
 }
 
-async function onClear() {
-  if (!confirm(t('settings.clearHint'))) return
+const clearConfirmOpen = ref(false)
+
+function onClear() {
+  clearConfirmOpen.value = true
+}
+
+async function confirmClearCache() {
   message.value = ''
   try {
     await invoke('clear_local_cache')
-    message.value = 'local cache cleared'
     lastSync.value = ''
   } catch (e) {
     message.value = String(e)

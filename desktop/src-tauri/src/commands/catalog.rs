@@ -56,7 +56,18 @@ pub struct InterfaceRow {
 pub struct EnvironmentRow {
     pub id: i64,
     pub name: String,
+    pub remark: String,
     pub is_default: bool,
+}
+
+#[derive(Debug, Serialize)]
+pub struct EnvironmentVariableRow {
+    pub id: i64,
+    pub environment_id: i64,
+    pub key: String,
+    pub value: String,
+    pub description: String,
+    pub enabled: bool,
 }
 
 #[tauri::command]
@@ -323,7 +334,7 @@ pub fn list_local_environments(
     let server_id = current_server_id(&db)?;
     db.with_conn(|conn| {
         let mut stmt = conn.prepare(
-            "SELECT id, name, is_default FROM environments
+            "SELECT id, name, IFNULL(remark, ''), is_default FROM environments
              WHERE server_id = ?1 AND workspace_id = ?2 AND project_id = ?3
              ORDER BY is_default DESC, name",
         )?;
@@ -332,7 +343,37 @@ pub fn list_local_environments(
                 Ok(EnvironmentRow {
                     id: r.get(0)?,
                     name: r.get(1)?,
-                    is_default: r.get::<_, i64>(2)? == 1,
+                    remark: r.get(2)?,
+                    is_default: r.get::<_, i64>(3)? == 1,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
+    })
+}
+
+#[tauri::command]
+pub fn list_local_variables(
+    db: State<'_, Db>,
+    environment_id: i64,
+) -> AppResult<Vec<EnvironmentVariableRow>> {
+    let server_id = current_server_id(&db)?;
+    db.with_conn(|conn| {
+        let mut stmt = conn.prepare(
+            "SELECT id, environment_id, key, value, IFNULL(description, ''), enabled
+             FROM environment_variables
+             WHERE server_id = ?1 AND environment_id = ?2
+             ORDER BY key",
+        )?;
+        let rows = stmt
+            .query_map(params![server_id, environment_id], |r| {
+                Ok(EnvironmentVariableRow {
+                    id: r.get(0)?,
+                    environment_id: r.get(1)?,
+                    key: r.get(2)?,
+                    value: r.get(3)?,
+                    description: r.get(4)?,
+                    enabled: r.get::<_, i64>(5)? == 1,
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;

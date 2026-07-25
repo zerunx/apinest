@@ -64,6 +64,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { bindOutsidePointerDismiss } from '../composables/useOverlayDismiss'
 
 const props = withDefaults(
   defineProps<{
@@ -99,13 +100,42 @@ const filteredOptions = computed(() => {
   return props.options.filter((opt) => opt.toLowerCase().includes(q))
 })
 
+function measureOptionsMinWidth() {
+  const sample = filteredOptions.value.length ? filteredOptions.value : props.options
+  if (!sample.length) return 0
+  const canvas = document.createElement('canvas')
+  const ctx = canvas.getContext('2d')
+  if (!ctx) {
+    const longest = sample.reduce((a, b) => (a.length >= b.length ? a : b), '')
+    return Math.ceil(longest.length * 8.2 + 36)
+  }
+  const style = rootRef.value ? getComputedStyle(rootRef.value) : null
+  const fontSize = style?.fontSize || '13px'
+  const fontFamily = style?.fontFamily || 'ui-sans-serif, system-ui, sans-serif'
+  ctx.font = `${fontSize} ${fontFamily}`
+  let max = 0
+  for (const opt of sample) {
+    max = Math.max(max, ctx.measureText(opt).width)
+  }
+  // item horizontal padding (10+10) + scrollbar cushion
+  return Math.ceil(max + 36)
+}
+
 function placeMenu() {
   const el = rootRef.value
   if (!el) return
   const rect = el.getBoundingClientRect()
+  const minWidth = measureOptionsMinWidth()
+  const width = Math.max(rect.width, minWidth)
   menuStyle.top = `${rect.bottom + 4}px`
   menuStyle.left = `${rect.left}px`
-  menuStyle.width = `${rect.width}px`
+  menuStyle.width = `${width}px`
+
+  // Keep menu inside the viewport on the right edge.
+  const overflow = rect.left + width - window.innerWidth + 8
+  if (overflow > 0) {
+    menuStyle.left = `${Math.max(8, rect.left - overflow)}px`
+  }
 }
 
 async function openMenu() {
@@ -140,24 +170,24 @@ function pick(value: string) {
   close()
 }
 
-function onDocClick(e: MouseEvent) {
-  const target = e.target as Node
-  if (rootRef.value?.contains(target) || menuRef.value?.contains(target)) return
-  close()
-}
-
 function onReposition() {
   if (open.value) placeMenu()
 }
 
+let unbindOutside: (() => void) | null = null
+
 onMounted(() => {
-  document.addEventListener('click', onDocClick)
+  unbindOutside = bindOutsidePointerDismiss(
+    () => open.value,
+    () => [rootRef.value, menuRef.value],
+    close,
+  )
   window.addEventListener('resize', onReposition)
   window.addEventListener('scroll', onReposition, true)
 })
 
 onUnmounted(() => {
-  document.removeEventListener('click', onDocClick)
+  unbindOutside?.()
   window.removeEventListener('resize', onReposition)
   window.removeEventListener('scroll', onReposition, true)
 })
@@ -247,6 +277,7 @@ onUnmounted(() => {
   padding: 9px 10px;
   border-radius: 5px;
   font-size: 13px;
+  white-space: nowrap;
   cursor: pointer;
 }
 

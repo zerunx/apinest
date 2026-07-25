@@ -5,7 +5,11 @@ import { setupI18n } from './i18n'
 import './styles/global.css'
 import './styles/interface-form.css'
 
-const app = createApp(App)
-setupI18n(app)
-app.use(router)
-app.mount('#app')
+async function bootstrap() {
+  const app = createApp(App)
+  await setupI18n(app)
+  app.use(router)
+  app.mount('#app')
+}
+
+void bootstrap()
