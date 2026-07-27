@@ -27,3 +27,7 @@ pnpm run tauri:dev
 | 业务真相 | 现有 ApiNest Go API |
 
 本地数据库文件位于应用数据目录下的 `apinest-client.db`（硬盘持久化，非内存库）。
+
+## License
+
+ApiNest 采用 [Apache License 2.0](LICENSE) 开源。修改或再分发时须保留版权声明与许可证文本。
