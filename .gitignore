@@ -9,4 +9,5 @@ docker/postgres/data/
 
 /runtime/
 
-# /web/
+/web/
+/desktop/
