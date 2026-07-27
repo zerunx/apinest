@@ -286,7 +286,7 @@ export function indexToLineColumn(text: string, index: number): { line: number; 
   return { line, column }
 }
 
-function mapCommaRemovalIndex(original: string, normalized: string, normIndex: number): number {
+function mapCommaRemovalIndex(original: string, normIndex: number): number {
   let oi = 0
   let ni = 0
   while (oi < original.length && ni < normIndex) {
@@ -326,7 +326,7 @@ export function findJsonSyntaxError(text: string): JsonSyntaxError | null {
     const msg = e instanceof Error ? e.message : String(e)
     const matched = msg.match(/position\s+(\d+)/i)
     const normPos = matched ? Number(matched[1]) : Math.max(0, normalized.length - 1)
-    const inTrimmed = mapCommaRemovalIndex(trimmed, normalized, normPos)
+    const inTrimmed = mapCommaRemovalIndex(trimmed, normPos)
     const index = Math.min(lead + inTrimmed, Math.max(0, text.length - (text.length ? 1 : 0)))
     const { line, column } = indexToLineColumn(text, index)
     return { index, line, column }
