@@ -1,5 +1,10 @@
 ﻿<template>
-  <header class="titlebar" data-tauri-drag-region @dblclick="toggleMaximize">
+  <header
+    class="titlebar"
+    :class="{ 'titlebar--mac': isMac }"
+    data-tauri-drag-region
+    @dblclick="toggleMaximize"
+  >
     <div class="titlebar-left" data-tauri-drag-region>
       <img class="app-logo" src="/nest.png" alt="" draggable="false" />
 
@@ -102,7 +107,7 @@
         </div>
       </div>
 
-      <div class="win-controls">
+      <div v-if="!isMac" class="win-controls">
         <button type="button" class="win-btn" :title="t('window.minimize')" @click="minimize">
           <svg class="win-icon" viewBox="0 0 16 16" aria-hidden="true">
             <path d="M3.5 8h9" />
@@ -152,12 +157,15 @@ import SettingsDialog from './SettingsDialog.vue'
 import NameDialog from './NameDialog.vue'
 import { anchorFromEvent, type DialogAnchor } from '../composables/useDialogAnchor'
 import { bindOutsidePointerDismiss } from '../composables/useOverlayDismiss'
+import { isMacOS } from '../utils/platform'
 
 const { t } = useI18n()
 const { session, refreshSession, openSettings, openLogin } = useAppUi()
 const { workspaces, workspaceId, currentWorkspace, selectWorkspace, loadWorkspaces } =
   useWorkspaceContext()
 
+/** Native traffic lights on macOS; custom buttons only on Windows/Linux. */
+const isMac = isMacOS()
 const maximized = ref(false)
 const wsOpen = ref(false)
 const wsQuery = ref('')
@@ -295,6 +303,12 @@ async function close() {
   color: var(--color-text);
   -webkit-app-region: drag;
   app-region: drag;
+}
+
+/* Leave room for native macOS traffic lights (close / minimize / zoom). */
+.titlebar--mac {
+  padding-left: 78px;
+  padding-right: 10px;
 }
 
 .titlebar-left {
@@ -458,6 +472,11 @@ async function close() {
   padding-right: 22px;
   margin-right: 4px;
   border-right: 1px solid transparent;
+}
+
+.titlebar--mac .app-actions {
+  padding-right: 4px;
+  margin-right: 0;
 }
 
 .action-btn,

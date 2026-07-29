@@ -99,33 +99,69 @@
             @manage="envManageOpen = true"
           />
         </div>
+        <button
+          type="button"
+          class="code-toggle"
+          :class="{ active: codePanelOpen }"
+          :title="t('codeSnippet.toggle')"
+          @click="toggleCodePanel"
+        >
+          <svg
+            class="code-toggle__icon"
+            viewBox="0 0 1024 1024"
+            width="16"
+            height="16"
+            aria-hidden="true"
+          >
+            <path
+              fill="currentColor"
+              d="M345.7 904c-3.4 0-6.6-0.7-9.7-2.1-11.6-5.3-16.6-19.1-11.3-30.7l340.8-739.1c3.8-8.2 12-13.5 21-13.5 3.4 0 6.6 0.7 9.7 2.1 11.6 5.4 16.6 19.1 11.3 30.7L366.7 890.6c-3.7 8.2-12 13.4-21 13.4z m410.9-140.9c-13.2 0-23.9-10.7-23.9-23.9 0-6.3 2.6-12.5 7.1-16.9l210.9-211-211-211.1c-4.4-4.4-7-10.5-7-16.9 0-13.2 10.7-23.9 23.9-23.9 6.3 0 12.2 2.5 16.8 7l244.7 244.8-244.8 244.9c-4.5 4.6-10.4 7-16.7 7z m-493 0c-6.3 0-12.2-2.5-16.8-7L2.1 511.4l244.7-244.8c4.5-4.5 10.5-7 16.8-7 13.2 0 23.9 10.7 23.9 23.9 0 6.3-2.5 12.4-7 16.9l-211 211.1 211 211.1c4.4 4.3 7 10.5 7 16.8 0 13-10.7 23.7-23.9 23.7z"
+            />
+          </svg>
+        </button>
       </div>
 
-      <div class="work">
-        <InterfaceEditor
-          v-if="workspaceId && projectId && editorReady"
-          ref="editorRef"
-          :key="editorKey"
-          class="work-editor"
-          :mode="editorMode"
-          :workspace-id="workspaceId"
-          :project-id="projectId"
-          :interface-id="activeInterfaceId"
-          :initial="(editorInitial as any)"
-          @saved="onInterfaceSaved"
-          @state-change="onEditorStateChange"
-          @editor-ready="onEditorReady"
-          @cancel="onEditorCancel"
-        />
-        <div v-else class="empty-work">
-          <p v-if="!workspaceId || !projectId" class="muted empty-work-hint">
-            {{ t('create.needProjectFirst') }}
-          </p>
-          <div v-else class="empty-work-brand">
-            <img class="empty-work-logo" src="/nest.png" alt="" draggable="false" />
-            <span class="empty-work-title">{{ t('app.brandName') }}</span>
+      <div ref="workRowRef" class="work-row">
+        <div class="work">
+          <InterfaceEditor
+            v-if="workspaceId && projectId && editorReady"
+            ref="editorRef"
+            :key="editorKey"
+            class="work-editor"
+            :mode="editorMode"
+            :workspace-id="workspaceId"
+            :project-id="projectId"
+            :interface-id="activeInterfaceId"
+            :initial="(editorInitial as any)"
+            @saved="onInterfaceSaved"
+            @state-change="onEditorStateChange"
+            @editor-ready="onEditorReady"
+            @cancel="onEditorCancel"
+          />
+          <div v-else class="empty-work">
+            <p v-if="!workspaceId || !projectId" class="muted empty-work-hint">
+              {{ t('create.needProjectFirst') }}
+            </p>
+            <div v-else class="empty-work-brand">
+              <img class="empty-work-logo" src="/nest.png" alt="" draggable="false" />
+              <span class="empty-work-title">{{ t('app.brandName') }}</span>
+            </div>
           </div>
         </div>
+
+        <div
+          v-if="codePanelOpen"
+          class="code-resizer"
+          :class="{ 'code-resizer--active': codePanelDragging }"
+          @mousedown="startCodePanelDrag"
+        />
+
+        <CodeSnippetPanel
+          v-if="codePanelOpen"
+          :width="codePanelWidth"
+          :curl-text="curlText"
+          @close="closeCodePanel"
+        />
       </div>
     </main>
 
@@ -220,6 +256,7 @@ import NameDialog from '../components/NameDialog.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import EnvironmentManageDialog from '../components/EnvironmentManageDialog.vue'
 import InterfaceEditor from '../components/InterfaceEditor.vue'
+import CodeSnippetPanel from '../components/CodeSnippetPanel.vue'
 import { useToast } from '../composables/useToast'
 import type { TreeAction } from '../components/TreeNode.vue'
 import type { HeaderPair, InterfaceRow, TreeItem } from '../types'
@@ -227,6 +264,7 @@ import { useSaveShortcut } from '../composables/useSaveShortcut'
 import { useCloseTabShortcut } from '../composables/useCloseTabShortcut'
 import { anchorFromEvent, type DialogAnchor } from '../composables/useDialogAnchor'
 import { useDragResize } from '../composables/useDragResize'
+import { buildCurlFromTabState } from '../utils/build-curl'
 
 const TAB_LAYOUT_KEY = 'request_tabs_layout'
 
@@ -265,12 +303,28 @@ const {
   initial: 280,
   storageKey: 'main_sidebar_width',
 })
+const workRowRef = ref<HTMLElement | null>(null)
+const {
+  size: codePanelWidth,
+  dragging: codePanelDragging,
+  startDrag: startCodePanelDragBase,
+} = useDragResize({
+  axis: 'x',
+  min: 260,
+  max: 720,
+  initial: 360,
+  invert: true,
+  storageKey: 'code_snippet_panel_width',
+})
+const codePanelOpen = ref(false)
+const curlText = ref('')
 const {
   projects,
   environments,
   workspaceId,
   projectId,
   environmentId,
+  envVarsRevision,
   initWorkspaceContext,
   selectProject,
   selectEnvironment,
@@ -440,7 +494,48 @@ function applyTabToForm(tab: RequestTab, options?: { remount?: boolean }) {
 }
 
 function onEditorReady() {
-  void nextTick().then(() => syncTabSnapshotFromEditor())
+  void nextTick().then(() => {
+    syncTabSnapshotFromEditor()
+    refreshCurlText()
+  })
+}
+
+async function refreshCurlText() {
+  if (!codePanelOpen.value) return
+  try {
+    const state = editorRef.value?.exportTabState?.() ?? null
+    let vars: Record<string, string> = {}
+    if (environmentId.value) {
+      try {
+        const rows = await invoke<[string, string][]>('get_env_vars', {
+          environmentId: environmentId.value,
+        })
+        vars = Object.fromEntries(rows)
+      } catch {
+        vars = {}
+      }
+    }
+    curlText.value = buildCurlFromTabState(state, vars)
+  } catch {
+    curlText.value = ''
+  }
+}
+
+function toggleCodePanel() {
+  codePanelOpen.value = !codePanelOpen.value
+  if (codePanelOpen.value) {
+    void nextTick().then(refreshCurlText)
+  }
+}
+
+function closeCodePanel() {
+  codePanelOpen.value = false
+}
+
+function startCodePanelDrag(e: MouseEvent) {
+  const bound = workRowRef.value?.getBoundingClientRect().width ?? 900
+  const max = Math.max(260, Math.min(720, Math.round(bound * 0.65)))
+  startCodePanelDragBase(e, max)
 }
 
 function clearTabs() {
@@ -553,6 +648,7 @@ function persistActiveTab() {
 
 function onEditorStateChange() {
   persistActiveTab()
+  refreshCurlText()
 }
 
 function activateTab(id: string) {
@@ -562,6 +658,7 @@ function activateTab(id: string) {
   const tab = tabs.value.find((x) => x.id === id)
   if (tab) applyTabToForm(tab)
   void persistTabLayout()
+  void nextTick().then(refreshCurlText)
 }
 
 function addTab() {
@@ -912,6 +1009,10 @@ watch([workspaceId, projectId], async ([ws, proj], [prevWs, prevProj]) => {
   await bootstrapWorkspaceContent(isSwitch)
 })
 
+watch([environmentId, envVarsRevision], () => {
+  void refreshCurlText()
+})
+
 onMounted(async () => {
   document.addEventListener('click', hideTabContextMenu)
   await initWorkspaceContext()
@@ -1210,12 +1311,73 @@ async function onSelectApi(id: number, options?: { restore?: boolean }) {
   max-width: 180px;
 }
 
+.code-toggle {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  padding: 0;
+  cursor: pointer;
+}
+
+.code-toggle:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.code-toggle.active {
+  background: var(--color-active);
+  color: var(--color-primary);
+}
+
+.work-row {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+}
+
 .work {
   flex: 1;
+  min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
   background: var(--color-content);
+}
+
+.code-resizer {
+  flex-shrink: 0;
+  width: 5px;
+  cursor: col-resize;
+  position: relative;
+  background: transparent;
+  z-index: 2;
+}
+
+.code-resizer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  transform: translateX(-50%);
+  background: var(--color-border);
+}
+
+.code-resizer:hover::before,
+.code-resizer--active::before {
+  width: 2px;
+  background: var(--color-primary);
 }
 
 .work-editor {

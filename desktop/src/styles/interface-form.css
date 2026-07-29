@@ -933,6 +933,11 @@
   -webkit-text-fill-color: var(--raw-hl-attr);
 }
 
+.interface-body-raw__highlight .raw-hl-plain {
+  color: var(--raw-hl-plain) !important;
+  -webkit-text-fill-color: var(--raw-hl-plain);
+}
+
 .interface-body-raw__highlight .raw-hl-comment {
   color: var(--raw-hl-comment) !important;
   -webkit-text-fill-color: var(--raw-hl-comment);

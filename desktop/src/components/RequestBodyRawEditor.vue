@@ -1,7 +1,7 @@
 <template>
-  <div class="interface-body-raw">
+  <div class="interface-body-raw" :class="{ 'interface-body-raw--no-gutter': hideGutter }">
     <div class="interface-body-raw__editor">
-      <div ref="gutterRef" class="interface-body-raw__gutter" aria-hidden="true">
+      <div v-if="!hideGutter" ref="gutterRef" class="interface-body-raw__gutter" aria-hidden="true">
         <div
           v-for="line in lineNumbers"
           :key="line"
@@ -54,7 +54,7 @@ type LineRect = {
   height: number
 }
 
-type RawContentType = 'JSON' | 'Text'
+type RawContentType = 'JSON' | 'Text' | 'CURL'
 
 const props = withDefaults(
   defineProps<{
@@ -62,11 +62,13 @@ const props = withDefaults(
     readonly?: boolean
     placeholder?: string
     contentType?: RawContentType
+    hideGutter?: boolean
   }>(),
   {
     readonly: false,
     placeholder: '',
     contentType: 'JSON',
+    hideGutter: false,
   },
 )
 

@@ -19,6 +19,7 @@
               placeholder=""
               spellcheck="false"
               @scroll="syncUrlHighlightScroll"
+              @paste="onUrlPaste"
             />
           </div>
         </div>
@@ -456,6 +457,7 @@ import ParamTableColumnResizer from './ParamTableColumnResizer.vue'
 import RequestBodyRawEditor from './RequestBodyRawEditor.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
 import { formatJsonLenient } from '../utils/raw-json-utils'
+import { looksLikeCurl, parseCurl, type ParsedCurl } from '../utils/parse-curl'
 import { useToast } from '../composables/useToast'
 import { useWorkspaceContext } from '../composables/useWorkspaceContext'
 import type { SendResponse } from '../types'
@@ -511,11 +513,11 @@ function escapeHtml(text: string) {
 }
 
 function applyEnvVars(input: string, vars: Record<string, string>) {
-  let out = input
-  for (const [k, v] of Object.entries(vars)) {
-    out = out.split(`{{${k}}}`).join(v)
-  }
-  return out
+  if (!input || !Object.keys(vars).length) return input
+  return input.replace(/\{\{\s*([^{}]+?)\s*\}\}/g, (match, key: string) => {
+    const k = key.trim()
+    return Object.prototype.hasOwnProperty.call(vars, k) ? vars[k] : match
+  })
 }
 
 function syncUrlHighlightScroll(e: Event) {
@@ -898,6 +900,66 @@ const highlightedUrlHtml = computed(() => {
 function clearQueryParams() {
   queryParams.value = [emptyParamRow()]
   normalizeQueryParams()
+}
+
+function applyParsedCurl(parsed: ParsedCurl) {
+  method.value = (parsed.method || 'GET').toUpperCase()
+  parseUrlInput(parsed.url || '')
+
+  if (parsed.headers.length) {
+    requestHeaders.value = parsed.headers.map((h) => ({
+      ...emptyRow(),
+      name: h.key,
+      example: h.value,
+      enabled: true,
+    }))
+  } else {
+    requestHeaders.value = [emptyParamRow()]
+  }
+  normalizeRequestHeaders()
+
+  // Prefer explicit Authorization header from curl over auth pane to avoid duplicates.
+  authType.value = 'none'
+  authBearerToken.value = ''
+  authBasicUser.value = ''
+  authBasicPassword.value = ''
+
+  if (parsed.formData?.length) {
+    bodyFormat.value = 'form-data'
+    bodyRaw.value = ''
+    formDataFields.value = parsed.formData.map((f) => ({
+      ...emptyRow(),
+      name: f.name,
+      type: f.type,
+      example: f.value,
+      enabled: true,
+    }))
+    normalizeFormDataFields()
+    requestTab.value = 'body'
+  } else if (parsed.body != null && parsed.body !== '') {
+    bodyFormat.value = 'raw'
+    bodyRaw.value = parsed.body
+    formDataFields.value = [emptyParamRow()]
+    normalizeFormDataFields()
+    requestTab.value = 'body'
+  } else {
+    bodyFormat.value = 'none'
+    bodyRaw.value = ''
+    formDataFields.value = [emptyParamRow()]
+    normalizeFormDataFields()
+    requestTab.value = parsed.headers.length ? 'headers' : 'params'
+  }
+
+  showToast(t('request.curlImported'), 1800, 'success')
+}
+
+function onUrlPaste(e: ClipboardEvent) {
+  const text = e.clipboardData?.getData('text') ?? ''
+  if (!looksLikeCurl(text)) return
+  const parsed = parseCurl(text)
+  if (!parsed) return
+  e.preventDefault()
+  applyParsedCurl(parsed)
 }
 
 function parseUrlInput(raw: string) {

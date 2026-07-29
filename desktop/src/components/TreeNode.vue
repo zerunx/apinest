@@ -296,9 +296,9 @@ export default {
 
 .method-wrap {
   box-sizing: border-box;
-  width: 44px;
-  min-width: 44px;
-  max-width: 44px;
+  width: 48px;
+  min-width: 48px;
+  max-width: 48px;
   height: 100%;
   flex-shrink: 0;
   display: inline-flex;

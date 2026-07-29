@@ -8,6 +8,8 @@ type DragResizeOptions = {
   max: number
   initial: number
   storageKey?: string
+  /** When true, dragging positive direction shrinks `size` (e.g. right-side panel). */
+  invert?: boolean
 }
 
 function readStored(key: string | undefined, fallback: number) {
@@ -43,7 +45,8 @@ export function useDragResize(options: DragResizeOptions) {
 
   function onMove(e: MouseEvent) {
     const delta = options.axis === 'x' ? e.clientX - startPos : e.clientY - startPos
-    const next = options.axis === 'x' ? startSize + delta : startSize - delta
+    const signed = options.invert ? -delta : delta
+    const next = options.axis === 'x' ? startSize + signed : startSize - delta
     size.value = clamp(next)
   }
 
