@@ -35,12 +35,11 @@ It replaces scattered spreadsheets and private API lists, keeping API definition
 
 ## Install
 
-Image: [Docker Hub · zzwzr/nest](https://hub.docker.com/r/zzwzr/nest/tags)
+Image: [Docker Hub · zerunx/nest](https://hub.docker.com/r/zerunx/nest/tags)
 
 ```bash
-docker pull zzwzr/nest:latest
-# or a specific version
-docker pull zzwzr/nest:0.0.1
+docker pull zerunx/nest:latest
+
 ```
 
 > **Before you deploy**
@@ -55,7 +54,7 @@ docker pull zzwzr/nest:0.0.1
 ```yaml
 services:
   nest:
-    image: zzwzr/nest:latest
+    image: zerunx/nest:latest
     ports:
       - "3000:3000"
     volumes:
@@ -73,7 +72,7 @@ docker compose up -d
 docker run -d --name nest \
   -p 3000:3000 \
   -v ./runtime:/app/runtime \
-  zzwzr/nest:latest
+  zerunx/nest:latest
 ```
 
 ### Reverse proxy
@@ -92,12 +91,6 @@ your.domain.com {
 
 Open the site in a browser and complete the install wizard (PostgreSQL connection + admin account). After that you can sign in and use the app.
 
-## Roadmap
-
-- [ ] Built-in / multi-database support (currently external PostgreSQL only)
-- [ ] Desktop client integration
-- [ ] Liquid-glass theme and border refinements
-
 ## License
 
-ApiNest is licensed under the [Apache License 2.0](LICENSE). Retain the copyright notice and license text when modifying or redistributing.
+ApiNest is licensed under the [Apache License 2.0](LICENSE)

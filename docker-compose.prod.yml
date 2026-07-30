@@ -1,6 +1,6 @@
 services:
   nest:
-    image: nest:1.0.0
+    image: nest:latest
     expose:
       - 3000
     volumes:

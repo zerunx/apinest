@@ -1,6 +1,6 @@
 # ApiNest
 
-> 开源 API 协作管理平台（1.0.0）
+> 开源 API 协作管理平台
 
 [中文](README.md) | [English](README_en.md)
 
@@ -35,10 +35,10 @@ ApiNest 用来集中管理接口文档与协作流程。你可以把团队放进
 
 ## 安装
 
-镜像地址：[Docker Hub · zzwzr/nest](https://hub.docker.com/r/zzwzr/nest/tags)
+镜像地址：[Docker Hub · zerunx/nest](https://hub.docker.com/r/zerunx/nest/tags)
 
 ```bash
-docker pull zzwzr/nest:latest
+docker pull zerunx/nest:latest
 
 ```
 
@@ -54,7 +54,7 @@ docker pull zzwzr/nest:latest
 ```yaml
 services:
   nest:
-    image: zzwzr/nest:latest
+    image: zerunx/nest:latest
     expose:
       - 3000
     volumes:
@@ -72,7 +72,7 @@ docker compose up -d
 docker run -d --name nest \
   -p 3000:3000 \
   -v ./runtime:/app/runtime \
-  zzwzr/nest:latest
+  zerunx/nest:latest
 ```
 
 ### 反向代理
@@ -94,13 +94,13 @@ your.domain.com {
 ## 路线图
 
 - [x] 桌面端对接
-- [x] 粘贴 CURL
-- [x] 复制成 CURL
+- [x] 粘贴 CURL，复制 CURL
 - [x] mac 优化
+- [ ] 导入，导出
 - [ ] 接口测试
 - [ ] 液态玻璃主题与边框细化
 - [ ] 内置 / 多数据库支持（当前仅外部 PostgreSQL）
 
 ## License
 
-ApiNest 采用 [Apache License 2.0](LICENSE) 开源。修改或再分发时须保留版权声明与许可证文本。
+ApiNest 采用 [Apache License 2.0](LICENSE) 开源
