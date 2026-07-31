@@ -1,0 +1,20 @@
+{
+  "app": {
+    "windows": [
+      {
+        "title": "ApiNest Desktop",
+        "width": 1480,
+        "height": 920,
+        "minWidth": 1100,
+        "minHeight": 720,
+        "decorations": true,
+        "hiddenTitle": true,
+        "titleBarStyle": "Overlay",
+        "trafficLightPosition": {
+          "x": 14,
+          "y": 19
+        }
+      }
+    ]
+  }
+}
