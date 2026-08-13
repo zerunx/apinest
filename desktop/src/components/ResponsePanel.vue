@@ -52,7 +52,7 @@ const tab = ref<'body' | 'headers'>('body')
 const prettyBody = computed(() => {
   const raw = props.response?.body ?? ''
   try {
-    return JSON.stringify(JSON.parse(raw), null, 2)
+    return JSON.stringify(JSON.parse(raw), null, 4)
   } catch {
     return raw
   }

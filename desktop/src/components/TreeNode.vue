@@ -520,13 +520,7 @@ export default {
 }
 
 .row.api.can-drag {
-  cursor: grab;
   touch-action: none;
-}
-
-.row.api.can-drag:active,
-.row.api.dragging {
-  cursor: grabbing;
 }
 
 .row.api.dragging {

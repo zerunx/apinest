@@ -94,10 +94,12 @@ your.domain.com {
 ## 路线图
 
 - [x] 桌面端对接
-- [x] 粘贴 CURL，复制 CURL
+- [x] 粘贴、复制 CURL
 - [x] mac 优化
-- [ ] 导入，导出
-- [ ] 接口测试
+- [x] raw 采用 CodeMirror
+- [ ] 接口导入，导出
+- [ ] ws grpc 协议
+- [ ] proto 文件导入参数，自动生成模拟参数
 - [ ] 液态玻璃主题与边框细化
 - [ ] 内置 / 多数据库支持（当前仅外部 PostgreSQL）
 

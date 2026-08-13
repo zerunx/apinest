@@ -207,7 +207,7 @@ async function onCopy() {
   min-height: 0;
 }
 
-.code-panel__editor :deep(.interface-body-raw__editor) {
+.code-panel__editor :deep(.interface-body-raw__host) {
   height: 100%;
   min-height: 0;
   margin: 0;
@@ -215,18 +215,8 @@ async function onCopy() {
   background: var(--color-surface);
 }
 
-.code-panel__editor :deep(.interface-body-raw__code-wrap) {
-  min-height: 0;
-  height: 100%;
-}
-
-.code-panel__editor :deep(.interface-body-raw__textarea) {
-  min-height: 0;
-  padding-right: 40px;
-}
-
-.code-panel__editor :deep(.interface-body-raw__highlight) {
-  padding-right: 40px;
+.code-panel__editor :deep(.cm-scroller) {
+  padding-right: 28px;
 }
 
 .code-panel__empty {

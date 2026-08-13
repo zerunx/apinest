@@ -33,13 +33,31 @@
               v-html="highlightedUrlHtml"
             />
             <input
+              ref="urlInputRef"
               v-model="displayUrl"
               class="interface-url-bar__url native-input"
               placeholder=""
               spellcheck="false"
               @scroll="syncUrlHighlightScroll"
               @paste="onUrlPaste"
+              @input="onUrlInput"
+              @keydown="onUrlKeydown"
+              @mousemove="onUrlInputMouseMove"
+              @mouseleave="onUrlInputMouseLeave"
             />
+            <Teleport to="body">
+              <div
+                v-if="urlVarTip"
+                class="url-var-tip"
+                :class="{ 'url-var-tip--missing': urlVarTip.missing }"
+                :style="urlVarTipStyle"
+                @mouseenter="onUrlVarTipEnter"
+                @mouseleave="onUrlVarTipLeave"
+              >
+                <div class="url-var-tip__key">{{ urlVarTip.key }}</div>
+                <div class="url-var-tip__value">{{ urlVarTip.value }}</div>
+              </div>
+            </Teleport>
           </div>
         </div>
         <div class="interface-url-actions">
@@ -482,11 +500,14 @@ import {
   isProtocolOnlySelect,
   methodsForProtocol,
   normalizeProtocol,
+  protocolFamily,
+  protocolLabel,
   switchableProtocols,
   type Protocol,
 } from '../utils/http-method'
 import { useToast } from '../composables/useToast'
 import { useWorkspaceContext } from '../composables/useWorkspaceContext'
+import { createTextUndo, matchUndoRedoKey } from '../composables/useTextUndo'
 import type { SendResponse } from '../types'
 
 export type FolderOption = { id: number; name: string; parent_id: number; label: string }
@@ -528,8 +549,271 @@ const folderOptions = computed(() => [
 const envVarKeys = ref<Set<string>>(new Set())
 const envVarMap = ref<Record<string, string>>({})
 const urlHighlightRef = ref<HTMLElement | null>(null)
+const urlInputRef = ref<HTMLInputElement | null>(null)
+const urlUndo = createTextUndo()
+let applyingUrlUndo = false
+
+type UrlVarTip = {
+  key: string
+  value: string
+  missing: boolean
+  left: number
+  top: number
+}
+const urlVarTip = ref<UrlVarTip | null>(null)
+const urlVarTipStyle = computed(() => {
+  const tip = urlVarTip.value
+  if (!tip) return {}
+  return {
+    left: `${tip.left}px`,
+    top: `${tip.top}px`,
+  }
+})
+let urlVarTipHideTimer: ReturnType<typeof setTimeout> | null = null
+let urlVarTipShowTimer: ReturnType<typeof setTimeout> | null = null
+const URL_VAR_TIP_SHOW_DELAY_MS = 420
+const URL_VAR_TIP_HIDE_DELAY_MS = 200
 
 const ENV_VAR_RE = /\{\{\s*([^{}]+?)\s*\}\}/g
+
+type UrlVarRange = { start: number; end: number; key: string; ok: boolean }
+
+type UrlVarHitBox = UrlVarRange & { left: number; right: number; bottom: number }
+
+let urlInputMeasureCtx: CanvasRenderingContext2D | null = null
+let urlInputMeasureFont = ''
+let urlVarHitBoxes: UrlVarHitBox[] = []
+let urlVarHitBoxesFor = ''
+let urlVarHoverRaf = 0
+let urlVarHoverKey: string | null = null
+let urlVarTipPinned = false
+
+function findUrlVarRanges(text: string): UrlVarRange[] {
+  const ranges: UrlVarRange[] = []
+  ENV_VAR_RE.lastIndex = 0
+  let match: RegExpExecArray | null
+  while ((match = ENV_VAR_RE.exec(text))) {
+    const key = match[1].trim()
+    ranges.push({
+      start: match.index,
+      end: match.index + match[0].length,
+      key,
+      ok: envVarKeys.value.has(key),
+    })
+  }
+  return ranges
+}
+
+function urlInputTextCtx(input: HTMLInputElement): CanvasRenderingContext2D {
+  if (!urlInputMeasureCtx) {
+    const canvas = document.createElement('canvas')
+    urlInputMeasureCtx = canvas.getContext('2d')!
+  }
+  const style = getComputedStyle(input)
+  const font = `${style.fontStyle} ${style.fontVariant} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`
+  if (font !== urlInputMeasureFont) {
+    urlInputMeasureCtx.font = font
+    urlInputMeasureFont = font
+  }
+  return urlInputMeasureCtx
+}
+
+function urlInputTextWidth(input: HTMLInputElement, text: string): number {
+  return urlInputTextCtx(input).measureText(text).width
+}
+
+function rebuildUrlVarHitBoxes() {
+  const input = urlInputRef.value
+  const text = displayUrl.value
+  urlVarHitBoxesFor = text
+  if (!input || !text) {
+    urlVarHitBoxes = []
+    return
+  }
+  const rect = input.getBoundingClientRect()
+  const padL = parseFloat(getComputedStyle(input).paddingLeft) || 0
+  const bottom = rect.bottom + 6
+  const scrollLeft = input.scrollLeft
+  urlVarHitBoxes = findUrlVarRanges(text).map((r) => {
+    const left =
+      rect.left + padL + urlInputTextWidth(input, text.slice(0, r.start)) - scrollLeft
+    const right =
+      rect.left + padL + urlInputTextWidth(input, text.slice(0, r.end)) - scrollLeft
+    return { ...r, left, right, bottom }
+  })
+}
+
+function clearUrlVarTipHideTimer() {
+  if (urlVarTipHideTimer == null) return
+  clearTimeout(urlVarTipHideTimer)
+  urlVarTipHideTimer = null
+}
+
+function clearUrlVarTipShowTimer() {
+  if (urlVarTipShowTimer == null) return
+  clearTimeout(urlVarTipShowTimer)
+  urlVarTipShowTimer = null
+}
+
+function hideUrlVarTip() {
+  clearUrlVarTipHideTimer()
+  clearUrlVarTipShowTimer()
+  if (urlVarHoverRaf) {
+    cancelAnimationFrame(urlVarHoverRaf)
+    urlVarHoverRaf = 0
+  }
+  urlVarTipPinned = false
+  urlVarTip.value = null
+  urlVarHoverKey = null
+}
+
+function scheduleHideUrlVarTip() {
+  if (urlVarTipPinned) return
+  clearUrlVarTipShowTimer()
+  if (!urlVarTip.value) return
+  clearUrlVarTipHideTimer()
+  urlVarTipHideTimer = setTimeout(() => {
+    urlVarTipHideTimer = null
+    if (urlVarTipPinned) return
+    urlVarTip.value = null
+    urlVarHoverKey = null
+  }, URL_VAR_TIP_HIDE_DELAY_MS)
+}
+
+function openUrlVarTip(hit: UrlVarHitBox) {
+  clearUrlVarTipHideTimer()
+  const rawValue = envVarMap.value[hit.key]
+  let value: string
+  if (!hit.ok) value = t('request.envVarUndefined')
+  else if (rawValue == null || rawValue === '') value = t('request.envVarEmpty')
+  else value = rawValue
+  urlVarTip.value = {
+    key: hit.key,
+    value,
+    missing: !hit.ok,
+    left: (hit.left + hit.right) / 2,
+    top: hit.bottom,
+  }
+}
+
+function scheduleShowUrlVarTip(hit: UrlVarHitBox) {
+  clearUrlVarTipHideTimer()
+  // Already showing this key — keep it.
+  if (urlVarTip.value?.key === hit.key) return
+  clearUrlVarTipShowTimer()
+  urlVarTipShowTimer = setTimeout(() => {
+    urlVarTipShowTimer = null
+    openUrlVarTip(hit)
+  }, URL_VAR_TIP_SHOW_DELAY_MS)
+}
+
+function onUrlVarTipEnter() {
+  urlVarTipPinned = true
+  clearUrlVarTipHideTimer()
+  clearUrlVarTipShowTimer()
+}
+
+function onUrlVarTipLeave() {
+  urlVarTipPinned = false
+  scheduleHideUrlVarTip()
+}
+
+function onUrlInputMouseMove(event: MouseEvent) {
+  // Dragging to select text — skip heavy work (was freezing the UI).
+  if (event.buttons !== 0) {
+    if (urlVarHoverKey !== null || urlVarTip.value || urlVarTipShowTimer != null) {
+      const input = urlInputRef.value
+      if (input) input.style.cursor = ''
+      hideUrlVarTip()
+    }
+    return
+  }
+
+  const clientX = event.clientX
+  if (urlVarHoverRaf) cancelAnimationFrame(urlVarHoverRaf)
+  urlVarHoverRaf = requestAnimationFrame(() => {
+    urlVarHoverRaf = 0
+    const input = urlInputRef.value
+    if (!input) return
+
+    const text = displayUrl.value
+    if (urlVarHitBoxesFor !== text) rebuildUrlVarHitBoxes()
+
+    const hit = urlVarHitBoxes.find((r) => clientX >= r.left && clientX < r.right)
+    if (!hit) {
+      if (urlVarHoverKey !== null || urlVarTipShowTimer != null) {
+        urlVarHoverKey = null
+        input.style.cursor = ''
+        clearUrlVarTipShowTimer()
+        scheduleHideUrlVarTip()
+      }
+      return
+    }
+
+    input.style.cursor = 'pointer'
+    if (urlVarHoverKey === hit.key) {
+      // Still over same var — cancel pending hide if any.
+      clearUrlVarTipHideTimer()
+      return
+    }
+    urlVarHoverKey = hit.key
+    scheduleShowUrlVarTip(hit)
+  })
+}
+
+function onUrlInputMouseLeave() {
+  const input = urlInputRef.value
+  if (input) input.style.cursor = ''
+  urlVarHoverKey = null
+  clearUrlVarTipShowTimer()
+  // Delay hide so pointer can move onto the tip bubble.
+  scheduleHideUrlVarTip()
+}
+
+function urlSnapshot() {
+  const el = urlInputRef.value
+  const text = displayUrl.value
+  return {
+    text,
+    start: el?.selectionStart ?? text.length,
+    end: el?.selectionEnd ?? text.length,
+  }
+}
+
+function resetUrlUndo() {
+  void nextTick(() => {
+    urlUndo.reset(urlSnapshot())
+  })
+}
+
+function onUrlInput() {
+  if (applyingUrlUndo) return
+  void nextTick(() => urlUndo.noteInput(urlSnapshot()))
+}
+
+function onUrlKeydown(event: KeyboardEvent) {
+  const kind = matchUndoRedoKey(event)
+  if (!kind) return
+  event.preventDefault()
+  const snap =
+    kind === 'undo' ? urlUndo.undo(urlSnapshot()) : urlUndo.redo(urlSnapshot())
+  if (!snap) return
+  applyingUrlUndo = true
+  parseUrlInput(snap.text)
+  void nextTick(() => {
+    const el = urlInputRef.value
+    if (el) {
+      const start = Math.max(0, Math.min(snap.start, el.value.length))
+      const end = Math.max(0, Math.min(snap.end, el.value.length))
+      try {
+        el.setSelectionRange(start, end)
+      } catch {
+        /* ignore */
+      }
+    }
+    applyingUrlUndo = false
+  })
+}
 
 function escapeHtml(text: string) {
   return text
@@ -552,6 +836,9 @@ function syncUrlHighlightScroll(e: Event) {
   if (urlHighlightRef.value) {
     urlHighlightRef.value.scrollLeft = el.scrollLeft
   }
+  hideUrlVarTip()
+  urlVarHoverKey = null
+  urlVarHitBoxesFor = ''
 }
 
 async function refreshEnvVars() {
@@ -582,12 +869,21 @@ watch([environmentId, envVarsRevision], () => {
   void refreshEnvVars()
 })
 
-const requestTabs = [
+type RequestTabId = 'params' | 'authorization' | 'headers' | 'body'
+
+const allRequestTabs: { id: RequestTabId; labelKey: string }[] = [
   { id: 'params', labelKey: 'request.params' },
   { id: 'authorization', labelKey: 'request.authorization' },
   { id: 'headers', labelKey: 'request.headers' },
   { id: 'body', labelKey: 'request.body' },
-] as const
+]
+
+const requestTabs = computed(() => {
+  if (protocolFamily(protocol.value) === 'ws') {
+    return allRequestTabs.filter((tab) => tab.id !== 'authorization')
+  }
+  return allRequestTabs
+})
 
 const headerKeySuggestions = [
   'Accept',
@@ -646,7 +942,7 @@ const isProtocolOnly = computed(() => isProtocolOnlySelect(protocol.value))
 const protocolOptions = computed(() =>
   switchableProtocols(protocol.value, isCreateMode.value).map((p) => ({
     value: p,
-    label: p,
+    label: protocolLabel(p),
   })),
 )
 const methodOptions = computed(() => methodsForProtocol(protocol.value))
@@ -667,12 +963,16 @@ watch(protocol, (next) => {
   if (!allowed.includes(method.value)) {
     method.value = allowed[0] ?? 'GET'
   }
+  // WS has no Authorization tab — leave it if currently open.
+  if (protocolFamily(next) === 'ws' && requestTab.value === 'authorization') {
+    requestTab.value = 'body'
+  }
 })
 
 const urlBase = ref('')
 const name = ref('')
 const folderId = ref<string | number | null>(null)
-const requestTab = ref<(typeof requestTabs)[number]['id']>('body')
+const requestTab = ref<RequestTabId>('body')
 const bodyFormat = ref<BodyFormat>('none')
 const bodyRaw = ref('')
 const rawBodyEditorRef = ref<{ formatContent: () => boolean } | null>(null)
@@ -945,11 +1245,18 @@ const highlightedUrlHtml = computed(() => {
     const full = match[0]
     const key = match[1].trim()
     const ok = envVarKeys.value.has(key)
+    const end = match.index + full.length
     html += `<span class="url-var ${ok ? 'url-var--ok' : 'url-var--missing'}">${escapeHtml(full)}</span>`
-    last = match.index + full.length
+    last = end
   }
   html += escapeHtml(raw.slice(last))
   return html || '&nbsp;'
+})
+
+watch(displayUrl, () => {
+  hideUrlVarTip()
+  urlVarHoverKey = null
+  urlVarHitBoxesFor = ''
 })
 
 function clearQueryParams() {
@@ -1014,7 +1321,9 @@ function onUrlPaste(e: ClipboardEvent) {
   const parsed = parseCurl(text)
   if (!parsed) return
   e.preventDefault()
+  urlUndo.checkpoint(urlSnapshot())
   applyParsedCurl(parsed)
+  void nextTick(() => urlUndo.commit(urlSnapshot()))
 }
 
 function parseUrlInput(raw: string) {
@@ -1036,7 +1345,7 @@ function parseUrlInput(raw: string) {
   } else if (/^http:\/\//i.test(raw)) {
     setProtocolFromUrl('HTTP')
   } else if (/^wss:\/\//i.test(raw)) {
-    setProtocolFromUrl('WSS')
+    setProtocolFromUrl('WS')
   } else if (/^ws:\/\//i.test(raw)) {
     setProtocolFromUrl('WS')
   } else if (/^tcp:\/\//i.test(raw)) {
@@ -1095,7 +1404,8 @@ function urlForSave(): string {
 function resolveRequestUrl(rawInput?: string): string | null {
   const raw = (rawInput ?? displayUrl.value).trim()
   if (!raw) return null
-  if (/^https?:\/\//i.test(raw)) {
+  // Absolute URLs keep their own scheme (http(s) / ws(s) / …).
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(raw)) {
     try {
       return new URL(raw).href
     } catch {
@@ -1111,10 +1421,9 @@ function resolveRequestUrl(rawInput?: string): string | null {
     HTTP: 'http',
     HTTPS: 'https',
     WS: 'ws',
-    WSS: 'wss',
     TCP: 'tcp',
     UDP: 'udp',
-    RPC: 'http',
+    GRPC: 'grpc',
   }
   const scheme = schemeMap[protocol.value] ?? 'http'
   try {
@@ -1207,6 +1516,7 @@ function applyInitial(resetUi = false) {
   name.value = init?.name ?? ''
   const initUrl = init?.url ?? ''
   parseUrlInput(initUrl)
+  resetUrlUndo()
 
   const detail = init?.detail
   const d = detail && typeof detail === 'object' ? (detail as Record<string, unknown>) : null
@@ -1524,6 +1834,8 @@ onUnmounted(() => {
   trackDirty.value = false
   editorReady.value = false
   baselineSnapshot.value = ''
+  hideUrlVarTip()
+  urlUndo.dispose()
   if (saveUiTimer) {
     clearTimeout(saveUiTimer)
     saveUiTimer = null

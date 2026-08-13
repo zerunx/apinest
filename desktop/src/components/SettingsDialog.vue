@@ -264,6 +264,7 @@ const modKey = computed(() => (isMacOS() ? '⌘' : 'Ctrl'))
 const shortcutItems = computed(() => [
   { id: 'save', labelKey: 'settings.shortcuts.save', keys: [modKey.value, 'S'] },
   { id: 'closeTab', labelKey: 'settings.shortcuts.closeTab', keys: [modKey.value, 'W'] },
+  { id: 'undo', labelKey: 'settings.shortcuts.undo', keys: [modKey.value, 'Z'] },
   { id: 'escape', labelKey: 'settings.shortcuts.escape', keys: ['Esc'] },
 ])
 

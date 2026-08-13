@@ -152,6 +152,8 @@ export default {
     'The authorization header will be automatically generated when you send the request.',
   'request.authBasicHint':
     'The authorization header will be automatically generated when you send the request.',
+  'request.envVarUndefined': 'Variable not defined',
+  'request.envVarEmpty': '(empty)',
   'request.name': 'Request name',
   'request.untitled': 'Untitled request',
   'request.newTab': 'New request',
@@ -188,6 +190,7 @@ export default {
   'settings.shortcuts.hint': 'Keyboard shortcuts available in the app (Ctrl is ⌘ on macOS).',
   'settings.shortcuts.save': 'Save current interface',
   'settings.shortcuts.closeTab': 'Close current tab',
+  'settings.shortcuts.undo': 'Undo (URL / raw editor)',
   'settings.shortcuts.escape': 'Close dialog / cancel',
   'settings.comingSoon': 'Reserved for later — not available yet',
   'settings.about.version': 'Version',

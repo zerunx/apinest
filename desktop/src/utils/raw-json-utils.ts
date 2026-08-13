@@ -142,8 +142,10 @@ export function findDuplicateKeyStarts(text: string): Set<number> {
   return dupes
 }
 
+export const JSON_INDENT_UNIT = '    '
+
 function indentLine(level: number) {
-  return `\n${'  '.repeat(level)}`
+  return `\n${JSON_INDENT_UNIT.repeat(level)}`
 }
 
 export function formatJsonLenient(text: string): string | null {
@@ -332,8 +334,6 @@ export function findJsonSyntaxError(text: string): JsonSyntaxError | null {
     return { index, line, column }
   }
 }
-
-export const JSON_INDENT_UNIT = '  '
 
 /** True when caret is inside a JSON string literal (not on the quotes). */
 export function isInsideJsonString(text: string, index: number): boolean {

@@ -58,7 +58,6 @@ function itemKey(item: TreeItem) {
 }
 
 .tree--dragging {
-  cursor: grabbing;
   user-select: none;
 }
 </style>
