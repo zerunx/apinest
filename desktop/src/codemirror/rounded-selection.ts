@@ -127,6 +127,32 @@ function stronglyOverlaps(a: SelRect, b: SelRect, charWidth: number): boolean {
   return overlapWidth(a, b) >= charWidth - ALIGN_EPS
 }
 
+function filletSize(_radius: number, gap: number, a: SelRect, b: SelRect): number {
+  const size = 2
+  if (gap < size || a.height < size || b.height < size) return 0
+  return size
+}
+
+/** Which quadrant of a circle to show. Inner join sits at the opposite corner. */
+type FilletCorner = 'br' | 'tr' | 'bl' | 'tl'
+
+const FILLET_SOLID = 'var(--raw-editor-selection)'
+const FILLET_SOFT = 'color-mix(in srgb, var(--raw-editor-selection) 40%, transparent)'
+
+/** 2x2 cells in row-major order: TL, TR, BL, BR. 1=transparent, 2=soft, 3=selection. */
+function filletCells(corner: FilletCorner): [string, string, string, string] {
+  switch (corner) {
+    case 'br':
+      return [FILLET_SOLID, FILLET_SOFT, FILLET_SOFT, 'transparent']
+    case 'tr':
+      return [FILLET_SOFT, 'transparent', FILLET_SOLID, FILLET_SOFT]
+    case 'bl':
+      return [FILLET_SOFT, FILLET_SOLID, 'transparent', FILLET_SOFT]
+    case 'tl':
+      return ['transparent', FILLET_SOFT, FILLET_SOFT, FILLET_SOLID]
+  }
+}
+
 function radiiFor(rects: SelRect[], index: number, radius: number, charWidth: number): string {
   const cur = rects[index]
   const prev = rects[index - 1]
@@ -142,7 +168,7 @@ function radiiFor(rects: SelRect[], index: number, radius: number, charWidth: nu
     const leftDocked = aligned(prev.left, cur.left)
     const rightDocked = aligned(prevRight, right)
     const overlap = stronglyOverlaps(prev, cur, charWidth)
-    if (leftDocked || (overlap && cur.left > prev.left)) tl = 0
+    if (leftDocked || ((rightDocked || overlap) && prev.left < cur.left)) tl = 0
     if (rightDocked || ((leftDocked || overlap) && prevRight > right)) tr = 0
   }
   if (next) {
@@ -150,7 +176,7 @@ function radiiFor(rects: SelRect[], index: number, radius: number, charWidth: nu
     const leftDocked = aligned(next.left, cur.left)
     const rightDocked = aligned(nextRight, right)
     const overlap = stronglyOverlaps(next, cur, charWidth)
-    if (leftDocked || (overlap && cur.left > next.left)) bl = 0
+    if (leftDocked || ((rightDocked || overlap) && next.left < cur.left)) bl = 0
     if (rightDocked || ((leftDocked || overlap) && nextRight > right)) br = 0
   }
 
@@ -167,16 +193,12 @@ function rightFillets(rects: SelRect[], radius: number, charWidth: number): Sele
     const gap = Math.abs(aRight - bRight)
     if (gap <= ALIGN_EPS) continue
     if (!aligned(a.left, b.left) && !stronglyOverlaps(a, b, charWidth)) continue
-    const size = Math.min(radius, gap, a.height, b.height)
+    const size = filletSize(radius, gap, a, b)
     if (size <= 0) continue
     if (aRight > bRight) {
-      fillets.push(
-        new SelectionRectMarker(bRight, b.top, size, size, '0', 'circle(50% at 0 0)'),
-      )
+      fillets.push(new SelectionRectMarker(bRight, b.top, size, size, '0', 'br'))
     } else {
-      fillets.push(
-        new SelectionRectMarker(aRight, b.top - size, size, size, '0', 'circle(50% at 0 100%)'),
-      )
+      fillets.push(new SelectionRectMarker(aRight, b.top - size, size, size, '0', 'tr'))
     }
   }
   return fillets
@@ -190,16 +212,12 @@ function leftFillets(rects: SelRect[], radius: number, charWidth: number): Selec
     const gap = Math.abs(a.left - b.left)
     if (gap <= ALIGN_EPS) continue
     if (!aligned(rectRight(a), rectRight(b)) && !stronglyOverlaps(a, b, charWidth)) continue
-    const size = Math.min(radius, gap, a.height, b.height)
+    const size = filletSize(radius, gap, a, b)
     if (size <= 0) continue
     if (a.left < b.left) {
-      fillets.push(
-        new SelectionRectMarker(b.left - size, b.top, size, size, '0', 'circle(50% at 100% 0)'),
-      )
+      fillets.push(new SelectionRectMarker(b.left - size, b.top, size, size, '0', 'bl'))
     } else {
-      fillets.push(
-        new SelectionRectMarker(a.left - size, b.top - size, size, size, '0', 'circle(50% at 100% 100%)'),
-      )
+      fillets.push(new SelectionRectMarker(a.left - size, b.top - size, size, size, '0', 'tl'))
     }
   }
   return fillets
@@ -212,7 +230,7 @@ class SelectionRectMarker implements LayerMarker {
     readonly width: number,
     readonly height: number,
     readonly radii: string,
-    readonly clip?: string,
+    readonly fillet?: FilletCorner,
   ) {}
 
   eq(other: LayerMarker): boolean {
@@ -223,18 +241,26 @@ class SelectionRectMarker implements LayerMarker {
       this.width === other.width &&
       this.height === other.height &&
       this.radii === other.radii &&
-      this.clip === other.clip
+      this.fillet === other.fillet
     )
   }
 
   draw(): HTMLElement {
     const elt = document.createElement('div')
-    elt.className = 'cm-roundedSelection'
+    if (this.fillet) {
+      elt.className = 'cm-roundedSelectionFillet'
+      for (let i = 0; i < 4; i += 1) elt.appendChild(document.createElement('div'))
+    } else {
+      elt.className = 'cm-roundedSelection'
+    }
     this.adjust(elt)
     return elt
   }
 
   update(elt: HTMLElement): boolean {
+    const isFillet = Boolean(this.fillet)
+    if (isFillet !== elt.classList.contains('cm-roundedSelectionFillet')) return false
+    if (isFillet && elt.childElementCount !== 4) return false
     this.adjust(elt)
     return true
   }
@@ -245,7 +271,28 @@ class SelectionRectMarker implements LayerMarker {
     elt.style.width = `${this.width}px`
     elt.style.height = `${this.height}px`
     elt.style.borderRadius = this.radii
-    elt.style.clipPath = this.clip ?? 'none'
+    elt.style.clipPath = 'none'
+    elt.style.removeProperty('background-image')
+    elt.style.removeProperty('transform')
+    elt.style.removeProperty('transform-origin')
+    if (this.fillet) {
+      elt.style.display = 'grid'
+      elt.style.gridTemplateColumns = '1px 1px'
+      elt.style.gridTemplateRows = '1px 1px'
+      elt.style.overflow = 'hidden'
+      elt.style.backgroundColor = 'transparent'
+      const colors = filletCells(this.fillet)
+      for (let i = 0; i < 4; i += 1) {
+        const cell = elt.children[i] as HTMLElement | undefined
+        if (cell) cell.style.backgroundColor = colors[i]
+      }
+    } else {
+      elt.style.removeProperty('display')
+      elt.style.removeProperty('grid-template-columns')
+      elt.style.removeProperty('grid-template-rows')
+      elt.style.overflow = 'visible'
+      elt.style.removeProperty('background-color')
+    }
   }
 }
 
