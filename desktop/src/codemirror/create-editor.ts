@@ -13,6 +13,7 @@ import { languageExtension, type EditorLanguage } from './languages'
 import { formatJsonDocument } from './format-json'
 import { selectedSpaceHighlighter } from './selected-space'
 import { roundedSelectionLayer } from './rounded-selection'
+import { lintExtension } from './json-lint'
 import { editorTheme } from './theme'
 
 const INDENT = '    '
@@ -66,6 +67,7 @@ export function createCodeMirror(options: CreateCodeMirrorOptions): CodeMirrorHa
   const language = new Compartment()
   const editable = new Compartment()
   const gutters = new Compartment()
+  const lint = new Compartment()
   const theme = new Compartment()
   let currentLanguage: EditorLanguage = options.language ?? 'JSON'
   let showLineNumbers = options.lineNumbers !== false
@@ -92,6 +94,7 @@ export function createCodeMirror(options: CreateCodeMirrorOptions): CodeMirrorHa
         bracketMatching(),
         codeFolding({ placeholderText: '…' }),
         language.of(languageExtension(currentLanguage)),
+        lint.of(lintExtension(currentLanguage)),
         editable.of(editableExtension(options.readonly ?? false)),
         gutters.of(gutterExtension(showLineNumbers, currentLanguage)),
         keymap.of([...defaultKeymap, ...historyKeymap, ...foldKeymap, indentWithTab]),
@@ -123,6 +126,7 @@ export function createCodeMirror(options: CreateCodeMirrorOptions): CodeMirrorHa
       view.dispatch({
         effects: [
           language.reconfigure(languageExtension(next)),
+          lint.reconfigure(lintExtension(next)),
           gutters.reconfigure(gutterExtension(showLineNumbers, next)),
         ],
       })

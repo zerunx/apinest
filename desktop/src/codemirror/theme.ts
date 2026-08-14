@@ -24,6 +24,15 @@ const highlightStyle = HighlightStyle.define([
   { tag: t.invalid, color: 'var(--raw-hl-error)' },
 ])
 
+/** Repeating sine tile. Period must equal SVG width so the join stays seamless. */
+function lintWave(color: string): string {
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="8" height="4" viewBox="0 0 8 4">` +
+    `<path d="M-4 3.1C-2.6 3.1-1.4.75 0 .75S2.6 3.1 4 3.1 6.6.75 8 .75 10.6 3.1 12 3.1" fill="none" stroke="${color}" stroke-width="1.15"/>` +
+    `</svg>`
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`
+}
+
 function chromeTheme(dark: boolean): Extension {
   return EditorView.theme(
     {
@@ -139,6 +148,16 @@ function chromeTheme(dark: boolean): Extension {
       '.cm-nonmatchingBracket': {
         backgroundColor: 'transparent',
         color: 'var(--raw-hl-error)',
+      },
+      '.cm-lintRange': {
+        backgroundImage: 'none',
+        backgroundPosition: 'left bottom',
+        backgroundRepeat: 'repeat-x',
+        paddingBottom: '2px',
+      },
+      '.cm-lintRange-error': {
+        backgroundImage: lintWave(dark ? '#f14c4c' : '#d13438'),
+        backgroundSize: '8px 4px',
       },
     },
     { dark },

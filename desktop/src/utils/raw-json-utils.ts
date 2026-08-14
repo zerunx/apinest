@@ -288,51 +288,162 @@ export function indexToLineColumn(text: string, index: number): { line: number; 
   return { line, column }
 }
 
-function mapCommaRemovalIndex(original: string, normIndex: number): number {
-  let oi = 0
-  let ni = 0
-  while (oi < original.length && ni < normIndex) {
-    if (original[oi] === '"') {
-      const end = readJsonStringEnd(original, oi)
-      const len = end - oi
-      if (ni + len >= normIndex) return oi + (normIndex - ni)
-      oi = end
-      ni += len
-      continue
-    }
-    if (original[oi] === ',') {
-      const next = skipWs(original, oi + 1)
-      if (original[next] === '}' || original[next] === ']') {
-        oi += 1
+/** First structural / unexpected-token index, or null if the document is valid. Trailing commas are allowed. */
+function locateJsonSyntaxErrorIndex(text: string): number | null {
+  let i = 0
+  const atEnd = () => i >= text.length
+  const skip = () => {
+    i = skipWs(text, i)
+  }
+  const failAt = () => (atEnd() ? Math.max(0, text.length - 1) : i)
+
+  const parseString = (): boolean => {
+    if (text[i] !== '"') return false
+    i += 1
+    while (i < text.length) {
+      const char = text[i]
+      if (char === '\\') {
+        i += 2
         continue
       }
+      if (char === '"') {
+        i += 1
+        return true
+      }
+      i += 1
     }
-    oi += 1
-    ni += 1
+    return false
   }
-  return oi
+
+  const parseNumber = (): boolean => {
+    const start = i
+    if (text[i] === '-') i += 1
+    if (i >= text.length || !/\d/.test(text[i])) {
+      i = start
+      return false
+    }
+    if (text[i] === '0') {
+      i += 1
+      if (/\d/.test(text[i] ?? '')) {
+        i = start
+        return false
+      }
+    } else {
+      while (i < text.length && /\d/.test(text[i])) i += 1
+    }
+    if (text[i] === '.') {
+      i += 1
+      if (!/\d/.test(text[i] ?? '')) {
+        i = start
+        return false
+      }
+      while (i < text.length && /\d/.test(text[i])) i += 1
+    }
+    if (text[i] === 'e' || text[i] === 'E') {
+      i += 1
+      if (text[i] === '+' || text[i] === '-') i += 1
+      if (!/\d/.test(text[i] ?? '')) {
+        i = start
+        return false
+      }
+      while (i < text.length && /\d/.test(text[i])) i += 1
+    }
+    return true
+  }
+
+  const parseLiteral = (word: string): boolean => {
+    if (!text.startsWith(word, i)) return false
+    i += word.length
+    return true
+  }
+
+  const parseValue = (): boolean => {
+    skip()
+    if (atEnd()) return false
+    const char = text[i]
+    if (char === '"') return parseString()
+    if (char === '{') return parseObject()
+    if (char === '[') return parseArray()
+    if (char === 't') return parseLiteral('true')
+    if (char === 'f') return parseLiteral('false')
+    if (char === 'n') return parseLiteral('null')
+    if (char === '-' || (char >= '0' && char <= '9')) return parseNumber()
+    return false
+  }
+
+  const parseObject = (): boolean => {
+    i += 1
+    skip()
+    if (text[i] === '}') {
+      i += 1
+      return true
+    }
+    while (true) {
+      skip()
+      if (text[i] !== '"') return false
+      if (!parseString()) return false
+      skip()
+      if (text[i] !== ':') return false
+      i += 1
+      if (!parseValue()) return false
+      skip()
+      if (text[i] === ',') {
+        i += 1
+        skip()
+        if (text[i] === '}') {
+          i += 1
+          return true
+        }
+        continue
+      }
+      if (text[i] === '}') {
+        i += 1
+        return true
+      }
+      return false
+    }
+  }
+
+  const parseArray = (): boolean => {
+    i += 1
+    skip()
+    if (text[i] === ']') {
+      i += 1
+      return true
+    }
+    while (true) {
+      if (!parseValue()) return false
+      skip()
+      if (text[i] === ',') {
+        i += 1
+        skip()
+        if (text[i] === ']') {
+          i += 1
+          return true
+        }
+        continue
+      }
+      if (text[i] === ']') {
+        i += 1
+        return true
+      }
+      return false
+    }
+  }
+
+  if (!parseValue()) return failAt()
+  skip()
+  if (!atEnd()) return i
+  return null
 }
 
 /** Locate first JSON syntax error. Trailing commas are allowed. Empty input is valid. */
 export function findJsonSyntaxError(text: string): JsonSyntaxError | null {
   if (!text.trim()) return null
-
-  const lead = text.match(/^\s*/)?.[0].length ?? 0
-  const trimmed = text.trim()
-  const normalized = removeTrailingCommas(trimmed)
-
-  try {
-    JSON.parse(normalized)
-    return null
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
-    const matched = msg.match(/position\s+(\d+)/i)
-    const normPos = matched ? Number(matched[1]) : Math.max(0, normalized.length - 1)
-    const inTrimmed = mapCommaRemovalIndex(trimmed, normPos)
-    const index = Math.min(lead + inTrimmed, Math.max(0, text.length - (text.length ? 1 : 0)))
-    const { line, column } = indexToLineColumn(text, index)
-    return { index, line, column }
-  }
+  const index = locateJsonSyntaxErrorIndex(text)
+  if (index == null) return null
+  const { line, column } = indexToLineColumn(text, index)
+  return { index, line, column }
 }
 
 /** True when caret is inside a JSON string literal (not on the quotes). */
