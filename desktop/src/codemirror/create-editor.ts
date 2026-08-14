@@ -1,5 +1,5 @@
 import { Compartment, EditorState, type Extension } from '@codemirror/state'
-import { EditorView, keymap, lineNumbers, placeholder as placeholderExt } from '@codemirror/view'
+import { EditorView, keymap, lineNumbers, placeholder as placeholderExt, drawSelection } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import {
   bracketMatching,
@@ -11,6 +11,8 @@ import {
 } from '@codemirror/language'
 import { languageExtension, type EditorLanguage } from './languages'
 import { formatJsonDocument } from './format-json'
+import { selectedSpaceHighlighter } from './selected-space'
+import { roundedSelectionLayer } from './rounded-selection'
 import { editorTheme } from './theme'
 
 const INDENT = '    '
@@ -79,7 +81,10 @@ export function createCodeMirror(options: CreateCodeMirrorOptions): CodeMirrorHa
       doc: options.doc ?? '',
       extensions: [
         theme.of(editorTheme(options.dark ?? false)),
+        selectedSpaceHighlighter,
+        roundedSelectionLayer,
         history(),
+        drawSelection({ cursorBlinkRate: 1200 }),
         EditorView.lineWrapping,
         indentUnit.of(INDENT),
         EditorState.tabSize.of(INDENT.length),

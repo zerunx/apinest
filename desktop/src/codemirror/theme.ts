@@ -1,7 +1,7 @@
 import { EditorView } from '@codemirror/view'
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language'
 import { tags as t } from '@lezer/highlight'
-import type { Extension } from '@codemirror/state'
+import { Prec, type Extension } from '@codemirror/state'
 
 const highlightStyle = HighlightStyle.define([
   { tag: t.propertyName, color: 'var(--raw-hl-key)' },
@@ -43,13 +43,39 @@ function chromeTheme(dark: boolean): Extension {
         lineHeight: '20px',
       },
       '.cm-content': {
-        caretColor: 'var(--color-interface-field-text)',
+        caretColor: 'transparent',
       },
-      '.cm-line ::selection, .cm-selectionBackground': {
-        backgroundColor: 'var(--raw-editor-selection) !important',
+      '.cm-line::selection, .cm-line ::selection, .cm-content ::selection': {
+        backgroundColor: 'transparent !important',
+      },
+      '.cm-roundedSelection': {
+        backgroundColor: 'var(--raw-editor-selection)',
+      },
+      '.cm-roundedSelectionLayer': {
+        pointerEvents: 'none',
+      },
+      '.cm-selected-space': {
+        position: 'relative',
+      },
+      '.cm-selected-space::after': {
+        content: '""',
+        position: 'absolute',
+        left: '50%',
+        top: '50%',
+        width: '2px',
+        height: '2px',
+        borderRadius: '50%',
+        backgroundColor: 'var(--raw-hl-space-dot)',
+        transform: 'translate(-50%, -50%)',
+        pointerEvents: 'none',
       },
       '.cm-cursor, .cm-dropCursor': {
+        borderLeftWidth: 'var(--raw-editor-cursor-width)',
+        borderLeftStyle: 'solid',
         borderLeftColor: 'var(--color-interface-field-text)',
+        marginLeft: '-1px',
+        marginTop: 'var(--raw-editor-cursor-nudge-y)',
+        height: 'var(--raw-editor-cursor-height) !important',
       },
       '.cm-gutters': {
         backgroundColor: 'var(--raw-editor-gutter-bg)',
@@ -104,8 +130,10 @@ function chromeTheme(dark: boolean): Extension {
         color: 'var(--color-interface-placeholder)',
       },
       '.cm-matchingBracket': {
-        backgroundColor: 'var(--raw-editor-bracket-match)',
-        outline: 'none',
+        backgroundColor: 'transparent',
+        outline: '1px solid var(--raw-editor-bracket-match)',
+        outlineOffset: '0px',
+        borderRadius: '1px',
         color: 'inherit',
       },
       '.cm-nonmatchingBracket': {
@@ -118,5 +146,22 @@ function chromeTheme(dark: boolean): Extension {
 }
 
 export function editorTheme(dark: boolean): Extension {
-  return [chromeTheme(dark), syntaxHighlighting(highlightStyle)]
+  return [
+    chromeTheme(dark),
+    syntaxHighlighting(highlightStyle),
+    // Keep native ::selection (avoids CM block selection) but hide the native caret.
+    Prec.highest(
+      EditorView.theme({
+        '.cm-line::selection, .cm-line ::selection, .cm-content ::selection': {
+          backgroundColor: 'transparent !important',
+        },
+        '.cm-content': {
+          caretColor: 'transparent !important',
+        },
+        '.cm-selectionLayer': {
+          display: 'none',
+        },
+      }),
+    ),
+  ]
 }
