@@ -49,7 +49,17 @@ const emit = defineEmits<{
 
 const { t } = useLocale()
 
-const openPanels = reactive({
+type PanelKey = 'requestParams' | 'responseHeader' | 'responseResult' | 'responseExample'
+
+const openPanels = reactive<Record<PanelKey, boolean>>({
+  requestParams: false,
+  responseHeader: false,
+  responseResult: false,
+  responseExample: false,
+})
+
+/** Manual expand/collapse should not be overwritten by empty-content auto-sync. */
+const userToggledPanels = reactive<Record<PanelKey, boolean>>({
   requestParams: false,
   responseHeader: false,
   responseResult: false,
@@ -63,28 +73,49 @@ function expandAllPanels() {
   openPanels.responseExample = true
 }
 
-function syncOpenFromContent() {
-  openPanels.requestParams = hasRequestParamsContent(
-    props.requestHeaders,
-    props.queryParams,
-    props.requestBody,
-  )
-  openPanels.responseHeader = hasResponseHeadersContent(props.responseHeaders)
-  openPanels.responseResult = hasResponseResultsContent(props.responseResults)
-  openPanels.responseExample = hasResponseExamplesContent(props.responseExamples)
+function resetUserToggled() {
+  userToggledPanels.requestParams = false
+  userToggledPanels.responseHeader = false
+  userToggledPanels.responseResult = false
+  userToggledPanels.responseExample = false
+}
+
+function syncOpenFromContent(force = false) {
+  if (force || !userToggledPanels.requestParams) {
+    openPanels.requestParams = hasRequestParamsContent(
+      props.requestHeaders,
+      props.queryParams,
+      props.requestBody,
+    )
+  }
+  if (force || !userToggledPanels.responseHeader) {
+    openPanels.responseHeader = hasResponseHeadersContent(props.responseHeaders)
+  }
+  if (force || !userToggledPanels.responseResult) {
+    openPanels.responseResult = hasResponseResultsContent(props.responseResults)
+  }
+  if (force || !userToggledPanels.responseExample) {
+    openPanels.responseExample = hasResponseExamplesContent(props.responseExamples)
+  }
+}
+
+function togglePanel(key: PanelKey) {
+  openPanels[key] = !openPanels[key]
+  userToggledPanels[key] = true
 }
 
 // Create flow: open all panels once per session; user can still collapse manually.
 watch(
   () => [props.panelStateKey, props.defaultOpen] as const,
   () => {
+    resetUserToggled()
     if (props.defaultOpen) expandAllPanels()
-    else syncOpenFromContent()
+    else syncOpenFromContent(true)
   },
   { immediate: true },
 )
 
-// Edit / doc: expand only sections that have content.
+// Edit / doc: expand only sections that have content, unless the user already toggled them.
 watch(
   () =>
     [
@@ -107,7 +138,7 @@ watch(
         type="button"
         class="interface-panel__summary"
         :aria-expanded="openPanels.requestParams"
-        @click="openPanels.requestParams = !openPanels.requestParams"
+        @click="togglePanel('requestParams')"
       >
         <span class="interface-panel__arrow"><el-icon :size="12"><ArrowDown /></el-icon></span>
         {{ t('workspace.interfaceForm.requestParams') }}
@@ -132,7 +163,7 @@ watch(
         type="button"
         class="interface-panel__summary"
         :aria-expanded="openPanels.responseHeader"
-        @click="openPanels.responseHeader = !openPanels.responseHeader"
+        @click="togglePanel('responseHeader')"
       >
         <span class="interface-panel__arrow"><el-icon :size="12"><ArrowDown /></el-icon></span>
         {{ t('workspace.interfaceForm.responseHeader') }}
@@ -153,7 +184,7 @@ watch(
         type="button"
         class="interface-panel__summary"
         :aria-expanded="openPanels.responseResult"
-        @click="openPanels.responseResult = !openPanels.responseResult"
+        @click="togglePanel('responseResult')"
       >
         <span class="interface-panel__arrow"><el-icon :size="12"><ArrowDown /></el-icon></span>
         {{ t('workspace.interfaceForm.responseResult') }}
@@ -174,7 +205,7 @@ watch(
         type="button"
         class="interface-panel__summary"
         :aria-expanded="openPanels.responseExample"
-        @click="openPanels.responseExample = !openPanels.responseExample"
+        @click="togglePanel('responseExample')"
       >
         <span class="interface-panel__arrow"><el-icon :size="12"><ArrowDown /></el-icon></span>
         {{ t('workspace.interfaceForm.responseExample') }}

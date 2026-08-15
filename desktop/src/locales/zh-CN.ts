@@ -136,7 +136,7 @@ export default {
   'request.formDataText': 'Text',
   'request.formDataFile': 'File',
   'request.formDataSelectFile': '选择文件',
-  'request.rawFormat': '整理格式',
+  'request.rawFormat': '美化',
   'request.params': 'Params',
   'request.authorization': 'Authorization',
   'request.authType': '类型',

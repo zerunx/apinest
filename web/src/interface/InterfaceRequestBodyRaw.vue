@@ -3,7 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { CopyDocument, MagicStick } from '@element-plus/icons-vue'
 import { useLocale } from '@/composables/useLocale'
-import { highlightRawContent } from '@/utils/raw-editor-highlight'
+import { CodeMirrorEditor, toEditorLanguage, type EditorLanguage } from '@/codemirror'
 import type { InterfaceRequestBody } from '@/types/workspace'
 
 const props = defineProps<{
@@ -17,11 +17,9 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useLocale()
-const editorRef = ref<HTMLTextAreaElement | null>(null)
-const gutterRef = ref<HTMLElement | null>(null)
-const highlightRef = ref<HTMLElement | null>(null)
+const editorRef = ref<{ formatContent: () => boolean } | null>(null)
 
-const contentTypeOptions = ['JSON', 'Text', 'XML', 'HTML']
+const contentTypeOptions: EditorLanguage[] = ['JSON', 'Text', 'XML', 'HTML']
 
 const rawContent = computed({
   get: () => props.modelValue.raw ?? '',
@@ -29,44 +27,17 @@ const rawContent = computed({
 })
 
 const contentType = computed({
-  get: () => props.modelValue.data_type || 'JSON',
-  set: (data_type: string) => emit('update:modelValue', { ...props.modelValue, data_type }),
+  get: () => toEditorLanguage(props.modelValue.data_type),
+  set: (data_type: EditorLanguage) => emit('update:modelValue', { ...props.modelValue, data_type }),
 })
-
-const lineNumbers = computed(() => {
-  const count = Math.max(1, rawContent.value.split('\n').length)
-  return Array.from({ length: count }, (_, index) => index + 1)
-})
-
-const highlightedContent = computed(() =>
-  highlightRawContent(rawContent.value, contentType.value, props.modelValue.format),
-)
-
-const editorLanguageClass = computed(() => {
-  const type = contentType.value.toLowerCase()
-  return type === 'text' ? 'interface-body-raw__code-wrap--text' : `interface-body-raw__code-wrap--${type}`
-})
-
-function syncScroll(event: Event) {
-  const target = event.target as HTMLTextAreaElement
-  const scrollTop = target.scrollTop
-  if (gutterRef.value) gutterRef.value.scrollTop = scrollTop
-  if (highlightRef.value) highlightRef.value.scrollTop = scrollTop
-}
 
 function updateContentType(value: string) {
-  contentType.value = value
+  contentType.value = toEditorLanguage(value)
 }
 
 function formatContent() {
-  if (contentType.value !== 'JSON') return
-  const text = rawContent.value.trim()
-  if (!text) return
-  try {
-    rawContent.value = `${JSON.stringify(JSON.parse(text), null, 2)}\n`
-  } catch {
-    ElMessage.warning(t('workspace.interfaceForm.rawFormatInvalid'))
-  }
+  if (contentType.value !== 'JSON' || props.readonly) return
+  editorRef.value?.formatContent()
 }
 
 async function copyContent() {
@@ -89,10 +60,15 @@ watch(
   },
   { immediate: true },
 )
+
+defineExpose({ formatContent })
 </script>
 
 <template>
-  <div class="interface-body-raw">
+  <div
+    class="interface-body-raw"
+    :class="{ 'interface-body-raw--readonly': readonly }"
+  >
     <div class="interface-body-raw__toolbar">
       <label v-if="!hideContentType" class="interface-body-raw__toolbar-label">
         {{ t('workspace.interfaceForm.rawContentType') }}
@@ -122,20 +98,13 @@ watch(
     </div>
 
     <div class="interface-body-raw__editor">
-      <div ref="gutterRef" class="interface-body-raw__gutter" aria-hidden="true">
-        <div v-for="line in lineNumbers" :key="line" class="interface-body-raw__line-no">{{ line }}</div>
-      </div>
-      <div class="interface-body-raw__code-wrap" :class="editorLanguageClass">
-        <pre ref="highlightRef" class="interface-body-raw__highlight" aria-hidden="true"><code v-html="highlightedContent" /></pre>
-        <textarea
-          ref="editorRef"
-          v-model="rawContent"
-          class="interface-body-raw__textarea"
-          :readonly="readonly"
-          spellcheck="false"
-          @scroll="syncScroll"
-        />
-      </div>
+      <CodeMirrorEditor
+        ref="editorRef"
+        v-model="rawContent"
+        class="interface-body-raw__host"
+        :language="contentType"
+        :readonly="readonly"
+      />
     </div>
   </div>
 </template>

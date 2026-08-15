@@ -137,7 +137,7 @@ export default {
   'request.formDataText': 'Text',
   'request.formDataFile': 'File',
   'request.formDataSelectFile': 'Select file',
-  'request.rawFormat': 'Format',
+  'request.rawFormat': 'Beautify',
   'request.params': 'Params',
   'request.authorization': 'Authorization',
   'request.authType': 'Type',

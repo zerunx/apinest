@@ -593,6 +593,10 @@
   padding: 0 12px 12px;
 }
 
+.interface-response-examples__raw .interface-body-raw {
+  padding: 0;
+}
+
 .interface-body-import-btn {
   display: inline-flex;
   align-items: center;
@@ -670,6 +674,9 @@
 
 /* Request body raw editor */
 .interface-body-raw {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   padding: 0 12px 12px;
 }
 
@@ -733,139 +740,40 @@
 }
 
 .interface-body-raw__editor {
+  --raw-editor-box-height: 280px;
   display: flex;
-  min-height: 280px;
+  flex-direction: column;
+  height: var(--raw-editor-box-height);
+  min-height: var(--raw-editor-box-height);
   margin-top: 0;
   border: 1px solid var(--color-interface-bar-border);
   border-radius: 4px;
-  background: var(--color-workspace-inset);
+  background: var(--raw-editor-bg);
   overflow: hidden;
+  cursor: text;
 }
 
-.interface-body-raw__gutter {
-  flex-shrink: 0;
-  width: 44px;
-  padding: 12px 8px 12px 0;
-  border-right: 1px solid var(--color-border);
-  background: var(--color-workspace-content);
-  overflow: hidden;
-  user-select: none;
-  text-align: right;
-}
-
-.interface-body-raw__line-no {
-  height: 20px;
-  line-height: 20px;
-  font-family: var(--raw-editor-font-family);
-  font-size: 12px;
-  color: var(--color-text-secondary);
-}
-
-.interface-body-raw__code-wrap {
-  position: relative;
+.interface-body-raw__editor .cm-host,
+.interface-body-raw__host {
   flex: 1;
-  min-width: 0;
-  min-height: 280px;
-}
-
-.interface-body-raw__highlight,
-.interface-body-raw__textarea {
-  margin: 0;
-  padding: 12px;
-  border: none;
-  outline: none;
-  font-family: var(--raw-editor-font-family);
-  font-size: 13px;
-  line-height: 20px;
-  tab-size: 2;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.interface-body-raw__highlight {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  pointer-events: none;
-  background: transparent;
-}
-
-.interface-body-raw__highlight code {
-  display: block;
-  margin: 0;
-  padding: 0;
-  font: inherit;
-  white-space: inherit;
-  word-break: inherit;
-  color: var(--raw-hl-plain);
-  background: transparent;
-}
-
-.interface-body-raw__textarea {
-  position: relative;
-  z-index: 1;
   width: 100%;
-  min-height: 280px;
-  resize: vertical;
-  background: transparent;
-  color: transparent;
-  caret-color: var(--color-interface-field-text);
-  -webkit-text-fill-color: transparent;
+  height: 100% !important;
+  min-height: 100% !important;
+  display: flex;
+  flex-direction: column;
 }
 
-.interface-body-raw__code-wrap--text .interface-body-raw__textarea {
-  color: var(--color-interface-field-text);
-  -webkit-text-fill-color: var(--color-interface-field-text);
+.interface-body-raw__editor .cm-editor,
+.interface-body-raw__editor .cm-scroller {
+  flex: 1;
+  width: 100%;
+  height: 100% !important;
+  min-height: 100% !important;
 }
 
-.interface-body-raw__textarea::placeholder {
-  color: var(--color-interface-placeholder);
-  -webkit-text-fill-color: var(--color-interface-placeholder);
-}
-
-.interface-body-raw__highlight .raw-hl-key {
-  color: var(--raw-hl-key) !important;
-  -webkit-text-fill-color: var(--raw-hl-key);
-}
-
-.interface-body-raw__highlight .raw-hl-string {
-  color: var(--raw-hl-string) !important;
-  -webkit-text-fill-color: var(--raw-hl-string);
-}
-
-.interface-body-raw__highlight .raw-hl-number {
-  color: var(--raw-hl-number) !important;
-  -webkit-text-fill-color: var(--raw-hl-number);
-}
-
-.interface-body-raw__highlight .raw-hl-bool {
-  color: var(--raw-hl-bool) !important;
-  -webkit-text-fill-color: var(--raw-hl-bool);
-}
-
-.interface-body-raw__highlight .raw-hl-null {
-  color: var(--raw-hl-null) !important;
-  -webkit-text-fill-color: var(--raw-hl-null);
-}
-
-.interface-body-raw__highlight .raw-hl-punct {
-  color: var(--raw-hl-punct) !important;
-  -webkit-text-fill-color: var(--raw-hl-punct);
-}
-
-.interface-body-raw__highlight .raw-hl-tag {
-  color: var(--raw-hl-tag) !important;
-  -webkit-text-fill-color: var(--raw-hl-tag);
-}
-
-.interface-body-raw__highlight .raw-hl-attr {
-  color: var(--raw-hl-attr) !important;
-  -webkit-text-fill-color: var(--raw-hl-attr);
-}
-
-.interface-body-raw__highlight .raw-hl-comment {
-  color: var(--raw-hl-comment) !important;
-  -webkit-text-fill-color: var(--raw-hl-comment);
+.interface-body-raw__editor .cm-content,
+.interface-body-raw__editor .cm-gutters {
+  min-height: 100% !important;
 }
 
 /* Param table */

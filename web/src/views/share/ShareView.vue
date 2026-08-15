@@ -15,6 +15,11 @@ import {
 import { useLocale } from '@/composables/useLocale'
 import { useSharePageMeta } from '@/composables/useSharePageMeta'
 import InterfaceRequestBodyRaw from '@/interface/InterfaceRequestBodyRaw.vue'
+import { toEditorLanguage } from '@/codemirror'
+import {
+  enrichResponseExample,
+  exampleFormatToHighlightType,
+} from '@/utils/response-example-format'
 import type {
   InterfaceBodyField,
   InterfaceDetail,
@@ -286,10 +291,20 @@ function requiredLabel(required?: boolean) {
   return required ? t('share.public.required') : t('share.public.optional')
 }
 
-function exampleRawBody(example: InterfaceResponseExample): InterfaceRequestBody {
+function requestRawBody(body: InterfaceRequestBody): InterfaceRequestBody {
   return {
-    format: example.format || 'raw',
-    data_type: example.content_type || example.data_type || 'JSON',
+    format: 'raw',
+    data_type: toEditorLanguage(body.data_type),
+    raw: body.raw || '',
+    fields: [],
+  }
+}
+
+function exampleRawBody(example: InterfaceResponseExample): InterfaceRequestBody {
+  const enriched = enrichResponseExample(example)
+  return {
+    format: 'raw',
+    data_type: exampleFormatToHighlightType(enriched.format ?? 'JSON', enriched.data_type ?? 'Object'),
     raw: example.raw || '',
     fields: [],
   }
@@ -560,10 +575,16 @@ onUnmounted(() => {
 
             <div v-if="hasRequestBody" class="share-view__block">
               <h4>{{ t('share.public.requestBody') }}</h4>
-              <pre
+              <div
                 v-if="detail.request_body?.raw"
-                class="share-view__raw"
-              >{{ detail.request_body.raw }}</pre>
+                class="share-view__example-raw"
+              >
+                <InterfaceRequestBodyRaw
+                  :model-value="requestRawBody(detail.request_body)"
+                  readonly
+                  hide-content-type
+                />
+              </div>
               <div
                 v-else-if="detail.request_body?.fields?.length"
                 class="share-view__table"
@@ -933,6 +954,7 @@ onUnmounted(() => {
 
 .share-view__example-raw :deep(.interface-body-raw) {
   gap: 0;
+  padding: 0;
 }
 
 .share-view__example-raw :deep(.interface-body-raw__toolbar) {
@@ -942,7 +964,7 @@ onUnmounted(() => {
 }
 
 .share-view__example-raw :deep(.interface-body-raw__editor) {
-  min-height: 160px;
+  --raw-editor-box-height: 160px;
   max-height: 360px;
 }
 
@@ -1001,19 +1023,6 @@ onUnmounted(() => {
 .share-view__row .is-required {
   color: #ef4444;
   font-weight: 600;
-}
-
-.share-view__raw {
-  margin: 0;
-  padding: 14px;
-  border-radius: 8px;
-  border: 1px solid var(--color-border);
-  background: var(--color-workspace-inset, var(--color-bg));
-  color: var(--color-text);
-  font-size: 14px;
-  line-height: 1.55;
-  overflow: auto;
-  white-space: pre-wrap;
 }
 
 .share-view__empty {
