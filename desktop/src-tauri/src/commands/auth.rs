@@ -110,11 +110,11 @@ pub fn logout(db: State<'_, Db>) -> AppResult<()> {
 }
 
 #[tauri::command]
-pub fn test_connection(db: State<'_, Db>) -> AppResult<String> {
+pub fn test_connection(db: State<'_, Db>) -> AppResult<usize> {
     let (base_url, token) = current_auth(&db)?;
     let client = NestClient::new(&base_url, Some(token))?;
     let list = client.list_workspaces()?;
-    Ok(format!("ok ({} workspaces)", list.len()))
+    Ok(list.len())
 }
 
 pub fn current_auth(db: &Db) -> AppResult<(String, String)> {

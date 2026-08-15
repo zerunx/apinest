@@ -101,51 +101,55 @@
           <div v-else-if="active === 'data'" class="panel-inner panel-data">
             <h2>{{ t('settings.nav.data') }}</h2>
 
-            <div class="data-card">
-              <h3>{{ t('settings.sync') }}</h3>
-              <div class="data-meta">
-                <p class="muted">{{ t('settings.server') }}: {{ session?.base_url || '—' }}</p>
-                <p v-if="session?.account" class="muted">{{ session.account }}</p>
-                <p v-if="!loggedIn" class="muted">{{ t('settings.loginRequired') }}</p>
+            <div class="data-card sync-card">
+              <div class="sync-main">
+                <h3>{{ t('settings.sync') }}</h3>
+                <div class="data-meta">
+                  <p class="muted">{{ t('settings.server') }}: {{ session?.base_url || '—' }}</p>
+                  <p v-if="session?.account" class="muted">{{ session.account }}</p>
+                  <p v-if="!loggedIn" class="muted">{{ t('settings.loginRequired') }}</p>
+                  <p v-else class="muted">{{ t('settings.syncHint') }}</p>
+                </div>
+                <div class="row">
+                  <button
+                    class="btn"
+                    type="button"
+                    :disabled="busy || !loggedIn"
+                    @click="onTest"
+                  >
+                    {{ testing ? t('settings.testing') : t('settings.test') }}
+                  </button>
+                  <button
+                    class="btn btn-primary"
+                    type="button"
+                    :disabled="busy || !loggedIn"
+                    @click="onSync"
+                  >
+                    {{ syncing ? t('settings.syncing') : t('settings.syncNow') }}
+                  </button>
+                  <button
+                    v-if="!loggedIn"
+                    class="btn"
+                    type="button"
+                    @click="goLoginFromSettings"
+                  >
+                    {{ t('nav.login') }}
+                  </button>
+                </div>
               </div>
-              <div class="row">
-                <label class="radio">
-                  <input v-model="syncScope" type="radio" value="current" :disabled="!loggedIn" />
-                  {{ t('settings.syncCurrent') }}
-                </label>
-                <label class="radio">
-                  <input v-model="syncScope" type="radio" value="all" :disabled="!loggedIn" />
-                  {{ t('settings.syncAll') }}
-                </label>
-              </div>
-              <div class="row">
-                <button
-                  class="btn"
-                  type="button"
-                  :disabled="busy || !loggedIn"
-                  @click="onTest"
-                >
-                  {{ testing ? t('settings.testing') : t('settings.test') }}
-                </button>
-                <button
-                  class="btn btn-primary"
-                  type="button"
-                  :disabled="busy || !loggedIn"
-                  @click="onSync"
-                >
-                  {{ syncing ? t('settings.syncing') : t('settings.syncNow') }}
-                </button>
-                <button
-                  v-if="!loggedIn"
-                  class="btn"
-                  type="button"
-                  @click="goLoginFromSettings"
-                >
-                  {{ t('nav.login') }}
-                </button>
-              </div>
-              <p v-if="message" class="msg">{{ message }}</p>
-              <p v-if="lastSync" class="muted last-sync">{{ t('settings.lastSync') }}: {{ lastSync }}</p>
+              <aside class="sync-aside">
+                <div class="sync-meta">
+                  <span class="sync-meta__label">{{ t('settings.lastSync') }}</span>
+                  <span class="sync-meta__value">{{ lastSync ? formatChinaDateTime(lastSync) : '—' }}</span>
+                </div>
+                <h4>{{ t('settings.syncResult') }}</h4>
+                <ul class="sync-stats">
+                  <li v-for="item in syncStatItems" :key="item.key">
+                    <span class="sync-stat-label">{{ item.label }}</span>
+                    <strong class="sync-stat-value" :class="{ empty: item.empty }">{{ item.value }}</strong>
+                  </li>
+                </ul>
+              </aside>
             </div>
 
             <div class="data-card">
@@ -236,6 +240,13 @@ import { useOverlayDismiss } from '../composables/useOverlayDismiss'
 import ConfirmDialog from './ConfirmDialog.vue'
 import type { SyncResult } from '../types'
 import { isMacOS } from '../utils/platform'
+import { formatChinaDateTime } from '../utils/datetime'
+import { useToast } from '../composables/useToast'
+
+type SyncStats = Pick<
+  SyncResult,
+  'workspaces' | 'projects' | 'folders' | 'interfaces' | 'environments'
+>
 
 type MenuId = 'general' | 'themes' | 'data' | 'shortcuts' | 'proxy' | 'update' | 'about'
 
@@ -243,15 +254,15 @@ const { t, locale, setLocale } = useI18n()
 const { settingsOpen, closeSettings, session, refreshSession, openLogin } = useAppUi()
 const { onOverlayMouseDown, onOverlayMouseUp } = useOverlayDismiss(settingsOpen, closeSettings)
 const clearConfirmOpen = ref(false)
+const { showToast } = useToast()
 const { theme, setTheme } = useTheme()
-const { workspaceId, refreshAfterSync } = useWorkspaceContext()
+const { refreshAfterSync } = useWorkspaceContext()
 
 const active = ref<MenuId>('general')
-const syncScope = ref<'current' | 'all'>('current')
 const testing = ref(false)
 const syncing = ref(false)
-const message = ref('')
 const lastSync = ref('')
+const lastSyncStats = ref<SyncStats | null>(null)
 const dbPath = ref('')
 const timeoutSecs = ref(60)
 const appVersion = '0.0.1'
@@ -260,6 +271,23 @@ const archLabel = ref('—')
 const busy = computed(() => testing.value || syncing.value)
 const loggedIn = computed(() => !!session.value?.logged_in)
 const modKey = computed(() => (isMacOS() ? '⌘' : 'Ctrl'))
+
+const syncStatItems = computed(() => {
+  const stats = lastSyncStats.value
+  const item = (key: string, labelKey: string, n: number | undefined) => ({
+    key,
+    label: t(labelKey),
+    value: stats == null ? '—' : String(n ?? 0),
+    empty: stats == null,
+  })
+  return [
+    item('workspaces', 'settings.syncStat.workspaces', stats?.workspaces),
+    item('projects', 'settings.syncStat.projects', stats?.projects),
+    item('folders', 'settings.syncStat.folders', stats?.folders),
+    item('interfaces', 'settings.syncStat.interfaces', stats?.interfaces),
+    item('environments', 'settings.syncStat.environments', stats?.environments),
+  ]
+})
 
 const shortcutItems = computed(() => [
   { id: 'save', labelKey: 'settings.shortcuts.save', keys: [modKey.value, 'S'] },
@@ -308,13 +336,14 @@ const menu: { id: MenuId; labelKey: string; icon: string }[] = [
 
 watch(settingsOpen, async (open) => {
   if (!open) return
-  message.value = ''
   active.value = 'general'
   await refreshSession()
   try {
     dbPath.value = await invoke('get_db_path')
     const saved = await invoke<string | null>('get_setting_value', { key: 'last_sync_at' })
-    if (saved) lastSync.value = saved
+    lastSync.value = saved || ''
+    const savedStats = await invoke<string | null>('get_setting_value', { key: 'last_sync_stats' })
+    lastSyncStats.value = parseSyncStats(savedStats)
     const timeoutSaved = await invoke<string | null>('get_setting_value', {
       key: 'request_timeout_secs',
     })
@@ -358,14 +387,35 @@ async function saveTimeout() {
   }
 }
 
+function parseSyncStats(raw: string | null): SyncStats | null {
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw) as Partial<SyncStats>
+    if (typeof parsed.workspaces !== 'number') return null
+    return {
+      workspaces: parsed.workspaces,
+      projects: parsed.projects ?? 0,
+      folders: parsed.folders ?? 0,
+      interfaces: parsed.interfaces ?? 0,
+      environments: parsed.environments ?? 0,
+    }
+  } catch {
+    return null
+  }
+}
+
 async function onTest() {
   if (!loggedIn.value) return
   testing.value = true
-  message.value = ''
   try {
-    message.value = await invoke<string>('test_connection')
+    const count = await invoke<number>('test_connection')
+    showToast(
+      `${t('settings.testOk')} · ${t('settings.testOkHint', { count })}`,
+      2200,
+      'success',
+    )
   } catch (e) {
-    message.value = String(e)
+    showToast(String(e), undefined, 'error')
   } finally {
     testing.value = false
   }
@@ -374,18 +424,26 @@ async function onTest() {
 async function onSync() {
   if (!loggedIn.value) return
   syncing.value = true
-  message.value = ''
   try {
-    const wid = syncScope.value === 'current' ? workspaceId.value : null
     const result = await invoke<SyncResult>('sync_now', {
-      args: { workspace_id: wid },
+      args: { workspace_id: null },
     })
     lastSync.value = result.synced_at
+    lastSyncStats.value = {
+      workspaces: result.workspaces,
+      projects: result.projects,
+      folders: result.folders,
+      interfaces: result.interfaces,
+      environments: result.environments,
+    }
     await invoke('set_setting_value', { key: 'last_sync_at', value: result.synced_at })
+    await invoke('set_setting_value', {
+      key: 'last_sync_stats',
+      value: JSON.stringify(lastSyncStats.value),
+    })
     await refreshAfterSync()
-    message.value = `OK · ws ${result.workspaces} / proj ${result.projects} / folder ${result.folders} / api ${result.interfaces} / env ${result.environments}`
   } catch (e) {
-    message.value = String(e)
+    showToast(String(e), undefined, 'error')
   } finally {
     syncing.value = false
   }
@@ -396,13 +454,15 @@ function onClear() {
 }
 
 async function confirmClearCache() {
-  message.value = ''
   try {
     await invoke('clear_local_cache')
     await refreshAfterSync()
     lastSync.value = ''
+    lastSyncStats.value = null
+    await invoke('set_setting_value', { key: 'last_sync_at', value: '' })
+    await invoke('set_setting_value', { key: 'last_sync_stats', value: '' })
   } catch (e) {
-    message.value = String(e)
+    showToast(String(e), undefined, 'error')
   }
 }
 </script>
@@ -578,6 +638,98 @@ async function confirmClearCache() {
   font-size: 14px;
 }
 
+.sync-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.sync-main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px 18px;
+}
+
+.sync-aside {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+  border-left: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-hover) 55%, var(--color-surface));
+}
+
+.sync-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sync-meta__label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--color-text-secondary);
+}
+
+.sync-meta__value {
+  font-size: 12px;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+}
+
+.sync-aside h4 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--color-text-secondary);
+}
+
+.sync-stats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sync-stats li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sync-stat-label {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.sync-stat-value {
+  min-width: 28px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+}
+
+.sync-stat-value.empty {
+  color: var(--color-text-secondary);
+  background: color-mix(in srgb, var(--color-text-secondary) 10%, transparent);
+  font-weight: 500;
+}
+
 .data-meta {
   display: flex;
   flex-direction: column;
@@ -594,10 +746,6 @@ async function confirmClearCache() {
   margin-top: 0;
 }
 
-.last-sync {
-  margin: 0;
-}
-
 .row {
   display: flex;
   flex-wrap: wrap;
@@ -606,22 +754,9 @@ async function confirmClearCache() {
   margin-top: 6px;
 }
 
-.radio {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-}
-
 .btn.active {
   border-color: var(--color-primary);
   background: var(--color-active);
-}
-
-.msg {
-  margin: 8px 0 0;
-  font-size: 13px;
-  white-space: pre-wrap;
 }
 
 .path {
