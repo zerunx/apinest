@@ -1,5 +1,7 @@
-.vscode/
-.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
 *.log
 
 docker/caddy/data/
