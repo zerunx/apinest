@@ -55,50 +55,56 @@ func init() {
 	api.DefaultMethod = apiDescMethod.Default.(string)
 	// api.MethodValidator is a validator for the "method" field. It is called by the builders before save.
 	api.MethodValidator = apiDescMethod.Validators[0].(func(string) error)
+	// apiDescProtocol is the schema descriptor for protocol field.
+	apiDescProtocol := apiFields[5].Descriptor()
+	// api.DefaultProtocol holds the default value on creation for the protocol field.
+	api.DefaultProtocol = apiDescProtocol.Default.(string)
+	// api.ProtocolValidator is a validator for the "protocol" field. It is called by the builders before save.
+	api.ProtocolValidator = apiDescProtocol.Validators[0].(func(string) error)
 	// apiDescURL is the schema descriptor for url field.
-	apiDescURL := apiFields[5].Descriptor()
+	apiDescURL := apiFields[6].Descriptor()
 	// api.DefaultURL holds the default value on creation for the url field.
 	api.DefaultURL = apiDescURL.Default.(string)
 	// api.URLValidator is a validator for the "url" field. It is called by the builders before save.
 	api.URLValidator = apiDescURL.Validators[0].(func(string) error)
 	// apiDescStatus is the schema descriptor for status field.
-	apiDescStatus := apiFields[6].Descriptor()
+	apiDescStatus := apiFields[7].Descriptor()
 	// api.DefaultStatus holds the default value on creation for the status field.
 	api.DefaultStatus = apiDescStatus.Default.(uint8)
 	// apiDescRequestBodyFormat is the schema descriptor for request_body_format field.
-	apiDescRequestBodyFormat := apiFields[7].Descriptor()
+	apiDescRequestBodyFormat := apiFields[8].Descriptor()
 	// api.DefaultRequestBodyFormat holds the default value on creation for the request_body_format field.
 	api.DefaultRequestBodyFormat = apiDescRequestBodyFormat.Default.(string)
 	// api.RequestBodyFormatValidator is a validator for the "request_body_format" field. It is called by the builders before save.
 	api.RequestBodyFormatValidator = apiDescRequestBodyFormat.Validators[0].(func(string) error)
 	// apiDescRequestBodyDataType is the schema descriptor for request_body_data_type field.
-	apiDescRequestBodyDataType := apiFields[8].Descriptor()
+	apiDescRequestBodyDataType := apiFields[9].Descriptor()
 	// api.DefaultRequestBodyDataType holds the default value on creation for the request_body_data_type field.
 	api.DefaultRequestBodyDataType = apiDescRequestBodyDataType.Default.(string)
 	// api.RequestBodyDataTypeValidator is a validator for the "request_body_data_type" field. It is called by the builders before save.
 	api.RequestBodyDataTypeValidator = apiDescRequestBodyDataType.Validators[0].(func(string) error)
 	// apiDescRequestBodyRaw is the schema descriptor for request_body_raw field.
-	apiDescRequestBodyRaw := apiFields[9].Descriptor()
+	apiDescRequestBodyRaw := apiFields[10].Descriptor()
 	// api.DefaultRequestBodyRaw holds the default value on creation for the request_body_raw field.
 	api.DefaultRequestBodyRaw = apiDescRequestBodyRaw.Default.(string)
 	// apiDescSortOrder is the schema descriptor for sort_order field.
-	apiDescSortOrder := apiFields[10].Descriptor()
+	apiDescSortOrder := apiFields[11].Descriptor()
 	// api.DefaultSortOrder holds the default value on creation for the sort_order field.
 	api.DefaultSortOrder = apiDescSortOrder.Default.(int)
 	// apiDescCreatedBy is the schema descriptor for created_by field.
-	apiDescCreatedBy := apiFields[11].Descriptor()
+	apiDescCreatedBy := apiFields[12].Descriptor()
 	// api.DefaultCreatedBy holds the default value on creation for the created_by field.
 	api.DefaultCreatedBy = apiDescCreatedBy.Default.(int64)
 	// apiDescUpdatedBy is the schema descriptor for updated_by field.
-	apiDescUpdatedBy := apiFields[12].Descriptor()
+	apiDescUpdatedBy := apiFields[13].Descriptor()
 	// api.DefaultUpdatedBy holds the default value on creation for the updated_by field.
 	api.DefaultUpdatedBy = apiDescUpdatedBy.Default.(int64)
 	// apiDescCreatedAt is the schema descriptor for created_at field.
-	apiDescCreatedAt := apiFields[13].Descriptor()
+	apiDescCreatedAt := apiFields[14].Descriptor()
 	// api.DefaultCreatedAt holds the default value on creation for the created_at field.
 	api.DefaultCreatedAt = apiDescCreatedAt.Default.(func() utils.DateTime)
 	// apiDescUpdatedAt is the schema descriptor for updated_at field.
-	apiDescUpdatedAt := apiFields[14].Descriptor()
+	apiDescUpdatedAt := apiFields[15].Descriptor()
 	// api.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	api.DefaultUpdatedAt = apiDescUpdatedAt.Default.(func() utils.DateTime)
 	// api.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

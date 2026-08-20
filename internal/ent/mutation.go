@@ -67,6 +67,7 @@ type APIMutation struct {
 	id                       *int64
 	name                     *string
 	method                   *string
+	protocol                 *string
 	url                      *string
 	status                   *uint8
 	addstatus                *int8
@@ -359,6 +360,42 @@ func (m *APIMutation) OldMethod(ctx context.Context) (v string, err error) {
 // ResetMethod resets all changes to the "method" field.
 func (m *APIMutation) ResetMethod() {
 	m.method = nil
+}
+
+// SetProtocol sets the "protocol" field.
+func (m *APIMutation) SetProtocol(s string) {
+	m.protocol = &s
+}
+
+// Protocol returns the value of the "protocol" field in the mutation.
+func (m *APIMutation) Protocol() (r string, exists bool) {
+	v := m.protocol
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProtocol returns the old "protocol" field's value of the API entity.
+// If the API object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *APIMutation) OldProtocol(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProtocol is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProtocol requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProtocol: %w", err)
+	}
+	return oldValue.Protocol, nil
+}
+
+// ResetProtocol resets all changes to the "protocol" field.
+func (m *APIMutation) ResetProtocol() {
+	m.protocol = nil
 }
 
 // SetURL sets the "url" field.
@@ -1356,7 +1393,7 @@ func (m *APIMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *APIMutation) Fields() []string {
-	fields := make([]string, 0, 15)
+	fields := make([]string, 0, 16)
 	if m.project != nil {
 		fields = append(fields, api.FieldProjectID)
 	}
@@ -1368,6 +1405,9 @@ func (m *APIMutation) Fields() []string {
 	}
 	if m.method != nil {
 		fields = append(fields, api.FieldMethod)
+	}
+	if m.protocol != nil {
+		fields = append(fields, api.FieldProtocol)
 	}
 	if m.url != nil {
 		fields = append(fields, api.FieldURL)
@@ -1418,6 +1458,8 @@ func (m *APIMutation) Field(name string) (ent.Value, bool) {
 		return m.Name()
 	case api.FieldMethod:
 		return m.Method()
+	case api.FieldProtocol:
+		return m.Protocol()
 	case api.FieldURL:
 		return m.URL()
 	case api.FieldStatus:
@@ -1457,6 +1499,8 @@ func (m *APIMutation) OldField(ctx context.Context, name string) (ent.Value, err
 		return m.OldName(ctx)
 	case api.FieldMethod:
 		return m.OldMethod(ctx)
+	case api.FieldProtocol:
+		return m.OldProtocol(ctx)
 	case api.FieldURL:
 		return m.OldURL(ctx)
 	case api.FieldStatus:
@@ -1515,6 +1559,13 @@ func (m *APIMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetMethod(v)
+		return nil
+	case api.FieldProtocol:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProtocol(v)
 		return nil
 	case api.FieldURL:
 		v, ok := value.(string)
@@ -1689,6 +1740,9 @@ func (m *APIMutation) ResetField(name string) error {
 		return nil
 	case api.FieldMethod:
 		m.ResetMethod()
+		return nil
+	case api.FieldProtocol:
+		m.ResetProtocol()
 		return nil
 	case api.FieldURL:
 		m.ResetURL()

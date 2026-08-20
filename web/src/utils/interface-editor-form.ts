@@ -106,6 +106,7 @@ export function buildInterfaceSavePayload(form: InterfaceEditorFormState) {
     folder_id: form.folderId ?? undefined,
     name: form.name.trim(),
     method: form.method,
+    protocol: form.protocol,
     url: form.url.trim(),
     status: form.status,
     request_headers: compactParamRows(form.requestHeaders),
@@ -126,6 +127,7 @@ export function buildInterfaceSavePayload(form: InterfaceEditorFormState) {
     folder_id?: number
     name: string
     method: HttpMethod
+    protocol: HttpProtocol
     url: string
     status: InterfaceStatus
   }
@@ -139,14 +141,29 @@ export function interfaceEditorSnapshot(form: InterfaceEditorFormState) {
   })
 }
 
+export function hasRequestHeadersContent(headers: ParamRow[]): boolean {
+  return headers.some(hasParamContent)
+}
+
+export function hasQueryParamsContent(queryParams: ParamRow[]): boolean {
+  return queryParams.some(hasParamContent)
+}
+
+export function hasRequestBodyContent(body: InterfaceRequestBody): boolean {
+  if (body.format === 'raw') return !!(body.raw?.trim())
+  return compactFieldTree(body.fields ?? []).length > 0
+}
+
 export function hasRequestParamsContent(
   headers: ParamRow[],
   queryParams: ParamRow[],
   body: InterfaceRequestBody,
 ): boolean {
-  if (headers.some(hasParamContent) || queryParams.some(hasParamContent)) return true
-  if (body.format === 'raw') return !!(body.raw?.trim())
-  return compactFieldTree(body.fields ?? []).length > 0
+  return (
+    hasRequestHeadersContent(headers) ||
+    hasQueryParamsContent(queryParams) ||
+    hasRequestBodyContent(body)
+  )
 }
 
 export function hasResponseHeadersContent(headers: ParamRow[]): boolean {

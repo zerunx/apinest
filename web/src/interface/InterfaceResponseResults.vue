@@ -190,12 +190,14 @@ watch(
     </div>
 
     <div v-if="activeResult" class="interface-response-results__content">
-      <div class="interface-response-results__toolbar">
+      <div
+        v-if="!readonly"
+        class="interface-response-results__toolbar"
+      >
         <el-input
           :model-value="activeResult.name"
           class="interface-response-results__name interface-response-results__boxed"
           :placeholder="t('workspace.interfaceForm.resultName')"
-          :readonly="readonly"
           @update:model-value="updateActive({ name: $event })"
         />
         <el-autocomplete
@@ -204,7 +206,6 @@ watch(
           :fetch-suggestions="searchStatusCodes"
           :trigger-on-focus="true"
           clearable
-          :disabled="readonly"
           :placeholder="t('workspace.interfaceForm.statusCodePlaceholder')"
           popper-class="app-action-dropdown"
           @update:model-value="updateStatusCode($event ?? '')"
@@ -213,7 +214,6 @@ watch(
         <el-select
           :model-value="activeResult.format"
           class="interface-response-results__format interface-response-results__boxed"
-          :disabled="readonly"
           popper-class="app-action-dropdown"
           @update:model-value="updateActive({ format: $event })"
         >
@@ -222,14 +222,12 @@ watch(
         <el-select
           :model-value="activeResult.data_type"
           class="interface-response-results__data-type interface-response-results__boxed"
-          :disabled="readonly"
           popper-class="app-action-dropdown"
           @update:model-value="updateActive({ data_type: $event })"
         >
           <el-option v-for="item in dataTypeOptions" :key="item" :label="item" :value="item" />
         </el-select>
         <button
-          v-if="!readonly"
           type="button"
           class="interface-body-import-btn"
           @click="importVisible = true"
@@ -237,7 +235,7 @@ watch(
           {{ t('workspace.interfaceForm.importJson') }}
         </button>
         <el-tooltip
-          v-if="!readonly && modelValue.length > 1"
+          v-if="modelValue.length > 1"
           :content="t('common.delete')"
           placement="top"
           :show-after="0"

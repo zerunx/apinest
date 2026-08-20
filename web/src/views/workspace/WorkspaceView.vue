@@ -303,12 +303,6 @@ async function confirmDiscardUnsaved(tab: WorkspaceTab): Promise<boolean> {
   }
 }
 
-async function confirmCloseCreateApi() {
-  const createTab = workspaceTabs.value.find((item) => item.id === 'create-api')
-  if (createTab && !(await confirmDiscardUnsaved(createTab))) return
-  closeTab('create-api')
-}
-
 async function handleTabClose(tab: WorkspaceTab, event?: MouseEvent) {
   event?.stopPropagation()
   if (!(await confirmDiscardUnsaved(tab))) return
@@ -401,7 +395,7 @@ onBeforeUnmount(() => {
             aria-label="Close"
             @click="handleTabClose(tab, $event)"
           >
-            <el-icon :size="12"><Close /></el-icon>
+            <el-icon :size="14"><Close /></el-icon>
           </button>
         </div>
       </div>
@@ -502,7 +496,6 @@ onBeforeUnmount(() => {
           <InterfaceCreateForm
             v-if="showCreateForm"
             ref="createFormRef"
-            @request-close="confirmCloseCreateApi"
           />
         </keep-alive>
         <keep-alive>
@@ -681,16 +674,11 @@ onBeforeUnmount(() => {
   flex: 1;
   overflow-x: auto;
   overflow-y: hidden;
-  scrollbar-width: thin;
+  scrollbar-width: none;
 }
 
 .workspace-main__tabbar-tabs::-webkit-scrollbar {
-  height: 4px;
-}
-
-.workspace-main__tabbar-tabs::-webkit-scrollbar-thumb {
-  background: var(--color-workspace-scrollbar);
-  border-radius: 2px;
+  display: none;
 }
 
 .workspace-main__tab {
@@ -701,7 +689,7 @@ onBeforeUnmount(() => {
   height: 44px;
   min-width: 140px;
   max-width: 240px;
-  padding: 0 16px;
+  padding: 0 8px 0 16px;
   border-right: 1px solid var(--color-border);
   font-size: 14px;
   color: var(--color-workspace-tab-text);
@@ -796,12 +784,14 @@ onBeforeUnmount(() => {
 }
 
 .workspace-main__tab-close {
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
+  margin-right: -2px;
   border: none;
-  border-radius: 2px;
+  border-radius: 50%;
   background: transparent;
   color: var(--color-text-secondary);
+  font-size: 14px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;

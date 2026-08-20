@@ -1,7 +1,8 @@
 ﻿<script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import InterfaceEditorPanels from '@/interface/InterfaceEditorPanels.vue'
+import InterfaceSaveButton from '@/interface/InterfaceSaveButton.vue'
 import InterfaceStatusRadio from '@/interface/InterfaceStatusRadio.vue'
 import InterfaceUrlBar from '@/interface/InterfaceUrlBar.vue'
 import { useInterfaceEditorDirty } from '@/composables/useInterfaceEditorDirty'
@@ -18,9 +19,6 @@ import {
 import { collectFolderOptions } from '@/utils/interface-folder-options'
 
 const { t } = useLocale()
-const emit = defineEmits<{
-  'request-close': []
-}>()
 
 const {
   apiTree,
@@ -33,6 +31,15 @@ const {
 } = useWorkspaceContext()
 
 const saving = ref(false)
+const saveUi = ref<'idle' | 'saving' | 'saved'>('idle')
+let saveUiTimer: ReturnType<typeof setTimeout> | null = null
+
+function clearSaveUiTimer() {
+  if (saveUiTimer) {
+    clearTimeout(saveUiTimer)
+    saveUiTimer = null
+  }
+}
 const form = reactive(createEmptyInterfaceEditorForm({ method: 'POST', status: 1 }))
 
 const folderOptions = computed(() => collectFolderOptions(apiTree.value, parseFolderId))
@@ -79,7 +86,7 @@ watch(selectedFolder, (folder) => {
 })
 
 async function handleSave(): Promise<boolean> {
-  if (saving.value) return false
+  if (saveUi.value === 'saving') return false
   const folderId = form.folderId
   if (!folderId) {
     ElMessage.warning(t('workspace.folderRequired'))
@@ -90,15 +97,22 @@ async function handleSave(): Promise<boolean> {
     return false
   }
 
+  clearSaveUiTimer()
+  saveUi.value = 'saving'
   saving.value = true
   try {
     await submitCreateInterface({
       ...buildInterfaceSavePayload(form),
       folder_id: folderId,
     })
-    ElMessage.success(t('workspace.createApiSuccess'))
+    saveUi.value = 'saved'
+    saveUiTimer = setTimeout(() => {
+      saveUi.value = 'idle'
+      saveUiTimer = null
+    }, 1400)
     return true
   } catch (error) {
+    saveUi.value = 'idle'
     ElMessage.error(error instanceof Error ? error.message : t('workspace.createApiFailed'))
     return false
   } finally {
@@ -106,55 +120,52 @@ async function handleSave(): Promise<boolean> {
   }
 }
 
+onBeforeUnmount(clearSaveUiTimer)
+
 defineExpose({
   save: handleSave,
 })
-
-function emitClose() {
-  emit('request-close')
-}
 </script>
 
 <template>
   <div class="interface-create interface-editor">
-    <div class="interface-create__toolbar">
-      <el-button type="primary" :loading="saving" @click="handleSave">
-        {{ t('common.save') }}
-      </el-button>
-      <el-button @click="emitClose">{{ t('common.cancel') }}</el-button>
-    </div>
-
     <div class="interface-create__scroll">
       <div class="interface-create__section">
-        <div class="interface-create__row">
+        <div class="interface-editor-head">
           <InterfaceUrlBar
             v-model:protocol="form.protocol"
             v-model:method="form.method"
             v-model:url="form.url"
             create-mode
           />
-        </div>
-
-        <div class="interface-create__row interface-meta-row">
-          <el-select
-            v-model="form.folderId"
-            class="interface-meta-row__folder"
-            :placeholder="t('workspace.selectFolder')"
-            size="default"
-            popper-class="app-action-dropdown"
-          >
-            <el-option
-              v-for="item in folderOptions"
-              :key="item.folderId"
-              :label="item.label"
-              :value="item.folderId"
+          <div class="interface-url-actions">
+            <InterfaceSaveButton
+              :saving="saveUi === 'saving'"
+              :saved="saveUi === 'saved'"
+              @click="handleSave"
             />
-          </el-select>
-          <el-input
-            v-model="form.name"
-            class="interface-meta-row__name"
-            :placeholder="t('workspace.apiNamePlaceholder')"
-          />
+          </div>
+          <div class="interface-meta-row">
+            <el-select
+              v-model="form.folderId"
+              class="interface-meta-row__folder"
+              :placeholder="t('workspace.selectFolder')"
+              size="default"
+              popper-class="app-action-dropdown"
+            >
+              <el-option
+                v-for="item in folderOptions"
+                :key="item.folderId"
+                :label="item.label"
+                :value="item.folderId"
+              />
+            </el-select>
+            <el-input
+              v-model="form.name"
+              class="interface-meta-row__name"
+              :placeholder="t('workspace.apiNamePlaceholder')"
+            />
+          </div>
         </div>
 
         <div class="interface-create__status-row">
@@ -188,16 +199,6 @@ function emitClose() {
   overflow: hidden;
 }
 
-.interface-create__toolbar {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-workspace-content);
-}
-
 .interface-create__scroll {
   flex: 1;
   min-height: 0;
@@ -214,12 +215,6 @@ function emitClose() {
   padding-left: var(--color-interface-section-padding-x);
   padding-right: var(--color-interface-section-padding-x);
   border-bottom: 1px solid var(--color-border);
-}
-
-.interface-create__row {
-  display: flex;
-  align-items: center;
-  width: 100%;
 }
 
 .interface-create__status-row {

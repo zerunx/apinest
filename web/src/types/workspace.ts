@@ -129,9 +129,12 @@ export interface InterfaceItem {
   folder_id: number
   name: string
   method: HttpMethod
+  protocol?: HttpProtocol
   url: string
   status: InterfaceStatus
   folder_name?: string
+  created_by?: number
+  created_by_name?: string
   updated_by?: number
   updated_by_name?: string
   created_at: string

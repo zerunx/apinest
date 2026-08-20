@@ -27,6 +27,7 @@ export type InterfaceWritePayload = {
   folder_id?: number
   name: string
   method: string
+  protocol?: string
   url?: string
   status?: number
   request_headers?: InterfaceDetail['request_headers']

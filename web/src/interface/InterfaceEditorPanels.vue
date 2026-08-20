@@ -1,17 +1,24 @@
 <script setup lang="ts">
-import { reactive, watch } from 'vue'
+import { computed, reactive, watch } from 'vue'
 import { ArrowDown } from '@element-plus/icons-vue'
 import InterfaceRequestParams from '@/interface/InterfaceRequestParams.vue'
-import InterfaceResponseHeaderTable from '@/interface/InterfaceResponseHeaderTable.vue'
+import InterfaceParamTable from '@/interface/InterfaceParamTable.vue'
+import InterfaceFieldTreeTable from '@/interface/InterfaceFieldTreeTable.vue'
+import InterfaceRequestBodyRaw from '@/interface/InterfaceRequestBodyRaw.vue'
 import InterfaceResponseExamples from '@/interface/InterfaceResponseExamples.vue'
 import InterfaceResponseResults from '@/interface/InterfaceResponseResults.vue'
 import { useLocale } from '@/composables/useLocale'
 import {
+  hasQueryParamsContent,
+  hasRequestBodyContent,
+  hasRequestHeadersContent,
   hasRequestParamsContent,
   hasResponseExamplesContent,
   hasResponseHeadersContent,
   hasResponseResultsContent,
 } from '@/utils/interface-editor-form'
+import { COMMON_REQUEST_HEADERS } from '@/utils/request-header-options'
+import { COMMON_RESPONSE_HEADERS } from '@/utils/response-header-options'
 import type { ParamRow } from '@/utils/interface-params'
 import type {
   InterfaceRequestBody,
@@ -32,9 +39,12 @@ const props = withDefaults(
     panelStateKey?: string | number | null
     /** When true (create API), keep all four panels expanded by default. */
     defaultOpen?: boolean
+    /** When false, wait before applying the initial open/closed state. */
+    ready?: boolean
   }>(),
   {
     defaultOpen: false,
+    ready: true,
   },
 )
 
@@ -49,22 +59,32 @@ const emit = defineEmits<{
 
 const { t } = useLocale()
 
-type PanelKey = 'requestParams' | 'responseHeader' | 'responseResult' | 'responseExample'
+type PanelKey =
+  | 'requestParams'
+  | 'requestHeader'
+  | 'queryParams'
+  | 'requestBody'
+  | 'responseHeader'
+  | 'responseResult'
+  | 'responseExample'
 
 const openPanels = reactive<Record<PanelKey, boolean>>({
   requestParams: false,
+  requestHeader: false,
+  queryParams: false,
+  requestBody: false,
   responseHeader: false,
   responseResult: false,
   responseExample: false,
 })
 
-/** Manual expand/collapse should not be overwritten by empty-content auto-sync. */
-const userToggledPanels = reactive<Record<PanelKey, boolean>>({
-  requestParams: false,
-  responseHeader: false,
-  responseResult: false,
-  responseExample: false,
-})
+const hasHeaders = computed(() => hasRequestHeadersContent(props.requestHeaders))
+const hasQuery = computed(() => hasQueryParamsContent(props.queryParams))
+const hasBody = computed(() => hasRequestBodyContent(props.requestBody))
+const hasRespHeaders = computed(() => hasResponseHeadersContent(props.responseHeaders))
+const hasRespResults = computed(() => hasResponseResultsContent(props.responseResults))
+const hasRespExamples = computed(() => hasResponseExamplesContent(props.responseExamples))
+const isRawBody = computed(() => props.requestBody.format === 'raw')
 
 function expandAllPanels() {
   openPanels.requestParams = true
@@ -73,67 +93,124 @@ function expandAllPanels() {
   openPanels.responseExample = true
 }
 
-function resetUserToggled() {
-  userToggledPanels.requestParams = false
-  userToggledPanels.responseHeader = false
-  userToggledPanels.responseResult = false
-  userToggledPanels.responseExample = false
-}
-
-function syncOpenFromContent(force = false) {
-  if (force || !userToggledPanels.requestParams) {
+function syncOpenFromContent() {
+  if (props.readonly) {
+    openPanels.requestHeader = hasRequestHeadersContent(props.requestHeaders)
+    openPanels.queryParams = hasQueryParamsContent(props.queryParams)
+    openPanels.requestBody = hasRequestBodyContent(props.requestBody)
+  } else {
     openPanels.requestParams = hasRequestParamsContent(
       props.requestHeaders,
       props.queryParams,
       props.requestBody,
     )
   }
-  if (force || !userToggledPanels.responseHeader) {
-    openPanels.responseHeader = hasResponseHeadersContent(props.responseHeaders)
-  }
-  if (force || !userToggledPanels.responseResult) {
-    openPanels.responseResult = hasResponseResultsContent(props.responseResults)
-  }
-  if (force || !userToggledPanels.responseExample) {
-    openPanels.responseExample = hasResponseExamplesContent(props.responseExamples)
-  }
+  openPanels.responseHeader = hasResponseHeadersContent(props.responseHeaders)
+  openPanels.responseResult = hasResponseResultsContent(props.responseResults)
+  openPanels.responseExample = hasResponseExamplesContent(props.responseExamples)
 }
 
 function togglePanel(key: PanelKey) {
   openPanels[key] = !openPanels[key]
-  userToggledPanels[key] = true
 }
 
-// Create flow: open all panels once per session; user can still collapse manually.
+// First open of an API / create session / doc|edit view: empty panels stay closed.
+// After that, only the summary click changes open state.
 watch(
-  () => [props.panelStateKey, props.defaultOpen] as const,
+  () => [props.panelStateKey, props.defaultOpen, props.readonly, props.ready] as const,
   () => {
-    resetUserToggled()
+    if (!props.ready) return
     if (props.defaultOpen) expandAllPanels()
-    else syncOpenFromContent(true)
+    else syncOpenFromContent()
   },
   { immediate: true },
-)
-
-// Edit / doc: expand only sections that have content, unless the user already toggled them.
-watch(
-  () =>
-    [
-      hasRequestParamsContent(props.requestHeaders, props.queryParams, props.requestBody),
-      hasResponseHeadersContent(props.responseHeaders),
-      hasResponseResultsContent(props.responseResults),
-      hasResponseExamplesContent(props.responseExamples),
-    ] as const,
-  () => {
-    if (props.defaultOpen) return
-    syncOpenFromContent()
-  },
 )
 </script>
 
 <template>
   <div class="interface-detail__panels">
-    <section class="interface-panel" :class="{ 'interface-panel--open': openPanels.requestParams }">
+    <template v-if="readonly">
+      <section
+        v-if="hasHeaders"
+        class="interface-panel"
+        :class="{ 'interface-panel--open': openPanels.requestHeader }"
+      >
+        <button
+          type="button"
+          class="interface-panel__summary"
+          :aria-expanded="openPanels.requestHeader"
+          @click="togglePanel('requestHeader')"
+        >
+          <span class="interface-panel__arrow"><el-icon :size="12"><ArrowDown /></el-icon></span>
+          {{ t('workspace.interfaceForm.reqHeader') }}
+        </button>
+        <div class="interface-panel__collapse">
+          <div class="interface-panel__body">
+            <InterfaceParamTable
+              :model-value="requestHeaders"
+              readonly
+              :name-suggestions="COMMON_REQUEST_HEADERS"
+              :name-label="t('workspace.interfaceForm.headerLabel')"
+              :name-placeholder="t('workspace.interfaceForm.reqHeaderPlaceholder')"
+            />
+          </div>
+        </div>
+      </section>
+
+      <section
+        v-if="hasQuery"
+        class="interface-panel"
+        :class="{ 'interface-panel--open': openPanels.queryParams }"
+      >
+        <button
+          type="button"
+          class="interface-panel__summary"
+          :aria-expanded="openPanels.queryParams"
+          @click="togglePanel('queryParams')"
+        >
+          <span class="interface-panel__arrow"><el-icon :size="12"><ArrowDown /></el-icon></span>
+          {{ t('workspace.interfaceForm.queryParams') }}
+        </button>
+        <div class="interface-panel__collapse">
+          <div class="interface-panel__body">
+            <InterfaceParamTable :model-value="queryParams" readonly />
+          </div>
+        </div>
+      </section>
+
+      <section
+        v-if="hasBody"
+        class="interface-panel"
+        :class="{ 'interface-panel--open': openPanels.requestBody }"
+      >
+        <button
+          type="button"
+          class="interface-panel__summary"
+          :aria-expanded="openPanels.requestBody"
+          @click="togglePanel('requestBody')"
+        >
+          <span class="interface-panel__arrow"><el-icon :size="12"><ArrowDown /></el-icon></span>
+          {{ t('workspace.interfaceForm.reqBodyParams') }}
+        </button>
+        <div class="interface-panel__collapse">
+          <div class="interface-panel__body">
+            <InterfaceRequestBodyRaw
+              v-if="isRawBody"
+              :model-value="requestBody"
+              readonly
+              hide-content-type
+            />
+            <InterfaceFieldTreeTable v-else :model-value="requestBody.fields" readonly />
+          </div>
+        </div>
+      </section>
+    </template>
+
+    <section
+      v-else
+      class="interface-panel"
+      :class="{ 'interface-panel--open': openPanels.requestParams }"
+    >
       <button
         type="button"
         class="interface-panel__summary"
@@ -149,7 +226,6 @@ watch(
             :request-headers="requestHeaders"
             :query-params="queryParams"
             :request-body="requestBody"
-            :readonly="readonly"
             @update:request-headers="emit('update:requestHeaders', $event)"
             @update:query-params="emit('update:queryParams', $event)"
             @update:request-body="emit('update:requestBody', $event)"
@@ -158,7 +234,11 @@ watch(
       </div>
     </section>
 
-    <section class="interface-panel" :class="{ 'interface-panel--open': openPanels.responseHeader }">
+    <section
+      v-if="!readonly || hasRespHeaders"
+      class="interface-panel"
+      :class="{ 'interface-panel--open': openPanels.responseHeader }"
+    >
       <button
         type="button"
         class="interface-panel__summary"
@@ -170,16 +250,23 @@ watch(
       </button>
       <div class="interface-panel__collapse">
         <div class="interface-panel__body">
-          <InterfaceResponseHeaderTable
+          <InterfaceParamTable
             :model-value="responseHeaders"
             :readonly="readonly"
+            :name-suggestions="COMMON_RESPONSE_HEADERS"
+            :name-label="t('workspace.interfaceForm.headerLabel')"
+            :name-placeholder="t('workspace.interfaceForm.reqHeaderPlaceholder')"
             @update:model-value="emit('update:responseHeaders', $event)"
           />
         </div>
       </div>
     </section>
 
-    <section class="interface-panel" :class="{ 'interface-panel--open': openPanels.responseResult }">
+    <section
+      v-if="!readonly || hasRespResults"
+      class="interface-panel"
+      :class="{ 'interface-panel--open': openPanels.responseResult }"
+    >
       <button
         type="button"
         class="interface-panel__summary"
@@ -200,7 +287,11 @@ watch(
       </div>
     </section>
 
-    <section class="interface-panel" :class="{ 'interface-panel--open': openPanels.responseExample }">
+    <section
+      v-if="!readonly || hasRespExamples"
+      class="interface-panel"
+      :class="{ 'interface-panel--open': openPanels.responseExample }"
+    >
       <button
         type="button"
         class="interface-panel__summary"

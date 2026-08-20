@@ -6,9 +6,12 @@ type Item struct {
 	FolderID      int64  `json:"folder_id"`
 	Name          string `json:"name"`
 	Method        string `json:"method"`
+	Protocol      string `json:"protocol,omitempty"`
 	URL           string `json:"url"`
 	Status        uint8  `json:"status"`
 	FolderName    string `json:"folder_name,omitempty"`
+	CreatedBy     int64  `json:"created_by"`
+	CreatedByName string `json:"created_by_name,omitempty"`
 	UpdatedBy     int64  `json:"updated_by"`
 	UpdatedByName string `json:"updated_by_name,omitempty"`
 	CreatedAt     string `json:"created_at"`
@@ -107,6 +110,7 @@ type CreateRequest struct {
 	FolderID         int64                 `json:"folder_id" binding:"required,min=1"`
 	Name             string                `json:"name" binding:"required,min=1,max=100"`
 	Method           string                `json:"method" binding:"required,min=1,max=10"`
+	Protocol         string                `json:"protocol"`
 	URL              string                `json:"url" binding:"max=500"`
 	Status           uint8                 `json:"status"`
 	RequestHeaders   []ParamItem           `json:"request_headers"`
@@ -124,6 +128,7 @@ type UpdateRequest struct {
 	FolderID         int64                 `json:"folder_id"`
 	Name             string                `json:"name" binding:"required,min=1,max=100"`
 	Method           string                `json:"method" binding:"required,min=1,max=10"`
+	Protocol         string                `json:"protocol"`
 	URL              string                `json:"url" binding:"max=500"`
 	Status           uint8                 `json:"status"`
 	RequestHeaders   []ParamItem           `json:"request_headers"`

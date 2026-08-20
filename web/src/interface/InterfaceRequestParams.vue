@@ -13,6 +13,7 @@ import {
   applyRawBodyImport,
   type BodyImportMode,
 } from '@/utils/json-body-import'
+import { COMMON_REQUEST_HEADERS } from '@/utils/request-header-options'
 import type { InterfaceBodyField, InterfaceRequestBody } from '@/types/workspace'
 
 type RequestTab = 'header' | 'body' | 'query'
@@ -21,7 +22,6 @@ const props = defineProps<{
   requestHeaders: ParamRow[]
   queryParams: ParamRow[]
   requestBody: InterfaceRequestBody
-  readonly?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -160,7 +160,9 @@ defineExpose({
     <div v-if="activeTab === 'header'" class="interface-request-params__content">
       <InterfaceParamTable
         :model-value="requestHeaders"
-        :readonly="readonly"
+        :name-suggestions="COMMON_REQUEST_HEADERS"
+        :name-label="t('workspace.interfaceForm.headerLabel')"
+        :name-placeholder="t('workspace.interfaceForm.reqHeaderPlaceholder')"
         @update:model-value="emit('update:requestHeaders', $event)"
       />
     </div>
@@ -168,7 +170,6 @@ defineExpose({
     <div v-else-if="activeTab === 'query'" class="interface-request-params__content">
       <InterfaceParamTable
         :model-value="queryParams"
-        :readonly="readonly"
         @update:model-value="emit('update:queryParams', $event)"
       />
     </div>
@@ -178,8 +179,6 @@ defineExpose({
         <el-radio-group
           :model-value="requestBody.format"
           class="interface-body-format-radio"
-          :class="{ 'interface-body-format-radio--readonly': readonly }"
-          :disabled="readonly"
           @update:model-value="updateBodyFormat"
         >
           <el-radio
@@ -194,7 +193,6 @@ defineExpose({
           </el-radio>
         </el-radio-group>
         <button
-          v-if="!readonly"
           type="button"
           class="interface-body-import-btn"
           @click="importVisible = true"
@@ -209,10 +207,9 @@ defineExpose({
       <InterfaceRequestBodyRaw
         v-if="isRawBody"
         :model-value="requestBody"
-        :readonly="readonly"
         @update:model-value="emit('update:requestBody', $event)"
       />
-      <InterfaceFieldTreeTable v-else v-model="bodyFields" :readonly="readonly" />
+      <InterfaceFieldTreeTable v-else v-model="bodyFields" />
     </div>
   </div>
 </template>

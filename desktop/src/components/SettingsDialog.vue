@@ -265,7 +265,7 @@ const lastSync = ref('')
 const lastSyncStats = ref<SyncStats | null>(null)
 const dbPath = ref('')
 const timeoutSecs = ref(60)
-const appVersion = '0.0.1'
+const appVersion = '0.2.0'
 const platformLabel = ref('—')
 const archLabel = ref('—')
 const busy = computed(() => testing.value || syncing.value)

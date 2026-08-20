@@ -94,6 +94,20 @@ func (_u *APIUpdate) SetNillableMethod(v *string) *APIUpdate {
 	return _u
 }
 
+// SetProtocol sets the "protocol" field.
+func (_u *APIUpdate) SetProtocol(v string) *APIUpdate {
+	_u.mutation.SetProtocol(v)
+	return _u
+}
+
+// SetNillableProtocol sets the "protocol" field if the given value is not nil.
+func (_u *APIUpdate) SetNillableProtocol(v *string) *APIUpdate {
+	if v != nil {
+		_u.SetProtocol(*v)
+	}
+	return _u
+}
+
 // SetURL sets the "url" field.
 func (_u *APIUpdate) SetURL(v string) *APIUpdate {
 	_u.mutation.SetURL(v)
@@ -627,6 +641,11 @@ func (_u *APIUpdate) check() error {
 			return &ValidationError{Name: "method", err: fmt.Errorf(`ent: validator failed for field "API.method": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.Protocol(); ok {
+		if err := api.ProtocolValidator(v); err != nil {
+			return &ValidationError{Name: "protocol", err: fmt.Errorf(`ent: validator failed for field "API.protocol": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.URL(); ok {
 		if err := api.URLValidator(v); err != nil {
 			return &ValidationError{Name: "url", err: fmt.Errorf(`ent: validator failed for field "API.url": %w`, err)}
@@ -674,6 +693,9 @@ func (_u *APIUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.Method(); ok {
 		_spec.SetField(api.FieldMethod, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Protocol(); ok {
+		_spec.SetField(api.FieldProtocol, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.URL(); ok {
 		_spec.SetField(api.FieldURL, field.TypeString, value)
@@ -1214,6 +1236,20 @@ func (_u *APIUpdateOne) SetMethod(v string) *APIUpdateOne {
 func (_u *APIUpdateOne) SetNillableMethod(v *string) *APIUpdateOne {
 	if v != nil {
 		_u.SetMethod(*v)
+	}
+	return _u
+}
+
+// SetProtocol sets the "protocol" field.
+func (_u *APIUpdateOne) SetProtocol(v string) *APIUpdateOne {
+	_u.mutation.SetProtocol(v)
+	return _u
+}
+
+// SetNillableProtocol sets the "protocol" field if the given value is not nil.
+func (_u *APIUpdateOne) SetNillableProtocol(v *string) *APIUpdateOne {
+	if v != nil {
+		_u.SetProtocol(*v)
 	}
 	return _u
 }
@@ -1764,6 +1800,11 @@ func (_u *APIUpdateOne) check() error {
 			return &ValidationError{Name: "method", err: fmt.Errorf(`ent: validator failed for field "API.method": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.Protocol(); ok {
+		if err := api.ProtocolValidator(v); err != nil {
+			return &ValidationError{Name: "protocol", err: fmt.Errorf(`ent: validator failed for field "API.protocol": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.URL(); ok {
 		if err := api.URLValidator(v); err != nil {
 			return &ValidationError{Name: "url", err: fmt.Errorf(`ent: validator failed for field "API.url": %w`, err)}
@@ -1828,6 +1869,9 @@ func (_u *APIUpdateOne) sqlSave(ctx context.Context) (_node *API, err error) {
 	}
 	if value, ok := _u.mutation.Method(); ok {
 		_spec.SetField(api.FieldMethod, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Protocol(); ok {
+		_spec.SetField(api.FieldProtocol, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.URL(); ok {
 		_spec.SetField(api.FieldURL, field.TypeString, value)

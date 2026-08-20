@@ -14,6 +14,7 @@ var (
 		{Name: "id", Type: field.TypeInt64, Increment: true},
 		{Name: "name", Type: field.TypeString, Size: 100, Default: ""},
 		{Name: "method", Type: field.TypeString, Size: 10, Default: ""},
+		{Name: "protocol", Type: field.TypeString, Size: 10, Default: ""},
 		{Name: "url", Type: field.TypeString, Size: 500, Default: ""},
 		{Name: "status", Type: field.TypeUint8, Default: 2},
 		{Name: "request_body_format", Type: field.TypeString, Size: 20, Default: "json"},
@@ -36,25 +37,25 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "interfaces_folders_interfaces",
-				Columns:    []*schema.Column{InterfacesColumns[12]},
+				Columns:    []*schema.Column{InterfacesColumns[13]},
 				RefColumns: []*schema.Column{FoldersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "interfaces_projects_interfaces",
-				Columns:    []*schema.Column{InterfacesColumns[13]},
+				Columns:    []*schema.Column{InterfacesColumns[14]},
 				RefColumns: []*schema.Column{ProjectsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "interfaces_users_created_interfaces",
-				Columns:    []*schema.Column{InterfacesColumns[14]},
+				Columns:    []*schema.Column{InterfacesColumns[15]},
 				RefColumns: []*schema.Column{UsersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "interfaces_users_updated_interfaces",
-				Columns:    []*schema.Column{InterfacesColumns[15]},
+				Columns:    []*schema.Column{InterfacesColumns[16]},
 				RefColumns: []*schema.Column{UsersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},

@@ -86,6 +86,7 @@ func (Repo) ListByProject(ctx context.Context, projectID int64) ([]*ent.API, err
 		Query().
 		Where(entapi.ProjectIDEQ(projectID)).
 		WithFolder().
+		WithCreator().
 		WithUpdater().
 		Order(ent.Asc(entapi.FieldSortOrder), ent.Asc(entapi.FieldID)).
 		All(ctx)
@@ -109,6 +110,7 @@ func (Repo) GetWithDetails(ctx context.Context, projectID, interfaceID int64) (*
 			entapi.ProjectIDEQ(projectID),
 		).
 		WithFolder().
+		WithCreator().
 		WithUpdater().
 		WithRequestHeaders(func(q *ent.InterfaceRequestHeaderQuery) {
 			q.Order(ent.Asc(entreqheader.FieldSortOrder), ent.Asc(entreqheader.FieldID))
@@ -141,6 +143,7 @@ func (Repo) Create(ctx context.Context, projectID, folderID, userID int64, name,
 		SetFolderID(folderID).
 		SetName(name).
 		SetMethod(method).
+		SetProtocol(normalizeProtocol("", method, url)).
 		SetURL(url).
 		SetStatus(status).
 		SetSortOrder(sortOrder).

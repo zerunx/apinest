@@ -86,6 +86,20 @@ func (_c *APICreate) SetNillableMethod(v *string) *APICreate {
 	return _c
 }
 
+// SetProtocol sets the "protocol" field.
+func (_c *APICreate) SetProtocol(v string) *APICreate {
+	_c.mutation.SetProtocol(v)
+	return _c
+}
+
+// SetNillableProtocol sets the "protocol" field if the given value is not nil.
+func (_c *APICreate) SetNillableProtocol(v *string) *APICreate {
+	if v != nil {
+		_c.SetProtocol(*v)
+	}
+	return _c
+}
+
 // SetURL sets the "url" field.
 func (_c *APICreate) SetURL(v string) *APICreate {
 	_c.mutation.SetURL(v)
@@ -436,6 +450,10 @@ func (_c *APICreate) defaults() error {
 		v := api.DefaultMethod
 		_c.mutation.SetMethod(v)
 	}
+	if _, ok := _c.mutation.Protocol(); !ok {
+		v := api.DefaultProtocol
+		_c.mutation.SetProtocol(v)
+	}
 	if _, ok := _c.mutation.URL(); !ok {
 		v := api.DefaultURL
 		_c.mutation.SetURL(v)
@@ -507,6 +525,14 @@ func (_c *APICreate) check() error {
 	if v, ok := _c.mutation.Method(); ok {
 		if err := api.MethodValidator(v); err != nil {
 			return &ValidationError{Name: "method", err: fmt.Errorf(`ent: validator failed for field "API.method": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.Protocol(); !ok {
+		return &ValidationError{Name: "protocol", err: errors.New(`ent: missing required field "API.protocol"`)}
+	}
+	if v, ok := _c.mutation.Protocol(); ok {
+		if err := api.ProtocolValidator(v); err != nil {
+			return &ValidationError{Name: "protocol", err: fmt.Errorf(`ent: validator failed for field "API.protocol": %w`, err)}
 		}
 	}
 	if _, ok := _c.mutation.URL(); !ok {
@@ -610,6 +636,10 @@ func (_c *APICreate) createSpec() (*API, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Method(); ok {
 		_spec.SetField(api.FieldMethod, field.TypeString, value)
 		_node.Method = value
+	}
+	if value, ok := _c.mutation.Protocol(); ok {
+		_spec.SetField(api.FieldProtocol, field.TypeString, value)
+		_node.Protocol = value
 	}
 	if value, ok := _c.mutation.URL(); ok {
 		_spec.SetField(api.FieldURL, field.TypeString, value)

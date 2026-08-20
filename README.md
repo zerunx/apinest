@@ -1,12 +1,14 @@
-# ApiNest
+# Apinest
 
-> 开源 API 协作管理平台
+> 开源 API 管理 / 接口文档协作平台 
 
 [中文](README.md) | [English](README_en.md)
 
+**Apinest**（ApiNest）是一套可自托管的 API 协作管理平台，用于集中管理接口文档，适合作为 Postman / Apifox 等等工具的轻量自托管替代方案。
+
 ## 它是做什么的
 
-ApiNest 用来集中管理接口文档与协作流程。你可以把团队放进同一个工作空间，按项目、文件夹组织接口，配置多套环境与变量，邀请成员共同编辑，再通过分享链接把指定接口开放给无需登录的访问者。
+把团队放进同一个工作空间，按项目、文件夹组织接口，配置多套环境与变量，邀请成员共同编辑，再通过分享链接把指定接口开放给无需登录的访问者。
 
 适合替代零散的文档表格或私有接口清单，让接口定义、环境切换与协作权限落在同一处。
 
@@ -16,30 +18,12 @@ ApiNest 用来集中管理接口文档与协作流程。你可以把团队放进
 - 账号：`admin`
 - 密码：`123123`
 
-## 技术栈
-
-| 层级 | 技术 |
-|------|------|
-| 后端 | Go · Gin · Ent · JWT · Zap · WebSocket |
-| 前端 | Vue 3 · TypeScript · Vite · Element Plus · Vue Router · Axios |
-| 基础设施 | Docker · PostgreSQL · Valkey · Caddy |
-
-## 特性
-
-- **工作空间与项目**：创建、重命名、删除；按项目归档接口资产
-- **接口文档**：文件夹分层、接口 CRUD、请求/响应相关字段管理
-- **环境与变量**：多环境配置，便于本地 / 测试 / 生产切换
-- **成员协作**：邀请加入工作空间，按角色控制编辑权限
-- **项目分享**：生成分享记录，访客无需登录即可查看勾选接口
-- **系统能力**：安装向导、用户鉴权、管理后台（用户与空间转移）、中英双语
-
-## 安装
+## 快速开始
 
 镜像地址：[Docker Hub · zerunx/nest](https://hub.docker.com/r/zerunx/nest/tags)
 
 ```bash
 docker pull zerunx/nest:latest
-
 ```
 
 > **部署前提**
@@ -55,8 +39,8 @@ docker pull zerunx/nest:latest
 services:
   nest:
     image: zerunx/nest:latest
-    expose:
-      - 3000
+    ports:
+      - "3000:3000"
     volumes:
       - ./runtime:/app/runtime
     restart: unless-stopped
@@ -77,9 +61,7 @@ docker run -d --name nest \
 
 ### 反向代理
 
-Nginx、Caddy 等 Web 服务器只需把流量反代到 ApiNest 服务（默认 `http://127.0.0.1:3000` 或容器网络中的 `nest:3000`）即可，前后端同源，无需再单独部署静态站点。
-
-Caddy 示例：
+Nginx、Caddy 等只需把流量反代到 Apinest 服务（默认 `http://127.0.0.1:3000` 或容器网络中的 `nest:3000`），前后端同源，无需单独部署静态站点。
 
 ```caddyfile
 your.domain.com {
@@ -89,7 +71,26 @@ your.domain.com {
 
 ### 完成安装
 
-浏览器访问站点后按安装向导填写 PostgreSQL 连接信息与管理员账号。安装完成后即可登录使用。
+浏览器访问站点后按安装向导填写 PostgreSQL 连接信息与管理员账号，完成后即可登录使用。
+
+## 技术栈
+
+| 层级 | 技术 |
+|------|------|
+| 后端 | Go · Gin · Ent · JWT · Zap · WebSocket |
+| 前端 | Vue 3 · TypeScript · Vite · Element Plus · Vue Router · Axios |
+| 桌面端 | Tauri 2 · Rust · Vue 3 · SQLite |
+| 基础设施 | Docker · PostgreSQL · Valkey · Caddy |
+
+## 特性
+
+- **工作空间与项目**：创建、重命名、删除；按项目归档接口资产
+- **接口文档**：文件夹分层、接口 CRUD、请求/响应相关字段管理
+- **环境与变量**：多环境配置，便于本地 / 测试 / 生产切换
+- **成员协作**：邀请加入工作空间，按角色控制编辑权限
+- **项目分享**：生成分享记录，访客无需登录即可查看勾选接口
+- **桌面客户端**：本地同步与发请求，支持环境变量替换与请求历史
+- **系统能力**：安装向导、用户鉴权、管理后台、中英双语
 
 ## 路线图
 
@@ -107,4 +108,4 @@ your.domain.com {
 
 ## License
 
-ApiNest 采用 [Apache License 2.0](LICENSE) 开源
+ApiNest is licensed under the [Apache License 2.0](LICENSE)

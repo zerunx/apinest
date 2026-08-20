@@ -29,6 +29,8 @@ type API struct {
 	Name string `json:"name,omitempty"`
 	// HTTP 方法
 	Method string `json:"method,omitempty"`
+	// 请求协议：HTTP, HTTPS, WS, TCP, UDP, GRPC
+	Protocol string `json:"protocol,omitempty"`
 	// 接口路径
 	URL string `json:"url,omitempty"`
 	// 状态：1: 已发布, 2: 测试中, 3: 开发中, 4: 异常, 5: 维护, 6: 废弃
@@ -202,7 +204,7 @@ func (*API) scanValues(columns []string) ([]any, error) {
 			values[i] = &sql.NullScanner{S: new(utils.DateTime)}
 		case api.FieldID, api.FieldProjectID, api.FieldFolderID, api.FieldStatus, api.FieldSortOrder, api.FieldCreatedBy, api.FieldUpdatedBy:
 			values[i] = new(sql.NullInt64)
-		case api.FieldName, api.FieldMethod, api.FieldURL, api.FieldRequestBodyFormat, api.FieldRequestBodyDataType, api.FieldRequestBodyRaw:
+		case api.FieldName, api.FieldMethod, api.FieldProtocol, api.FieldURL, api.FieldRequestBodyFormat, api.FieldRequestBodyDataType, api.FieldRequestBodyRaw:
 			values[i] = new(sql.NullString)
 		case api.FieldCreatedAt, api.FieldUpdatedAt:
 			values[i] = new(utils.DateTime)
@@ -250,6 +252,12 @@ func (_m *API) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field method", values[i])
 			} else if value.Valid {
 				_m.Method = value.String
+			}
+		case api.FieldProtocol:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field protocol", values[i])
+			} else if value.Valid {
+				_m.Protocol = value.String
 			}
 		case api.FieldURL:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -420,6 +428,9 @@ func (_m *API) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("method=")
 	builder.WriteString(_m.Method)
+	builder.WriteString(", ")
+	builder.WriteString("protocol=")
+	builder.WriteString(_m.Protocol)
 	builder.WriteString(", ")
 	builder.WriteString("url=")
 	builder.WriteString(_m.URL)

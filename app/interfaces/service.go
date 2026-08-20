@@ -31,24 +31,7 @@ func (Service) List(ctx context.Context, userID int64, params ListRequest) ([]It
 
 	items := make([]Item, 0, len(rows))
 	for _, row := range rows {
-		folderName := ""
-		if row.Edges.Folder != nil {
-			folderName = row.Edges.Folder.Name
-		}
-		items = append(items, Item{
-			ID:            row.ID,
-			ProjectID:     row.ProjectID,
-			FolderID:      row.FolderID,
-			Name:          row.Name,
-			Method:        row.Method,
-			URL:           row.URL,
-			Status:        row.Status,
-			FolderName:    folderName,
-			UpdatedBy:     row.UpdatedBy,
-			UpdatedByName: workspace.UserDisplayName(row.Edges.Updater),
-			CreatedAt:     row.CreatedAt.Format(utils.DateTimeFormat),
-			UpdatedAt:     row.UpdatedAt.Format(utils.DateTimeFormat),
-		})
+		items = append(items, toItem(row))
 	}
 	return items, nil
 }
@@ -74,26 +57,8 @@ func LoadDetail(ctx context.Context, projectID, interfaceID int64) (*DetailItem,
 		return nil, err
 	}
 
-	folderName := ""
-	if row.Edges.Folder != nil {
-		folderName = row.Edges.Folder.Name
-	}
-
 	return &DetailItem{
-		Item: Item{
-			ID:            row.ID,
-			ProjectID:     row.ProjectID,
-			FolderID:      row.FolderID,
-			Name:          row.Name,
-			Method:        row.Method,
-			URL:           row.URL,
-			Status:        row.Status,
-			FolderName:    folderName,
-			UpdatedBy:     row.UpdatedBy,
-			UpdatedByName: workspace.UserDisplayName(row.Edges.Updater),
-			CreatedAt:     row.CreatedAt.Format(utils.DateTimeFormat),
-			UpdatedAt:     row.UpdatedAt.Format(utils.DateTimeFormat),
-		},
+		Item:           toItem(row),
 		RequestHeaders: buildParamItems(row.Edges.RequestHeaders),
 		RequestBody: RequestBodyConfig{
 			Format:   row.RequestBodyFormat,
@@ -109,6 +74,9 @@ func LoadDetail(ctx context.Context, projectID, interfaceID int64) (*DetailItem,
 }
 
 func (Service) Create(ctx context.Context, userID int64, params CreateRequest) (int64, error) {
+	if userID <= 0 {
+		return 0, bizerr.New("未登录")
+	}
 	if _, err := workspace.Require(ctx, userID, params.WorkspaceID, workspace.ActionProjectCreate); err != nil {
 		return 0, err
 	}
@@ -181,6 +149,7 @@ func InsertInTx(ctx context.Context, tx *ent.Tx, userID, projectID, folderID int
 		SetFolderID(folderID).
 		SetName(name).
 		SetMethod(method).
+		SetProtocol(normalizeProtocol(params.Protocol, method, url)).
 		SetURL(url).
 		SetStatus(status).
 		SetSortOrder(sortOrder).
@@ -189,6 +158,8 @@ func InsertInTx(ctx context.Context, tx *ent.Tx, userID, projectID, folderID int
 		SetRequestBodyRaw(params.RequestBody.Raw).
 		SetCreatedBy(userID).
 		SetUpdatedBy(userID).
+		SetCreatorID(userID).
+		SetUpdaterID(userID).
 		Save(ctx)
 	if err != nil {
 		return 0, err
@@ -250,6 +221,7 @@ func (Service) Update(ctx context.Context, userID int64, params UpdateRequest) e
 		UpdateOneID(params.InterfaceID).
 		SetName(params.Name).
 		SetMethod(strings.ToUpper(params.Method)).
+		SetProtocol(normalizeProtocol(params.Protocol, params.Method, params.URL)).
 		SetURL(params.URL).
 		SetStatus(status).
 		SetRequestBodyFormat(bodyFormat).
@@ -362,6 +334,55 @@ func (Service) Reorder(ctx context.Context, userID int64, params ReorderRequest)
 	}
 
 	return tx.Commit()
+}
+
+func normalizeProtocol(protocol, method, url string) string {
+	switch strings.ToUpper(strings.TrimSpace(protocol)) {
+	case "HTTP", "HTTPS", "WS", "TCP", "UDP", "GRPC":
+		return strings.ToUpper(strings.TrimSpace(protocol))
+	case "WSS":
+		return "WS"
+	case "RPC":
+		return "GRPC"
+	}
+	switch strings.ToUpper(strings.TrimSpace(method)) {
+	case "WS", "WSS":
+		return "WS"
+	case "TCP":
+		return "TCP"
+	case "UDP":
+		return "UDP"
+	case "GRPC", "RPC":
+		return "GRPC"
+	}
+	if len(url) >= 8 && strings.EqualFold(url[:8], "https://") {
+		return "HTTPS"
+	}
+	return "HTTP"
+}
+
+func toItem(row *ent.API) Item {
+	folderName := ""
+	if row.Edges.Folder != nil {
+		folderName = row.Edges.Folder.Name
+	}
+	return Item{
+		ID:            row.ID,
+		ProjectID:     row.ProjectID,
+		FolderID:      row.FolderID,
+		Name:          row.Name,
+		Method:        row.Method,
+		Protocol:      normalizeProtocol(row.Protocol, row.Method, row.URL),
+		URL:           row.URL,
+		Status:        row.Status,
+		FolderName:    folderName,
+		CreatedBy:     row.CreatedBy,
+		CreatedByName: workspace.UserDisplayName(row.Edges.Creator),
+		UpdatedBy:     row.UpdatedBy,
+		UpdatedByName: workspace.UserDisplayName(row.Edges.Updater),
+		CreatedAt:     row.CreatedAt.Format(utils.DateTimeFormat),
+		UpdatedAt:     row.UpdatedAt.Format(utils.DateTimeFormat),
+	}
 }
 
 func buildParamItems(rows []*ent.InterfaceRequestHeader) []ParamItem {

@@ -3,6 +3,7 @@ import { computed, watch } from 'vue'
 import { Delete, Plus } from '@element-plus/icons-vue'
 import { useTableRowDrag } from '@/composables/useTableRowDrag'
 import { useLocale } from '@/composables/useLocale'
+import InterfaceDocCopyCell from '@/interface/InterfaceDocCopyCell.vue'
 import {
   addChildAtPath,
   addSiblingAtPath,
@@ -34,6 +35,19 @@ const { t } = useLocale()
 const fieldTypeOptions = ['string', 'number', 'boolean', 'object', 'array', 'file']
 
 const flatRows = computed(() => flattenFieldTree(props.modelValue))
+const displayRows = computed(() =>
+  props.readonly ? flattenFieldTree(compactFieldTree(props.modelValue)) : flatRows.value,
+)
+
+function requiredLabel(required: boolean) {
+  return required
+    ? t('workspace.interfaceForm.requiredYes')
+    : t('workspace.interfaceForm.requiredNo')
+}
+
+function typeLabel(type: string) {
+  return `[${type || 'string'}]`
+}
 
 const allFilledRequired = computed(
   () => flatRows.value.length > 0 && flatRows.value.every((row) => row.node.required),
@@ -120,10 +134,16 @@ defineExpose({ compact: () => compactFieldTree(props.modelValue) })
 </script>
 
 <template>
-  <div class="interface-param-table-wrap">
-  <table class="interface-param-table">
+  <div
+    class="interface-param-table-wrap"
+    :class="{ 'interface-param-table-wrap--readonly': readonly }"
+  >
+  <table
+    class="interface-param-table"
+    :class="{ 'interface-param-table--readonly': readonly }"
+  >
     <colgroup>
-      <col class="interface-param-table__sort" />
+      <col v-if="!readonly" class="interface-param-table__sort" />
       <col class="interface-param-table__col-name" />
       <col class="interface-param-table__col-type" />
       <col class="interface-param-table__center" />
@@ -133,7 +153,7 @@ defineExpose({ compact: () => compactFieldTree(props.modelValue) })
     </colgroup>
     <thead>
       <tr>
-        <th class="interface-param-table__sort" />
+        <th v-if="!readonly" class="interface-param-table__sort" />
         <th class="interface-param-table__col-name">{{ t('workspace.interfaceForm.paramName') }}</th>
         <th class="interface-param-table__col-type">{{ t('workspace.interfaceForm.paramType') }}</th>
         <th class="interface-param-table__center interface-param-table__required-header">
@@ -159,14 +179,14 @@ defineExpose({ compact: () => compactFieldTree(props.modelValue) })
     </thead>
     <tbody>
       <tr
-        v-for="(row, index) in flatRows"
+        v-for="(row, index) in displayRows"
         :key="row.path.join('-')"
         :class="rowClass(index)"
         @dragover="handleDragOver($event, index)"
         @dragleave="handleDragLeave(index)"
         @drop="handleDrop($event, index)"
       >
-        <td class="interface-param-table__sort">
+        <td v-if="!readonly" class="interface-param-table__sort">
           <span
             v-if="canDragRow(index)"
             class="interface-param-table__sort-handle"
@@ -182,18 +202,20 @@ defineExpose({ compact: () => compactFieldTree(props.modelValue) })
         </td>
         <td class="interface-param-table__col-name">
           <div class="interface-param-table__name-cell" :style="{ paddingLeft: `${row.depth * 20}px` }">
+            <InterfaceDocCopyCell v-if="readonly" :value="row.node.name" />
             <el-input
+              v-else
               :model-value="row.node.name"
               :placeholder="t('workspace.interfaceForm.paramName')"
-              :readonly="readonly"
               @update:model-value="updateRow(row.path, { name: $event })"
             />
           </div>
         </td>
         <td class="interface-param-table__col-type">
+          <span v-if="readonly" class="interface-param-table__text">{{ typeLabel(row.node.type) }}</span>
           <el-select
+            v-else
             :model-value="row.node.type"
-            :disabled="readonly"
             popper-class="app-action-dropdown"
             @update:model-value="updateRow(row.path, { type: $event })"
           >
@@ -201,25 +223,28 @@ defineExpose({ compact: () => compactFieldTree(props.modelValue) })
           </el-select>
         </td>
         <td class="interface-param-table__center">
+          <span v-if="readonly" class="interface-param-table__text">{{ requiredLabel(row.node.required) }}</span>
           <el-checkbox
+            v-else
             :model-value="row.node.required"
-            :disabled="readonly"
             @update:model-value="updateRow(row.path, { required: $event })"
           />
         </td>
         <td class="interface-param-table__col-desc">
+          <InterfaceDocCopyCell v-if="readonly" :value="row.node.description" />
           <el-input
+            v-else
             :model-value="row.node.description"
             :placeholder="t('workspace.interfaceForm.paramDescPlaceholder')"
-            :readonly="readonly"
             @update:model-value="updateRow(row.path, { description: $event })"
           />
         </td>
         <td class="interface-param-table__col-example">
+          <InterfaceDocCopyCell v-if="readonly" :value="row.node.example" />
           <el-input
+            v-else
             :model-value="row.node.example"
             :placeholder="t('workspace.interfaceForm.example')"
-            :readonly="readonly"
             @update:model-value="updateRow(row.path, { example: $event })"
           />
         </td>

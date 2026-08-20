@@ -50,6 +50,7 @@ type Node struct {
 	Name             string                           `json:"name"`
 	Children         []Node                           `json:"children,omitempty"`
 	Method           string                           `json:"method,omitempty"`
+	Protocol         string                           `json:"protocol,omitempty"`
 	URL              string                           `json:"url,omitempty"`
 	Status           uint8                            `json:"status,omitempty"`
 	RequestHeaders   []interfaces.ParamItem           `json:"request_headers,omitempty"`

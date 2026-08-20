@@ -18,6 +18,7 @@ import { fetchEnvironments } from '@/api/environment'
 import { fetchEnvironmentVariables } from '@/api/envvariable'
 import { createProject as apiCreateProject, fetchProjects } from '@/api/project'
 import { createWorkspace as apiCreateWorkspace, fetchWorkspaces } from '@/api/workspace'
+import { useAuth } from '@/composables/useAuth'
 import { readWorkspaceLayout, writeWorkspaceLayout } from '@/utils/workspace-layout-storage'
 import type { StoredWorkspaceTab } from '@/utils/workspace-layout-storage'
 import type {
@@ -60,6 +61,8 @@ const activeEnvironmentId = ref<number | null>(null)
 const createWorkspaceVisible = ref(false)
 const createProjectVisible = ref(false)
 const creatingApi = ref(false)
+/** After creating an API, open its detail tab in edit mode (keep-alive may remember "doc"). */
+const openNextApiInEdit = ref(false)
 
 const CREATE_API_TAB_ID = 'create-api'
 
@@ -149,6 +152,18 @@ function patchLocalApi(
   }
 }
 
+function currentUserDisplayName() {
+  const profile = useAuth().user.value
+  if (!profile) return ''
+  return profile.name.trim() || profile.account.trim()
+}
+
+function formatNow() {
+  const date = new Date()
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+}
+
 function insertLocalApi(
   projectId: number,
   folderId: number,
@@ -174,6 +189,8 @@ function insertLocalApi(
   }
 
   if (!interfaces.value.some((row) => row.id === apiId)) {
+    const actorName = currentUserDisplayName()
+    const now = formatNow()
     interfaces.value.push({
       id: apiId,
       project_id: projectId,
@@ -182,7 +199,10 @@ function insertLocalApi(
       method,
       url,
       status: status as InterfaceItem['status'],
-      created_at: '',
+      created_by_name: actorName,
+      updated_by_name: actorName,
+      created_at: now,
+      updated_at: now,
     })
   }
 }
@@ -1110,6 +1130,7 @@ export function useWorkspaceContext() {
     } else {
       upsertTab(apiTab)
     }
+    openNextApiInEdit.value = true
     activateTab(apiTabId)
     return created.id
   }
@@ -1330,6 +1351,7 @@ export function useWorkspaceContext() {
     setActiveTabDirty,
     setTabDirty,
     createApiSessionKey,
+    openNextApiInEdit,
     CREATE_API_TAB_ID,
     toggleNode,
     isNodeExpanded,

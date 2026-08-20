@@ -216,6 +216,7 @@ func insertAPI(ctx context.Context, tx *ent.Tx, userID, projectID, folderID int6
 	params := interfaces.CreateRequest{
 		Name:             node.Name,
 		Method:           node.Method,
+		Protocol:         node.Protocol,
 		URL:              node.URL,
 		Status:           node.Status,
 		RequestHeaders:   node.RequestHeaders,
@@ -331,15 +332,17 @@ func buildExportTree(folders []*ent.Folder, apis []*ent.API, details map[int64]*
 
 func apiNode(row *ent.API, detail *interfaces.DetailItem) Node {
 	node := Node{
-		Type:   "api",
-		Name:   row.Name,
-		Method: row.Method,
-		URL:    row.URL,
-		Status: row.Status,
+		Type:     "api",
+		Name:     row.Name,
+		Method:   row.Method,
+		Protocol: row.Protocol,
+		URL:      row.URL,
+		Status:   row.Status,
 	}
 	if detail != nil {
 		node.Name = detail.Name
 		node.Method = detail.Method
+		node.Protocol = detail.Protocol
 		node.URL = detail.URL
 		node.Status = detail.Status
 		node.RequestHeaders = detail.RequestHeaders

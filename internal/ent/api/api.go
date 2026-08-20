@@ -23,6 +23,8 @@ const (
 	FieldName = "name"
 	// FieldMethod holds the string denoting the method field in the database.
 	FieldMethod = "method"
+	// FieldProtocol holds the string denoting the protocol field in the database.
+	FieldProtocol = "protocol"
 	// FieldURL holds the string denoting the url field in the database.
 	FieldURL = "url"
 	// FieldStatus holds the string denoting the status field in the database.
@@ -155,6 +157,7 @@ var Columns = []string{
 	FieldFolderID,
 	FieldName,
 	FieldMethod,
+	FieldProtocol,
 	FieldURL,
 	FieldStatus,
 	FieldRequestBodyFormat,
@@ -198,6 +201,10 @@ var (
 	DefaultMethod string
 	// MethodValidator is a validator for the "method" field. It is called by the builders before save.
 	MethodValidator func(string) error
+	// DefaultProtocol holds the default value on creation for the "protocol" field.
+	DefaultProtocol string
+	// ProtocolValidator is a validator for the "protocol" field. It is called by the builders before save.
+	ProtocolValidator func(string) error
 	// DefaultURL holds the default value on creation for the "url" field.
 	DefaultURL string
 	// URLValidator is a validator for the "url" field. It is called by the builders before save.
@@ -256,6 +263,11 @@ func ByName(opts ...sql.OrderTermOption) OrderOption {
 // ByMethod orders the results by the method field.
 func ByMethod(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldMethod, opts...).ToFunc()
+}
+
+// ByProtocol orders the results by the protocol field.
+func ByProtocol(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldProtocol, opts...).ToFunc()
 }
 
 // ByURL orders the results by the url field.

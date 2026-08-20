@@ -28,10 +28,21 @@
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.06);
 
   --el-color-primary: #007acc;
+  --el-color-primary-light-3: #4da8e8;
+  --el-color-primary-light-5: #80c2f0;
+  --el-color-primary-light-7: #b3dbf7;
+  --el-color-primary-light-8: #cce7fa;
+  --el-color-primary-light-9: #e6f3fc;
   --el-bg-color: #ffffff;
   --el-bg-color-page: #f3f3f3;
   --el-bg-color-overlay: #ffffff;
+  --el-fill-color: #f0f0f0;
   --el-fill-color-blank: #ffffff;
+  --el-fill-color-light: #f5f5f5;
+  --el-fill-color-lighter: #fafafa;
+  --el-fill-color-extra-light: #fafafa;
+  --el-fill-color-dark: #ebebeb;
+  --el-fill-color-darker: #e0e0e0;
   --el-text-color-primary: #333333;
   --el-text-color-regular: #666666;
   --el-text-color-placeholder: #888888;
@@ -116,10 +127,21 @@
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.2);
 
   --el-color-primary: #007acc;
+  --el-color-primary-light-3: #1a6ca3;
+  --el-color-primary-light-5: #1a5578;
+  --el-color-primary-light-7: #1c3f56;
+  --el-color-primary-light-8: #1e3546;
+  --el-color-primary-light-9: #21303c;
   --el-bg-color: #242424;
   --el-bg-color-page: #1a1a1a;
   --el-bg-color-overlay: #242424;
+  --el-fill-color: #2a2a2a;
   --el-fill-color-blank: #242424;
+  --el-fill-color-light: #333338;
+  --el-fill-color-lighter: #2f2f2f;
+  --el-fill-color-extra-light: #2c2c2c;
+  --el-fill-color-dark: #3a3a3a;
+  --el-fill-color-darker: #444444;
   --el-text-color-primary: #e8e8e8;
   --el-text-color-regular: #a8a8a8;
   --el-text-color-placeholder: #8a8a8a;
@@ -326,6 +348,15 @@ a {
 .el-dropdown-menu__item:not(.is-disabled):focus {
   background-color: var(--color-hover);
   color: var(--color-text);
+}
+
+.el-button:not(.el-button--primary):not(.el-button--success):not(.el-button--warning):not(.el-button--danger):not(.el-button--info):not(.el-button--text) {
+  --el-button-hover-bg-color: var(--color-hover);
+  --el-button-hover-border-color: var(--color-border);
+  --el-button-hover-text-color: var(--color-text);
+  --el-button-active-bg-color: var(--color-hover);
+  --el-button-active-border-color: var(--color-border);
+  --el-button-active-text-color: var(--color-text);
 }
 
 .el-button--primary {

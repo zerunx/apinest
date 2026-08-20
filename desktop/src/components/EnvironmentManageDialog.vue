@@ -8,7 +8,7 @@
     >
       <div class="dialog" role="dialog" aria-modal="true">
         <button type="button" class="close-btn" :title="t('common.close')" @click="close">
-          ×
+          <span>×</span>
         </button>
 
         <aside class="nav">
@@ -683,12 +683,21 @@ async function submitVarForm() {
   background: transparent;
   color: var(--color-text-secondary);
   font-size: 19px;
-  line-height: 1;
+  line-height: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
 }
 
 .close-btn:hover {
   background: var(--color-hover);
   color: var(--color-text);
+}
+
+.close-btn span {
+  display: block;
+  transform: translateY(-1px);
 }
 
 .nav {

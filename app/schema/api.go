@@ -53,6 +53,11 @@ func (API) Fields() []ent.Field {
 			Default("").
 			Comment("HTTP 方法"),
 
+		field.String("protocol").
+			MaxLen(10).
+			Default("").
+			Comment("请求协议：HTTP, HTTPS, WS, TCP, UDP, GRPC"),
+
 		field.String("url").
 			MaxLen(500).
 			Default("").

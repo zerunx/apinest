@@ -3,6 +3,7 @@ import { computed, watch } from 'vue'
 import { Delete } from '@element-plus/icons-vue'
 import { reorderList, useTableRowDrag } from '@/composables/useTableRowDrag'
 import { useLocale } from '@/composables/useLocale'
+import InterfaceDocCopyCell from '@/interface/InterfaceDocCopyCell.vue'
 import {
   compactParamRows,
   emptyParamRow,
@@ -12,9 +13,16 @@ import {
   type ParamRow,
 } from '@/utils/interface-params'
 
+interface HeaderSuggestion {
+  value: string
+}
+
 const props = defineProps<{
   modelValue: ParamRow[]
   readonly?: boolean
+  nameSuggestions?: readonly string[]
+  nameLabel?: string
+  namePlaceholder?: string
 }>()
 
 const emit = defineEmits<{
@@ -24,6 +32,14 @@ const emit = defineEmits<{
 const { t } = useLocale()
 
 const fieldTypeOptions = ['string', 'number', 'boolean', 'object', 'array', 'file']
+const useNameSuggest = computed(() => !!props.nameSuggestions?.length)
+const nameColumnLabel = computed(() => props.nameLabel || t('workspace.interfaceForm.paramName'))
+const nameColumnPlaceholder = computed(
+  () => props.namePlaceholder || t('workspace.interfaceForm.paramName'),
+)
+const displayRows = computed(() =>
+  props.readonly ? compactParamRows(props.modelValue) : props.modelValue,
+)
 
 const allFilledRequired = computed(
   () => props.modelValue.length > 0 && props.modelValue.every((row) => row.required),
@@ -39,6 +55,24 @@ const requiredHeaderTooltip = computed(() =>
     ? t('workspace.interfaceForm.clearAllRequired')
     : t('workspace.interfaceForm.toggleAllRequired'),
 )
+
+function searchNameSuggestions(query: string, cb: (results: HeaderSuggestion[]) => void) {
+  const keyword = query.trim().toLowerCase()
+  const results = (props.nameSuggestions ?? [])
+    .filter((header) => !keyword || header.toLowerCase().includes(keyword))
+    .map((value) => ({ value }))
+  cb([...results])
+}
+
+function requiredLabel(required: boolean) {
+  return required
+    ? t('workspace.interfaceForm.requiredYes')
+    : t('workspace.interfaceForm.requiredNo')
+}
+
+function typeLabel(type: string) {
+  return `[${type || 'string'}]`
+}
 
 function syncRows(rows: ParamRow[]) {
   const normalized = props.readonly ? rows : ensureTrailingEmptyRow(rows)
@@ -104,10 +138,16 @@ defineExpose({ compact: () => compactParamRows(props.modelValue) })
 </script>
 
 <template>
-  <div class="interface-param-table-wrap">
-  <table class="interface-param-table">
+  <div
+    class="interface-param-table-wrap"
+    :class="{ 'interface-param-table-wrap--readonly': readonly }"
+  >
+  <table
+    class="interface-param-table"
+    :class="{ 'interface-param-table--readonly': readonly }"
+  >
     <colgroup>
-      <col class="interface-param-table__sort" />
+      <col v-if="!readonly" class="interface-param-table__sort" />
       <col class="interface-param-table__col-name" />
       <col class="interface-param-table__col-type" />
       <col class="interface-param-table__center" />
@@ -117,8 +157,8 @@ defineExpose({ compact: () => compactParamRows(props.modelValue) })
     </colgroup>
     <thead>
       <tr>
-        <th class="interface-param-table__sort" />
-        <th class="interface-param-table__col-name">{{ t('workspace.interfaceForm.paramName') }}</th>
+        <th v-if="!readonly" class="interface-param-table__sort" />
+        <th class="interface-param-table__col-name">{{ nameColumnLabel }}</th>
         <th class="interface-param-table__col-type">{{ t('workspace.interfaceForm.paramType') }}</th>
         <th class="interface-param-table__center interface-param-table__required-header">
           <template v-if="readonly">{{ t('workspace.interfaceForm.required') }}</template>
@@ -143,14 +183,14 @@ defineExpose({ compact: () => compactParamRows(props.modelValue) })
     </thead>
     <tbody>
       <tr
-        v-for="(row, index) in modelValue"
+        v-for="(row, index) in displayRows"
         :key="index"
         :class="rowClass(index)"
         @dragover="handleDragOver($event, index)"
         @dragleave="handleDragLeave(index)"
         @drop="handleDrop($event, index)"
       >
-        <td class="interface-param-table__sort">
+        <td v-if="!readonly" class="interface-param-table__sort">
           <span
             v-if="canDragRow(index)"
             class="interface-param-table__sort-handle"
@@ -165,17 +205,29 @@ defineExpose({ compact: () => compactParamRows(props.modelValue) })
           </span>
         </td>
         <td class="interface-param-table__col-name">
-          <el-input
+          <InterfaceDocCopyCell v-if="readonly" :value="row.name" />
+          <el-autocomplete
+            v-else-if="useNameSuggest"
             :model-value="row.name"
-            :placeholder="t('workspace.interfaceForm.paramName')"
-            :readonly="readonly"
+            :fetch-suggestions="searchNameSuggestions"
+            :trigger-on-focus="true"
+            clearable
+            :placeholder="nameColumnPlaceholder"
+            popper-class="app-action-dropdown"
+            @update:model-value="updateRow(index, { name: $event ?? '' })"
+          />
+          <el-input
+            v-else
+            :model-value="row.name"
+            :placeholder="nameColumnPlaceholder"
             @update:model-value="updateRow(index, { name: $event })"
           />
         </td>
         <td class="interface-param-table__col-type">
+          <span v-if="readonly" class="interface-param-table__text">{{ typeLabel(row.type) }}</span>
           <el-select
+            v-else
             :model-value="row.type"
-            :disabled="readonly"
             popper-class="app-action-dropdown"
             @update:model-value="updateRow(index, { type: $event })"
           >
@@ -183,25 +235,28 @@ defineExpose({ compact: () => compactParamRows(props.modelValue) })
           </el-select>
         </td>
         <td class="interface-param-table__center">
+          <span v-if="readonly" class="interface-param-table__text">{{ requiredLabel(row.required) }}</span>
           <el-checkbox
+            v-else
             :model-value="row.required"
-            :disabled="readonly"
             @update:model-value="updateRow(index, { required: $event })"
           />
         </td>
         <td class="interface-param-table__col-desc">
+          <InterfaceDocCopyCell v-if="readonly" :value="row.description" />
           <el-input
+            v-else
             :model-value="row.description"
             :placeholder="t('workspace.interfaceForm.paramDescPlaceholder')"
-            :readonly="readonly"
             @update:model-value="updateRow(index, { description: $event })"
           />
         </td>
         <td class="interface-param-table__col-example">
+          <InterfaceDocCopyCell v-if="readonly" :value="row.example" />
           <el-input
+            v-else
             :model-value="row.example"
             :placeholder="t('workspace.interfaceForm.example')"
-            :readonly="readonly"
             @update:model-value="updateRow(index, { example: $event })"
           />
         </td>
