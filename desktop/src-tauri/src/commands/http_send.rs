@@ -12,8 +12,8 @@ use url::Url;
 use crate::db::{get_setting, now_iso, Db};
 use crate::error::{AppError, AppResult};
 
-const DEFAULT_TIMEOUT_SECS: u64 = 30;
-const CONNECT_TIMEOUT_SECS: u64 = 10;
+pub(crate) const DEFAULT_TIMEOUT_SECS: u64 = 30;
+pub(crate) const CONNECT_TIMEOUT_SECS: u64 = 10;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct SendRequestArgs {
@@ -51,7 +51,7 @@ struct PreparedRequest {
     timeout_secs: u64,
 }
 
-fn apply_vars(input: &str, vars: &HashMap<String, String>) -> String {
+pub(crate) fn apply_vars(input: &str, vars: &HashMap<String, String>) -> String {
     let mut out = input.to_string();
     for (k, v) in vars {
         let needle = format!("{{{{{k}}}}}");

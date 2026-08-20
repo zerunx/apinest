@@ -47,6 +47,12 @@ pub fn sync_now(db: State<'_, Db>, args: SyncArgs) -> AppResult<SyncResult> {
 
         if args.workspace_id.is_none() {
             tx.execute(
+                "DELETE FROM grpc_rpcs WHERE server_id = ?1 AND interface_id IN (
+                   SELECT id FROM interfaces WHERE server_id = ?1 AND IFNULL(is_local, 0) = 0
+                 )",
+                params![server_id],
+            )?;
+            tx.execute(
                 "DELETE FROM interface_details WHERE server_id = ?1 AND interface_id IN (
                    SELECT id FROM interfaces WHERE server_id = ?1 AND IFNULL(is_local, 0) = 0
                  )",
@@ -250,6 +256,13 @@ fn clear_workspace_cache(conn: &Connection, server_id: i64, workspace_id: i64) -
         params![server_id, workspace_id],
     )?;
     conn.execute(
+        "DELETE FROM grpc_rpcs WHERE server_id = ?1 AND interface_id IN (
+           SELECT id FROM interfaces
+           WHERE server_id = ?1 AND workspace_id = ?2 AND IFNULL(is_local, 0) = 0
+         )",
+        params![server_id, workspace_id],
+    )?;
+    conn.execute(
         "DELETE FROM interface_details WHERE server_id = ?1 AND interface_id IN (
            SELECT id FROM interfaces
            WHERE server_id = ?1 AND workspace_id = ?2 AND IFNULL(is_local, 0) = 0
@@ -353,6 +366,7 @@ pub fn clear_local_cache(db: State<'_, Db>) -> AppResult<()> {
         if server_id > 0 {
             conn.execute("DELETE FROM environment_variables WHERE server_id = ?1", params![server_id])?;
             conn.execute("DELETE FROM environments WHERE server_id = ?1", params![server_id])?;
+            conn.execute("DELETE FROM grpc_rpcs WHERE server_id = ?1", params![server_id])?;
             conn.execute("DELETE FROM interface_details WHERE server_id = ?1", params![server_id])?;
             conn.execute("DELETE FROM interfaces WHERE server_id = ?1", params![server_id])?;
             conn.execute("DELETE FROM folders WHERE server_id = ?1", params![server_id])?;
@@ -363,6 +377,7 @@ pub fn clear_local_cache(db: State<'_, Db>) -> AppResult<()> {
             conn.execute_batch(
                 "DELETE FROM environment_variables;
                  DELETE FROM environments;
+                 DELETE FROM grpc_rpcs;
                  DELETE FROM interface_details;
                  DELETE FROM interfaces;
                  DELETE FROM folders;

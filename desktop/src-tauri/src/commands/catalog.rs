@@ -322,6 +322,12 @@ pub fn get_interface(
     }
 
     row.detail = cached_detail;
+    if let Some(detail) = row.detail.as_mut() {
+        db.with_conn(|conn| {
+            crate::grpc::store::attach_grpc_rpcs(conn, server_id, interface_id, detail);
+            Ok(())
+        })?;
+    }
     Ok(row)
 }
 

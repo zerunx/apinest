@@ -90,6 +90,22 @@ CREATE TABLE IF NOT EXISTS interface_details (
   PRIMARY KEY (server_id, interface_id)
 );
 
+CREATE TABLE IF NOT EXISTS grpc_rpcs (
+  server_id INTEGER NOT NULL,
+  interface_id INTEGER NOT NULL,
+  rpc_path TEXT NOT NULL,
+  service_name TEXT NOT NULL DEFAULT '',
+  method_name TEXT NOT NULL DEFAULT '',
+  request_type TEXT NOT NULL DEFAULT '',
+  response_type TEXT NOT NULL DEFAULT '',
+  client_streaming INTEGER NOT NULL DEFAULT 0,
+  server_streaming INTEGER NOT NULL DEFAULT 0,
+  message_json TEXT NOT NULL DEFAULT '{}',
+  metadata_json TEXT NOT NULL DEFAULT '[]',
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (server_id, interface_id, rpc_path)
+);
+
 CREATE TABLE IF NOT EXISTS environments (
   id INTEGER NOT NULL,
   server_id INTEGER NOT NULL,
@@ -142,5 +158,6 @@ CREATE TABLE IF NOT EXISTS local_drafts (
 
 CREATE INDEX IF NOT EXISTS idx_folders_project ON folders(server_id, project_id, parent_id);
 CREATE INDEX IF NOT EXISTS idx_interfaces_folder ON interfaces(server_id, project_id, folder_id);
+CREATE INDEX IF NOT EXISTS idx_grpc_rpcs_interface ON grpc_rpcs(server_id, interface_id);
 CREATE INDEX IF NOT EXISTS idx_projects_workspace ON projects(server_id, workspace_id);
 CREATE INDEX IF NOT EXISTS idx_env_vars ON environment_variables(server_id, environment_id);

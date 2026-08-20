@@ -95,12 +95,16 @@ pub struct NestClient {
 
 impl NestClient {
     pub fn new(base_url: &str, token: Option<String>) -> AppResult<Self> {
+        Self::with_timeout(base_url, token, 30)
+    }
+
+    pub fn with_timeout(base_url: &str, token: Option<String>, secs: u64) -> AppResult<Self> {
         let base = base_url.trim_end_matches('/').to_string();
         if base.is_empty() {
             return Err(AppError::msg("server URL is empty"));
         }
         let http = Client::builder()
-            .timeout(std::time::Duration::from_secs(30))
+            .timeout(std::time::Duration::from_secs(secs))
             .build()?;
         Ok(Self {
             http,
@@ -219,6 +223,52 @@ impl NestClient {
             "/api/v1/variables?workspace_id={workspace_id}&project_id={project_id}&environment_id={environment_id}"
         ))
     }
+
+    pub fn export_apinest(
+        &self,
+        workspace_id: i64,
+        project_id: i64,
+        folder_id: Option<i64>,
+    ) -> AppResult<Value> {
+        let mut path = format!(
+            "/api/v1/import/export?workspace_id={workspace_id}&project_id={project_id}"
+        );
+        if let Some(folder_id) = folder_id.filter(|id| *id > 0) {
+            path.push_str(&format!("&folder_id={folder_id}"));
+        }
+        self.get_data(&path)
+    }
+
+    pub fn import_apinest(
+        &self,
+        workspace_id: i64,
+        project_id: i64,
+        source: &str,
+        document: &Value,
+    ) -> AppResult<ImportApiResult> {
+        #[derive(Serialize)]
+        struct Payload<'a> {
+            workspace_id: i64,
+            project_id: i64,
+            source: &'a str,
+            document: &'a Value,
+        }
+        self.post_data(
+            "/api/v1/import/import",
+            &Payload {
+                workspace_id,
+                project_id,
+                source,
+                document,
+            },
+        )
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImportApiResult {
+    pub folders: i64,
+    pub apis: i64,
 }
 
 pub fn parse_folder_id(key: &str) -> Option<i64> {

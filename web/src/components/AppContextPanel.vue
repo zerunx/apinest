@@ -4,12 +4,17 @@ import { ArrowDown, Folder, Plus, Search, Setting, User } from '@element-plus/ic
 import { ElMessage } from 'element-plus'
 import { useLocale } from '@/composables/useLocale'
 import { useWorkspaceContext } from '@/composables/useWorkspaceContext'
+import { exportApis, importApis } from '@/api/importexport'
+import { downloadJson, safeDownloadName } from '@/utils/download-json'
+import SplitCreateButton from '@/components/SplitCreateButton.vue'
+import ImportApiDialog from '@/components/ImportApiDialog.vue'
 import {
   clampPanelWidth,
   readWorkspaceLayout,
   writeWorkspaceLayout,
 } from '@/utils/workspace-layout-storage'
-import type { ApiTreeNode, HttpMethod } from '@/types/workspace'
+import { methodTone, shortMethodLabel } from '@/utils/http-method'
+import type { ApiTreeNode } from '@/types/workspace'
 
 const { t } = useLocale()
 const {
@@ -38,9 +43,15 @@ const {
   openCreateApi,
   parseFolderId,
   parseApiId,
+  refreshApiData,
+  activeWorkspaceId,
+  activeProjectId,
+  activeProject,
 } = useWorkspaceContext()
 
 const deletingApiId = ref<number | null>(null)
+const importDialogOpen = ref(false)
+const importDialogRef = ref<{ setSubmitting: (value: boolean) => void; close: () => void } | null>(null)
 
 const searchQuery = ref('')
 
@@ -91,15 +102,6 @@ const folderDialogTitle = computed(() => {
   return t('workspace.createFolder')
 })
 
-const methodColors: Record<HttpMethod, string> = {
-  GET: 'get',
-  POST: 'post',
-  PUT: 'put',
-  DELETE: 'delete',
-  PATCH: 'patch',
-  HEAD: 'head',
-  OPTIONS: 'options',
-}
 
 const filteredProjects = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
@@ -437,12 +439,74 @@ function handleFolderAction(command: string, node: ApiTreeNode) {
     case 'add-folder':
       handleAddSubFolder(folderId)
       break
+    case 'export':
+      void handleExportFolder(folderId, node.name)
+      break
     case 'edit':
       handleEditFolder(folderId, node.name)
       break
     case 'delete':
       handleDeleteFolder(folderId, node.name)
       break
+  }
+}
+
+function openImportDialog() {
+  if (!activeWorkspaceId.value || !activeProjectId.value) {
+    ElMessage.warning(t('workspace.importExport.needProject'))
+    return
+  }
+  importDialogOpen.value = true
+}
+
+async function handleExportProject() {
+  await runExport()
+}
+
+async function handleExportFolder(folderId: number, folderName: string) {
+  await runExport(folderId, folderName)
+}
+
+async function runExport(folderId?: number, folderName?: string) {
+  if (!activeWorkspaceId.value || !activeProjectId.value) {
+    ElMessage.warning(t('workspace.importExport.needProject'))
+    return
+  }
+  try {
+    const doc = await exportApis(activeWorkspaceId.value, activeProjectId.value, folderId)
+    const base = folderName || activeProject.value?.name || 'apinest'
+    downloadJson(`${safeDownloadName(base)}.apinest.json`, doc)
+    ElMessage.success(t('workspace.importExport.exportSuccess'))
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : t('workspace.importExport.exportFailed'))
+  }
+}
+
+async function handleImportSubmit(payload: { source: string; document: unknown }) {
+  if (!activeWorkspaceId.value || !activeProjectId.value) {
+    ElMessage.warning(t('workspace.importExport.needProject'))
+    return
+  }
+  importDialogRef.value?.setSubmitting(true)
+  try {
+    const result = await importApis(
+      activeWorkspaceId.value,
+      activeProjectId.value,
+      payload.source,
+      payload.document,
+    )
+    await refreshApiData({ silent: true })
+    importDialogOpen.value = false
+    ElMessage.success(
+      t('workspace.importExport.importSuccess', {
+        folders: String(result.folders),
+        apis: String(result.apis),
+      }),
+    )
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : t('workspace.importExport.importFailed'))
+  } finally {
+    importDialogRef.value?.setSubmitting(false)
   }
 }
 
@@ -533,15 +597,15 @@ onBeforeUnmount(() => {
       >
         <el-icon :size="16"><Plus /></el-icon>
       </button>
-      <button
+      <SplitCreateButton
         v-else-if="activeModule === 'api'"
-        type="button"
-        class="context-panel__add-btn"
-        :title="t('workspace.createFolder')"
-        @click="handleCreateRootFolder"
-      >
-        <span class="context-panel__add-btn-plus">+</span>
-      </button>
+        :create-title="t('workspace.createFolder')"
+        :import-label="t('workspace.importExport.import')"
+        :export-label="t('workspace.importExport.export')"
+        @create="() => handleCreateRootFolder()"
+        @import="openImportDialog"
+        @export="handleExportProject"
+      />
     </div>
 
     <div v-if="activeModule === 'project'" class="context-panel__body">
@@ -655,9 +719,9 @@ onBeforeUnmount(() => {
           >
             <span
               class="context-panel__method"
-              :class="`context-panel__method--${methodColors[node.method]}`"
+              :class="`context-panel__method--${methodTone(node.method)}`"
             >
-              {{ node.method }}
+              {{ shortMethodLabel(node.method) }}
             </span>
           </span>
 
@@ -709,6 +773,7 @@ onBeforeUnmount(() => {
               <el-dropdown-menu>
                 <el-dropdown-item command="add-api">{{ t('workspace.addApi') }}</el-dropdown-item>
                 <el-dropdown-item command="add-folder">{{ t('workspace.addSubFolder') }}</el-dropdown-item>
+                <el-dropdown-item command="export" divided>{{ t('workspace.importExport.exportFolder') }}</el-dropdown-item>
                 <el-dropdown-item command="edit" divided>{{ t('common.rename') }}</el-dropdown-item>
                 <el-dropdown-item command="delete">{{ t('common.delete') }}</el-dropdown-item>
               </el-dropdown-menu>
@@ -767,6 +832,12 @@ onBeforeUnmount(() => {
         </el-button>
       </template>
     </el-dialog>
+
+    <ImportApiDialog
+      ref="importDialogRef"
+      v-model:open="importDialogOpen"
+      @submit="handleImportSubmit"
+    />
   </aside>
 </template>
 
@@ -841,8 +912,8 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 10px;
   padding: 0 12px;
-  height: 38px;
-  border-radius: 8px;
+  height: 35px;
+  border-radius: 4px;
   background: var(--color-workspace-inset);
   border: 1px solid var(--color-border);
 }
@@ -878,31 +949,6 @@ onBeforeUnmount(() => {
 
 .context-panel__create-btn:hover {
   border-color: var(--color-primary);
-}
-
-.context-panel__add-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 34px;
-  height: 34px;
-  padding: 0;
-  border: 1px solid var(--color-primary);
-  border-radius: 4px;
-  background: var(--color-primary);
-  color: #fff;
-  cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
-}
-
-.context-panel__add-btn:hover {
-  background: var(--color-primary-light);
-  border-color: var(--color-primary-light);
-}
-
-.context-panel__add-btn .el-icon {
-  color: #fff;
 }
 
 .context-panel__body {
@@ -1099,28 +1145,44 @@ onBeforeUnmount(() => {
 }
 
 .context-panel__method--get {
-  color: #61affe;
+  color: var(--method-get);
 }
 
 .context-panel__method--post {
-  color: #49cc90;
+  color: var(--method-post);
 }
 
 .context-panel__method--put {
-  color: #fca130;
+  color: var(--method-put);
 }
 
 .context-panel__method--delete {
-  color: #f93e3e;
+  color: var(--method-delete);
 }
 
 .context-panel__method--patch {
-  color: #50e3c2;
+  color: var(--method-patch);
 }
 
-.context-panel__method--head,
+.context-panel__method--head {
+  color: var(--method-head);
+}
+
 .context-panel__method--options {
-  color: var(--color-text-secondary);
+  color: var(--method-options);
+}
+
+.context-panel__method--ws {
+  color: var(--method-ws);
+}
+
+.context-panel__method--tcp,
+.context-panel__method--udp {
+  color: var(--method-tcp);
+}
+
+.context-panel__method--grpc {
+  color: var(--method-rpc);
 }
 
 .context-panel__tree-name {

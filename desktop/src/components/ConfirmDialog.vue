@@ -135,6 +135,8 @@ onUnmounted(() => {
   font-size: 13px;
   line-height: 1.55;
   color: var(--color-text-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .actions {

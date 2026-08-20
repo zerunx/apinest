@@ -22,6 +22,7 @@ import {
   normalizeResponseExampleForSave,
 } from '@/utils/response-example-format'
 import { emptyParamRow, ensureTrailingEmptyRow, type ParamRow } from '@/utils/interface-params'
+import { inferProtocol } from '@/utils/http-method'
 import type { InterfaceDetail } from '@/types/workspace'
 
 type DetailMode = 'doc' | 'edit'
@@ -81,7 +82,7 @@ function toParamRows(
 }
 
 function applyDetail(detail: InterfaceDetail) {
-  form.protocol = 'HTTP'
+  form.protocol = inferProtocol(detail.method, detail.url)
   form.method = detail.method
   form.url = detail.url
   form.folderId = detail.folder_id

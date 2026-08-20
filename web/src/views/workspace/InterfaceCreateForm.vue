@@ -131,6 +131,7 @@ function emitClose() {
             v-model:protocol="form.protocol"
             v-model:method="form.method"
             v-model:url="form.url"
+            create-mode
           />
         </div>
 

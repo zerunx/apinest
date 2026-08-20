@@ -14,6 +14,7 @@ import {
 } from '@/api/share'
 import { useLocale } from '@/composables/useLocale'
 import { useSharePageMeta } from '@/composables/useSharePageMeta'
+import { methodTone, shortMethodLabel } from '@/utils/http-method'
 import InterfaceRequestBodyRaw from '@/interface/InterfaceRequestBodyRaw.vue'
 import { toEditorLanguage } from '@/codemirror'
 import {
@@ -476,9 +477,9 @@ onUnmounted(() => {
                 <span class="share-view__method-wrap">
                   <span
                     class="http-method-badge"
-                    :class="`http-method-badge--${String(node.method || 'get').toLowerCase()}`"
+                    :class="`http-method-badge--${methodTone(String(node.method || 'GET'))}`"
                   >
-                    {{ node.method }}
+                    {{ shortMethodLabel(String(node.method || 'GET')) }}
                   </span>
                 </span>
                 <span class="share-view__api-name">{{ node.name }}</span>
@@ -496,9 +497,9 @@ onUnmounted(() => {
             <div class="share-view__detail-head">
               <span
                 class="http-method-badge"
-                :class="`http-method-badge--${detail.method.toLowerCase()}`"
+                :class="`http-method-badge--${methodTone(detail.method)}`"
               >
-                {{ detail.method }}
+                {{ shortMethodLabel(detail.method) }}
               </span>
               <h3>{{ detail.name }}</h3>
             </div>

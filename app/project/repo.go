@@ -33,6 +33,23 @@ func (Repo) EnsureExists(ctx context.Context, workspaceID, projectID int64) erro
 	return nil
 }
 
+func (Repo) Get(ctx context.Context, workspaceID, projectID int64) (*ent.Project, error) {
+	row, err := database.DB.Project.
+		Query().
+		Where(
+			entproject.IDEQ(projectID),
+			entproject.WorkspaceIDEQ(workspaceID),
+		).
+		Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, bizerr.New("项目不存在")
+		}
+		return nil, err
+	}
+	return row, nil
+}
+
 func (Repo) ListByWorkspace(ctx context.Context, workspaceID int64) ([]*ent.Project, error) {
 	return database.DB.Project.
 		Query().

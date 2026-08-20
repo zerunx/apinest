@@ -2,7 +2,7 @@
   <div class="interface-editor">
     <div class="interface-create__section">
       <div class="interface-url-row">
-        <div class="interface-url-bar">
+        <div class="interface-url-bar" :class="{ 'interface-url-bar--grpc': isGrpc }">
           <div
             class="interface-url-bar__selects"
             :class="{ 'interface-url-bar__selects--single': isProtocolOnly }"
@@ -59,6 +59,17 @@
               </div>
             </Teleport>
           </div>
+          <div v-if="isGrpc" class="interface-url-bar__rpc-wrap">
+            <MenuSelect
+              :model-value="grpcSelectedRpc || null"
+              class="interface-url-bar__rpc"
+              :options="grpcRpcOptions"
+              :placeholder="t('grpc.selectMethod')"
+              fit-menu
+              :menu-width="280"
+              @update:model-value="onGrpcRpcChange"
+            />
+          </div>
         </div>
         <div class="interface-url-actions">
           <button
@@ -68,7 +79,7 @@
             :disabled="sending"
             @click="onSend"
           >
-            {{ sending ? t('request.sending') : t('request.send') }}
+            {{ sending ? t('request.sending') : isGrpc ? t('request.invoke') : t('request.send') }}
           </button>
           <button
             class="btn interface-url-actions__save"
@@ -111,7 +122,28 @@
       </div>
     </div>
 
-    <div ref="splitContainerRef" class="interface-work-split">
+    <div
+      ref="splitContainerRef"
+      class="interface-work-split"
+      :class="{ 'interface-work-split--grpc': isGrpc }"
+    >
+      <template v-if="isGrpc">
+        <GrpcMethodList
+          class="grpc-method-host"
+          :style="{ width: `${grpcListWidth}px` }"
+          :proto-name="grpcProtoName"
+          :services="grpcServices"
+          :selected-rpc="grpcSelectedRpc"
+          @select="selectGrpcRpc"
+          @import="pickProtoFile"
+        />
+        <div
+          class="grpc-list-handle"
+          :class="{ 'grpc-list-handle--active': grpcListDragging }"
+          @mousedown="startGrpcListDrag"
+        />
+      </template>
+      <div class="interface-work-main">
       <section class="interface-request-pane">
         <div class="interface-request-tabs">
           <button
@@ -126,7 +158,10 @@
           </button>
         </div>
 
-        <div class="interface-request-content">
+        <div
+          class="interface-request-content"
+          :class="{ 'interface-request-content--fill': isGrpc && requestTab === 'message' }"
+        >
           <div v-if="requestTab === 'params'" class="param-table param-table--resizable-wrap">
             <ParamTableColumnResizer
               :columns="paramGridColumns"
@@ -218,7 +253,10 @@
             </div>
           </div>
 
-          <div v-else-if="requestTab === 'headers'" class="param-table param-table--resizable-wrap">
+          <div
+            v-else-if="requestTab === 'headers' || requestTab === 'metadata'"
+            class="param-table param-table--resizable-wrap"
+          >
             <ParamTableColumnResizer
               :columns="paramGridColumns"
               :handles="[false, 'key', false, false, false]"
@@ -377,6 +415,30 @@
               :placeholder="t('create.bodyPlaceholder')"
             />
           </div>
+
+          <div v-else-if="requestTab === 'message'" class="body-pane">
+            <div class="body-format-row body-format-row--grpc">
+              <div class="body-format-switch">
+                <button type="button" class="body-format-switch__btn" @click="autoGenerateGrpcMessage">
+                  {{ t('grpc.autoGenerate') }}
+                </button>
+              </div>
+              <button type="button" class="body-format-action" @click="formatBodyRaw">
+                <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+                  <path
+                    fill="currentColor"
+                    d="M7 5h10v2H7V5zm0 4h10v2H7V9zm0 4h7v2H7v-2zm-1 6l-4-4h3v-4h2v4h3l-4 4z"
+                  />
+                </svg>
+                {{ t('request.rawFormat') }}
+              </button>
+            </div>
+            <RequestBodyRawEditor
+              ref="rawBodyEditorRef"
+              v-model="bodyRaw"
+              :placeholder="t('grpc.messagePlaceholder')"
+            />
+          </div>
         </div>
       </section>
 
@@ -395,7 +457,7 @@
               :class="{ 'interface-response-tabs__tab--active': responseTab === 'body' }"
               @click="responseTab = 'body'"
             >
-              {{ t('request.body') }}
+              {{ isGrpc ? t('request.response') : t('request.body') }}
             </button>
             <button
               type="button"
@@ -403,7 +465,7 @@
               :class="{ 'interface-response-tabs__tab--active': responseTab === 'headers' }"
               @click="responseTab = 'headers'"
             >
-              {{ t('request.headers') }}
+              {{ isGrpc ? t('request.metadata') : t('request.headers') }}
               <span v-if="response?.headers?.length" class="interface-response-tabs__badge">
                 {{ response.headers.length }}
               </span>
@@ -468,7 +530,15 @@
           <p v-else class="interface-response-empty muted">{{ t('response.empty') }}</p>
         </div>
       </section>
+      </div>
     </div>
+    <input
+      ref="protoFileRef"
+      type="file"
+      accept=".proto,text/plain"
+      class="grpc-file-input"
+      @change="onProtoFileChange"
+    />
     <ConfirmDialog
       v-model:open="validationDialogOpen"
       :title="validationDialogTitle"
@@ -493,8 +563,19 @@ import ComboInput from './ComboInput.vue'
 import ParamTableColumnResizer from './ParamTableColumnResizer.vue'
 import RequestBodyRawEditor from './RequestBodyRawEditor.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
+import GrpcMethodList from './GrpcMethodList.vue'
 import { formatJsonLenient } from '../utils/raw-json-utils'
 import { looksLikeCurl, parseCurl, type ParsedCurl } from '../utils/parse-curl'
+import {
+  compactGrpcMetadata,
+  fillGrpcMessageSamples,
+  findGrpcMethod,
+  firstRpcPath,
+  normalizeGrpcMetadata,
+  parseGrpcCatalog,
+  type GrpcCatalog,
+  type GrpcService,
+} from '../utils/grpc'
 import {
   isKnownProtocol,
   isProtocolOnlySelect,
@@ -869,7 +950,7 @@ watch([environmentId, envVarsRevision], () => {
   void refreshEnvVars()
 })
 
-type RequestTabId = 'params' | 'authorization' | 'headers' | 'body'
+type RequestTabId = 'params' | 'authorization' | 'headers' | 'body' | 'message' | 'metadata'
 
 const allRequestTabs: { id: RequestTabId; labelKey: string }[] = [
   { id: 'params', labelKey: 'request.params' },
@@ -878,7 +959,15 @@ const allRequestTabs: { id: RequestTabId; labelKey: string }[] = [
   { id: 'body', labelKey: 'request.body' },
 ]
 
+const grpcRequestTabs: { id: RequestTabId; labelKey: string }[] = [
+  { id: 'message', labelKey: 'request.message' },
+  { id: 'metadata', labelKey: 'request.metadata' },
+]
+
+const isGrpc = computed(() => protocolFamily(protocol.value) === 'grpc')
+
 const requestTabs = computed(() => {
+  if (isGrpc.value) return grpcRequestTabs
   if (protocolFamily(protocol.value) === 'ws') {
     return allRequestTabs.filter((tab) => tab.id !== 'authorization')
   }
@@ -930,6 +1019,17 @@ const {
   maxRatio: 0.75,
   storageKey: 'interface_response_height',
 })
+const {
+  size: grpcListWidth,
+  dragging: grpcListDragging,
+  startDrag: startGrpcListDrag,
+} = useContainerBoundedResize(splitContainerRef, {
+  axis: 'x',
+  min: 180,
+  initial: 240,
+  maxRatio: 0.42,
+  storageKey: 'grpc_method_list_width',
+})
 
 const folders = ref<FolderOption[]>([])
 const saveUi = ref<'idle' | 'saving' | 'saved'>('idle')
@@ -963,7 +1063,20 @@ watch(protocol, (next) => {
   if (!allowed.includes(method.value)) {
     method.value = allowed[0] ?? 'GET'
   }
-  // WS has no Authorization tab — leave it if currently open.
+  if (protocolFamily(next) === 'grpc') {
+    if (requestTab.value !== 'message' && requestTab.value !== 'metadata') {
+      requestTab.value = 'message'
+    }
+    bodyFormat.value = 'raw'
+    if (!grpcServices.value.length) {
+      applyGrpcMetadata([])
+      if (!bodyRaw.value.trim()) bodyRaw.value = '{}'
+    }
+    return
+  }
+  if (requestTab.value === 'message' || requestTab.value === 'metadata') {
+    requestTab.value = 'body'
+  }
   if (protocolFamily(next) === 'ws' && requestTab.value === 'authorization') {
     requestTab.value = 'body'
   }
@@ -976,6 +1089,20 @@ const requestTab = ref<RequestTabId>('body')
 const bodyFormat = ref<BodyFormat>('none')
 const bodyRaw = ref('')
 const rawBodyEditorRef = ref<{ formatContent: () => boolean } | null>(null)
+const protoFileRef = ref<HTMLInputElement | null>(null)
+const grpcProtoName = ref('')
+const grpcProtoSource = ref('')
+const grpcPackage = ref('')
+const grpcServices = ref<GrpcService[]>([])
+const grpcSelectedRpc = ref('')
+const grpcRpcOptions = computed(() =>
+  grpcServices.value.flatMap((svc) =>
+    svc.methods.map((m) => ({
+      value: m.rpc_path,
+      label: m.rpc_path,
+    })),
+  ),
+)
 const validationDialogOpen = ref(false)
 const validationDialogTitle = ref('')
 const validationDialogMessage = ref('')
@@ -1164,6 +1291,16 @@ function resolveBodyFormat(raw: string, fields: FormDataRow[]): BodyFormat {
 
 function formatBodyRaw() {
   rawBodyEditorRef.value?.formatContent()
+}
+
+function autoGenerateGrpcMessage() {
+  const method = findGrpcMethod(currentGrpcCatalog(), grpcSelectedRpc.value)
+  const next = fillGrpcMessageSamples(bodyRaw.value, method?.message ?? '')
+  if (!next) {
+    showToast(t('grpc.autoGenerateEmpty'), 1600, 'warning')
+    return
+  }
+  bodyRaw.value = next
 }
 
 function buildRequestBodyForSend(): string | null {
@@ -1445,7 +1582,157 @@ function compactParams(rows: ParamRow[]) {
     }))
 }
 
+function currentGrpcCatalog(): GrpcCatalog {
+  return {
+    proto_name: grpcProtoName.value,
+    proto_source: grpcProtoSource.value,
+    package: grpcPackage.value,
+    selected_rpc: grpcSelectedRpc.value,
+    services: grpcServices.value,
+  }
+}
+
+function headersToGrpcMetadata() {
+  return compactGrpcMetadata(
+    requestHeaders.value.map((r) => ({
+      name: r.name,
+      example: r.example,
+      description: r.description,
+      enabled: r.enabled !== false,
+    })),
+  )
+}
+
+function applyGrpcMetadata(rows: ReturnType<typeof normalizeGrpcMetadata>) {
+  requestHeaders.value = rows.map((r) => ({
+    name: r.name,
+    type: 'string',
+    required: false,
+    description: r.description,
+    example: r.example,
+    enabled: r.enabled,
+  }))
+  if (!requestHeaders.value.length) {
+    requestHeaders.value = [emptyParamRow()]
+  }
+  normalizeRequestHeaders()
+}
+
+function flushGrpcDraft() {
+  const method = findGrpcMethod(currentGrpcCatalog(), grpcSelectedRpc.value)
+  if (!method) return
+  method.message = bodyRaw.value
+  method.metadata = headersToGrpcMetadata()
+}
+
+function loadGrpcDraft(rpcPath: string) {
+  const method = findGrpcMethod(currentGrpcCatalog(), rpcPath)
+  bodyRaw.value = method?.message?.trim() ? method.message : '{}'
+  applyGrpcMetadata(normalizeGrpcMetadata(method?.metadata ?? []))
+  bodyFormat.value = 'raw'
+}
+
+function selectGrpcRpc(rpcPath: string) {
+  if (!rpcPath || rpcPath === grpcSelectedRpc.value) return
+  flushGrpcDraft()
+  grpcSelectedRpc.value = rpcPath
+  loadGrpcDraft(rpcPath)
+}
+
+function onGrpcRpcChange(value: string | number | null) {
+  if (typeof value === 'string' && value) selectGrpcRpc(value)
+}
+
+function pickProtoFile() {
+  const input = protoFileRef.value
+  if (!input) return
+  input.value = ''
+  input.click()
+}
+
+async function onProtoFileChange(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  try {
+    const source = await file.text()
+    const parsed = await invoke<{
+      proto_name: string
+      package: string
+      services: GrpcService[]
+    }>('parse_proto_source', {
+      args: { filename: file.name, source },
+    })
+    applyParsedProto(parsed.proto_name || file.name, source, parsed)
+  } catch (e) {
+    showValidation(String(e))
+  }
+}
+
+function applyParsedProto(
+  filename: string,
+  source: string,
+  parsed: { proto_name: string; package: string; services: GrpcService[] },
+) {
+  protocol.value = 'GRPC'
+  method.value = 'GRPC'
+  const prevFileStem = grpcProtoName.value.replace(/\.proto$/i, '')
+  grpcProtoName.value = parsed.proto_name || filename
+  grpcProtoSource.value = source
+  grpcPackage.value = parsed.package || ''
+  grpcServices.value = (parsed.services ?? []).map((svc) => ({
+    name: svc.name,
+    full_name: svc.full_name,
+    methods: (svc.methods ?? []).map((m) => ({
+      ...m,
+      message: m.message || '{}',
+      metadata: normalizeGrpcMetadata(m.metadata),
+    })),
+  }))
+  const fallbackName = grpcProtoName.value.replace(/\.proto$/i, '')
+  if (
+    !name.value.trim() ||
+    name.value === t('create.api') ||
+    (prevFileStem && name.value === prevFileStem)
+  ) {
+    name.value = fallbackName || name.value
+  }
+  grpcSelectedRpc.value = firstRpcPath(currentGrpcCatalog())
+  loadGrpcDraft(grpcSelectedRpc.value)
+  requestTab.value = 'message'
+  bodyFormat.value = 'raw'
+  showToast(t('grpc.imported'), 1500, 'success')
+}
+
+function resetGrpcState() {
+  grpcProtoName.value = ''
+  grpcProtoSource.value = ''
+  grpcPackage.value = ''
+  grpcServices.value = []
+  grpcSelectedRpc.value = ''
+}
+
 function buildDetail() {
+  if (isGrpc.value) {
+    flushGrpcDraft()
+    return {
+      protocol: 'GRPC' as const,
+      grpc: {
+        proto_name: grpcProtoName.value,
+        proto_source: grpcProtoSource.value,
+        package: grpcPackage.value,
+        selected_rpc: grpcSelectedRpc.value,
+        services: grpcServices.value.map((svc) => ({
+          ...svc,
+          methods: svc.methods.map((m) => ({
+            ...m,
+            metadata: compactGrpcMetadata(m.metadata),
+          })),
+        })),
+      },
+    }
+  }
   return {
     protocol: protocol.value,
     request_headers: compactParams(requestHeaders.value),
@@ -1522,6 +1809,8 @@ function applyInitial(resetUi = false) {
   const d = detail && typeof detail === 'object' ? (detail as Record<string, unknown>) : null
   if (d && isKnownProtocol(d.protocol)) {
     protocol.value = normalizeProtocol(d.protocol)
+  } else if (String(init?.method ?? '').toUpperCase() === 'GRPC') {
+    protocol.value = 'GRPC'
   }
 
   const allowed = methodsForProtocol(protocol.value)
@@ -1540,7 +1829,7 @@ function applyInitial(resetUi = false) {
   response.value = null
   if (resetUi) {
     responseTab.value = 'body'
-    requestTab.value = 'body'
+    requestTab.value = protocolFamily(protocol.value) === 'grpc' ? 'message' : 'body'
   }
 
   if (d) {
@@ -1643,6 +1932,28 @@ function applyInitial(resetUi = false) {
     resultName.value = t('create.defaultSuccess')
     exampleName.value = t('create.successExample')
   }
+
+  const catalog = parseGrpcCatalog(d)
+  if (protocolFamily(protocol.value) === 'grpc') {
+    if (catalog) {
+      grpcProtoName.value = catalog.proto_name
+      grpcProtoSource.value = catalog.proto_source
+      grpcPackage.value = catalog.package
+      grpcServices.value = catalog.services
+      grpcSelectedRpc.value = catalog.selected_rpc || firstRpcPath(catalog)
+      loadGrpcDraft(grpcSelectedRpc.value)
+    } else {
+      resetGrpcState()
+      bodyRaw.value = '{}'
+      applyGrpcMetadata([])
+    }
+    if (requestTab.value !== 'message' && requestTab.value !== 'metadata') {
+      requestTab.value = 'message'
+    }
+    bodyFormat.value = 'raw'
+  } else {
+    resetGrpcState()
+  }
 }
 
 async function loadFolders() {
@@ -1667,6 +1978,48 @@ async function onSend() {
     showToast(t('request.invalidUrl'), 1500, 'warning')
     return
   }
+  if (isGrpc.value) {
+    flushGrpcDraft()
+    if (!grpcProtoSource.value.trim()) {
+      showToast(t('grpc.needProto'), 1600, 'warning')
+      return
+    }
+    if (!grpcSelectedRpc.value) {
+      showToast(t('grpc.needMethod'), 1600, 'warning')
+      return
+    }
+    const grpcMethod = findGrpcMethod(currentGrpcCatalog(), grpcSelectedRpc.value)
+    if (grpcMethod?.client_streaming || grpcMethod?.server_streaming) {
+      showToast(t('grpc.streamingUnsupported'), 1800, 'warning')
+      return
+    }
+    sending.value = true
+    response.value = null
+    responseTab.value = 'body'
+    try {
+      const result = await invoke<SendResponse>('invoke_grpc', {
+        args: {
+          endpoint: url,
+          rpc_path: grpcSelectedRpc.value,
+          proto_source: grpcProtoSource.value,
+          proto_name: grpcProtoName.value || null,
+          message_json: bodyRaw.value,
+          metadata: buildSendHeaders(),
+          tls: false,
+          interface_id: props.interfaceId ?? null,
+          variables: Object.keys(envVarMap.value).length ? envVarMap.value : null,
+        },
+      })
+      response.value = result
+      responseBodyType.value = detectResponseBodyType(result.body ?? '')
+      responseTab.value = 'body'
+    } catch (e) {
+      showValidation(String(e))
+    } finally {
+      sending.value = false
+    }
+    return
+  }
   sending.value = true
   response.value = null
   responseTab.value = 'body'
@@ -1685,7 +2038,7 @@ async function onSend() {
     responseBodyType.value = detectResponseBodyType(result.body ?? '')
     responseTab.value = 'body'
   } catch (e) {
-    alert(String(e))
+    showValidation(String(e))
   } finally {
     sending.value = false
   }
@@ -1888,6 +2241,10 @@ watch(
   flex-shrink: 0;
   position: relative;
   z-index: 2;
+}
+
+.body-format-row--grpc {
+  padding-left: 10px;
 }
 
 .body-format-action {

@@ -50,12 +50,66 @@ func (Repo) ListAPIsByProject(ctx context.Context, projectID int64) ([]*ent.API,
 		All(ctx)
 }
 
+func (Repo) Get(ctx context.Context, projectID, folderID int64) (*ent.Folder, error) {
+	row, err := database.DB.Folder.
+		Query().
+		Where(
+			entfolder.IDEQ(folderID),
+			entfolder.ProjectIDEQ(projectID),
+		).
+		Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, bizerr.New("文件夹不存在")
+		}
+		return nil, err
+	}
+	return row, nil
+}
+
+func (Repo) NextSortOrder(ctx context.Context, projectID, parentID int64) (int, error) {
+	return nextFolderSortOrder(ctx, database.DB.Folder.Query(), projectID, parentID)
+}
+
+func (Repo) NextSortOrderTx(ctx context.Context, tx *ent.Tx, projectID, parentID int64) (int, error) {
+	return nextFolderSortOrder(ctx, tx.Folder.Query(), projectID, parentID)
+}
+
+func nextFolderSortOrder(ctx context.Context, q *ent.FolderQuery, projectID, parentID int64) (int, error) {
+	rows, err := q.
+		Where(
+			entfolder.ProjectIDEQ(projectID),
+			entfolder.ParentIDEQ(parentID),
+		).
+		Order(ent.Desc(entfolder.FieldSortOrder)).
+		Limit(1).
+		All(ctx)
+	if err != nil {
+		return 0, err
+	}
+	if len(rows) == 0 {
+		return 0, nil
+	}
+	return rows[0].SortOrder + 1, nil
+}
+
 func (Repo) Create(ctx context.Context, projectID, parentID, userID int64, name string) (*ent.Folder, error) {
 	return database.DB.Folder.
 		Create().
 		SetProjectID(projectID).
 		SetParentID(parentID).
 		SetName(name).
+		SetCreatedBy(userID).
+		Save(ctx)
+}
+
+func (Repo) CreateTx(ctx context.Context, tx *ent.Tx, projectID, parentID, userID int64, name string, sortOrder int) (*ent.Folder, error) {
+	return tx.Folder.
+		Create().
+		SetProjectID(projectID).
+		SetParentID(parentID).
+		SetName(name).
+		SetSortOrder(sortOrder).
 		SetCreatedBy(userID).
 		Save(ctx)
 }

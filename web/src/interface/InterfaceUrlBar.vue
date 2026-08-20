@@ -1,11 +1,20 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { HttpMethod, HttpProtocol } from '@/types/workspace'
+import {
+  applyProtocolScheme,
+  isProtocolOnlySelect,
+  methodsForProtocol,
+  protocolLabel,
+  switchableProtocols,
+} from '@/utils/http-method'
 
-defineProps<{
+const props = defineProps<{
   protocol: HttpProtocol
   method: HttpMethod
   url: string
   readonly?: boolean
+  createMode?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -14,24 +23,46 @@ const emit = defineEmits<{
   'update:url': [value: string]
 }>()
 
-const protocolOptions: HttpProtocol[] = ['HTTP', 'HTTPS']
-const methodOptions: HttpMethod[] = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS']
+const protocolOptions = computed(() => switchableProtocols(props.protocol, !!props.createMode))
+const isProtocolOnly = computed(() => isProtocolOnlySelect(props.protocol))
+const methodOptions = computed(() => methodsForProtocol(props.protocol))
+
+function onProtocolChange(next: HttpProtocol) {
+  emit('update:protocol', next)
+  const allowed = methodsForProtocol(next)
+  if (!allowed.includes(props.method)) {
+    emit('update:method', (allowed[0] ?? 'GET') as HttpMethod)
+  }
+  const nextUrl = applyProtocolScheme(props.url, next)
+  if (nextUrl !== props.url) {
+    emit('update:url', nextUrl)
+  }
+}
 </script>
 
 <template>
   <div class="interface-url-bar">
-    <div class="interface-url-bar__selects">
+    <div
+      class="interface-url-bar__selects"
+      :class="{ 'interface-url-bar__selects--single': isProtocolOnly }"
+    >
       <el-select
         :model-value="protocol"
         class="interface-url-bar__protocol"
         size="default"
         :disabled="readonly"
         popper-class="app-action-dropdown"
-        @update:model-value="emit('update:protocol', $event)"
+        @update:model-value="onProtocolChange"
       >
-        <el-option v-for="item in protocolOptions" :key="item" :label="item" :value="item" />
+        <el-option
+          v-for="item in protocolOptions"
+          :key="item"
+          :label="protocolLabel(item)"
+          :value="item"
+        />
       </el-select>
       <el-select
+        v-if="!isProtocolOnly"
         :model-value="method"
         class="interface-url-bar__method"
         size="default"

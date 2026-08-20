@@ -61,6 +61,9 @@
               <button type="button" @click="emitAction('add-subfolder')">
                 {{ t('tree.addSubFolder') }}
               </button>
+              <span class="row-menu-sep" aria-hidden="true" />
+              <button type="button" @click="emitAction('export')">{{ t('tree.exportFolder') }}</button>
+              <span class="row-menu-sep" aria-hidden="true" />
               <button type="button" @click="emitAction('rename')">{{ t('tree.rename') }}</button>
               <button type="button" class="danger" @click="emitAction('delete')">
                 {{ t('tree.delete') }}
@@ -156,7 +159,7 @@ export type TreeAction =
       type: 'folder'
       id: number
       name: string
-      action: 'add-api' | 'add-subfolder' | 'rename' | 'delete'
+      action: 'add-api' | 'add-subfolder' | 'export' | 'rename' | 'delete'
       anchor?: DialogAnchor | null
     }
   | {
@@ -438,7 +441,7 @@ function emitAction(action: TreeAction['action']) {
       type: 'folder',
       id: props.item.id,
       name: props.item.name,
-      action: action as 'add-api' | 'add-subfolder' | 'rename' | 'delete',
+      action: action as 'add-api' | 'add-subfolder' | 'export' | 'rename' | 'delete',
       anchor,
     })
   } else {
@@ -697,5 +700,12 @@ export default {
 
 .row-menu-pop button.danger {
   color: var(--color-danger);
+}
+
+.row-menu-sep {
+  display: block;
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--color-border);
 }
 </style>

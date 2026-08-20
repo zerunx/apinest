@@ -9,6 +9,7 @@ use crate::commands::catalog::{
 };
 use crate::db::{ensure_catalog_server, next_local_id, now_iso, Db};
 use crate::error::{AppError, AppResult};
+use crate::grpc::store::{delete_grpc_rpcs, delete_grpc_rpcs_for_folder, replace_grpc_rpcs_from_detail};
 
 #[derive(Debug, Deserialize)]
 pub struct CreateWorkspaceArgs {
@@ -187,6 +188,7 @@ pub fn create_local_interface(
                synced_at = excluded.synced_at",
             params![server_id, id, detail_str, now],
         )?;
+        replace_grpc_rpcs_from_detail(conn, server_id, id, &detail)?;
         Ok(InterfaceRow {
             id,
             workspace_id: args.workspace_id,
@@ -246,6 +248,7 @@ pub fn update_local_interface(
                synced_at = excluded.synced_at",
             params![server_id, args.id, detail_str, now],
         )?;
+        replace_grpc_rpcs_from_detail(conn, server_id, args.id, &detail)?;
         Ok(InterfaceRow {
             id: args.id,
             workspace_id: args.workspace_id,
@@ -567,6 +570,7 @@ pub fn delete_local_folder(
         collect(&all, folder_id, &mut ids);
 
         for id in &ids {
+            delete_grpc_rpcs_for_folder(conn, server_id, *id)?;
             conn.execute(
                 "DELETE FROM interface_details WHERE server_id = ?1 AND interface_id IN (
                    SELECT id FROM interfaces WHERE server_id = ?1 AND folder_id = ?2
@@ -611,6 +615,7 @@ pub fn rename_local_interface(db: State<'_, Db>, args: RenameInterfaceArgs) -> A
 pub fn delete_local_interface(db: State<'_, Db>, interface_id: i64) -> AppResult<()> {
     let server_id = current_server_id(&db)?;
     db.with_conn(|conn| {
+        delete_grpc_rpcs(conn, server_id, interface_id)?;
         conn.execute(
             "DELETE FROM interface_details WHERE server_id = ?1 AND interface_id = ?2",
             params![server_id, interface_id],

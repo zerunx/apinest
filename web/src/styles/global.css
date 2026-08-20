@@ -13,6 +13,16 @@
   --color-active: rgba(0, 122, 204, 0.12);
   --color-danger: #c42b1c;
   --color-danger-hover-bg: rgba(196, 43, 28, 0.08);
+  --method-get: #0a7a3e;
+  --method-post: #c27a00;
+  --method-put: #0b6bcb;
+  --method-delete: #c42b1c;
+  --method-patch: #7a3e9d;
+  --method-head: #5a7a5a;
+  --method-options: #a33a8a;
+  --method-rpc: #0b6bcb;
+  --method-ws: #7a3e9d;
+  --method-tcp: #5a7a5a;
   --color-menu-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   --radius-lg: 10px;
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.06);
@@ -91,6 +101,16 @@
   --color-active: rgba(0, 122, 204, 0.22);
   --color-danger: #f48771;
   --color-danger-hover-bg: rgba(244, 135, 113, 0.12);
+  --method-get: #6fcf97;
+  --method-post: #f2c94c;
+  --method-put: #56ccf2;
+  --method-patch: #c3a6ff;
+  --method-delete: #f28b82;
+  --method-head: #8fbc8f;
+  --method-options: #e879c8;
+  --method-rpc: #56ccf2;
+  --method-ws: #c3a6ff;
+  --method-tcp: #8fbc8f;
   --color-menu-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
   --radius-lg: 10px;
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.2);
@@ -680,40 +700,64 @@ a {
 }
 
 .http-method-badge--get {
-  color: #61affe;
-  background: rgba(97, 175, 254, 0.12);
-  border-color: rgba(97, 175, 254, 0.45);
+  color: var(--method-get);
+  background: color-mix(in srgb, var(--method-get) 12%, transparent);
+  border-color: color-mix(in srgb, var(--method-get) 45%, transparent);
 }
 
 .http-method-badge--post {
-  color: #49cc90;
-  background: rgba(73, 204, 144, 0.12);
-  border-color: rgba(73, 204, 144, 0.45);
+  color: var(--method-post);
+  background: color-mix(in srgb, var(--method-post) 12%, transparent);
+  border-color: color-mix(in srgb, var(--method-post) 45%, transparent);
 }
 
 .http-method-badge--put {
-  color: #fca130;
-  background: rgba(252, 161, 48, 0.12);
-  border-color: rgba(252, 161, 48, 0.45);
+  color: var(--method-put);
+  background: color-mix(in srgb, var(--method-put) 12%, transparent);
+  border-color: color-mix(in srgb, var(--method-put) 45%, transparent);
 }
 
 .http-method-badge--delete {
-  color: #f93e3e;
-  background: rgba(249, 62, 62, 0.12);
-  border-color: rgba(249, 62, 62, 0.45);
+  color: var(--method-delete);
+  background: color-mix(in srgb, var(--method-delete) 12%, transparent);
+  border-color: color-mix(in srgb, var(--method-delete) 45%, transparent);
 }
 
 .http-method-badge--patch {
-  color: #50e3c2;
-  background: rgba(80, 227, 194, 0.12);
-  border-color: rgba(80, 227, 194, 0.45);
+  color: var(--method-patch);
+  background: color-mix(in srgb, var(--method-patch) 12%, transparent);
+  border-color: color-mix(in srgb, var(--method-patch) 45%, transparent);
 }
 
-.http-method-badge--head,
+.http-method-badge--head {
+  color: var(--method-head);
+  background: color-mix(in srgb, var(--method-head) 12%, transparent);
+  border-color: color-mix(in srgb, var(--method-head) 45%, transparent);
+}
+
 .http-method-badge--options {
-  color: var(--color-text-secondary);
-  background: rgba(168, 168, 168, 0.12);
-  border-color: rgba(168, 168, 168, 0.35);
+  color: var(--method-options);
+  background: color-mix(in srgb, var(--method-options) 12%, transparent);
+  border-color: color-mix(in srgb, var(--method-options) 45%, transparent);
+}
+
+.http-method-badge--ws {
+  color: var(--method-ws);
+  background: color-mix(in srgb, var(--method-ws) 12%, transparent);
+  border-color: color-mix(in srgb, var(--method-ws) 45%, transparent);
+}
+
+.http-method-badge--tcp,
+.http-method-badge--udp {
+  color: var(--method-tcp);
+  background: color-mix(in srgb, var(--method-tcp) 12%, transparent);
+  border-color: color-mix(in srgb, var(--method-tcp) 45%, transparent);
+}
+
+.http-method-badge--grpc {
+  color: var(--method-rpc);
+  background: color-mix(in srgb, var(--method-rpc) 12%, transparent);
+  border-color: color-mix(in srgb, var(--method-rpc) 45%, transparent);
 }
 
 .workspace-action-btn {

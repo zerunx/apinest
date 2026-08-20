@@ -159,6 +159,13 @@ function chromeTheme(dark: boolean): Extension {
         backgroundImage: lintWave(dark ? '#f14c4c' : '#d13438'),
         backgroundSize: '8px 4px',
       },
+      '.cm-searchMatch': {
+        backgroundColor: 'var(--raw-find-match)',
+        borderRadius: '2px',
+      },
+      '.cm-searchMatch-selected': {
+        backgroundColor: 'var(--raw-find-match-active)',
+      },
     },
     { dark },
   )

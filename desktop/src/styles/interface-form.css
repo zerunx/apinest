@@ -23,6 +23,8 @@
   --raw-editor-cursor-nudge-y: 0px;
   --raw-editor-selection-radius: 4px;
   --raw-editor-bracket-match: var(--raw-editor-selection);
+  --raw-find-match: rgba(234, 179, 8, 0.38);
+  --raw-find-match-active: rgba(249, 115, 22, 0.55);
   --raw-hl-plain: #333333;
   --raw-hl-key: #0451a5;
   --raw-hl-string: #a31515;
@@ -56,6 +58,8 @@
   --raw-editor-cursor-nudge-y: 0px;
   --raw-editor-selection-radius: 3px;
   --raw-editor-bracket-match: var(--raw-editor-selection);
+  --raw-find-match: rgba(234, 179, 8, 0.32);
+  --raw-find-match-active: rgba(251, 146, 60, 0.55);
   --raw-hl-plain: #d4d4d4;
   --raw-hl-key: #9cdcfe;
   --raw-hl-string: #ce9178;
@@ -95,6 +99,58 @@
   display: flex;
   flex-direction: column;
   padding: 0 var(--color-interface-section-padding-x) 12px;
+}
+
+.interface-work-split--grpc {
+  flex-direction: row;
+  gap: 0;
+}
+
+.interface-work-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.grpc-method-host {
+  flex-shrink: 0;
+  height: 100%;
+}
+
+.grpc-list-handle {
+  flex-shrink: 0;
+  width: 6px;
+  margin: 0 2px;
+  cursor: col-resize;
+  position: relative;
+}
+
+.grpc-list-handle::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  transform: translateX(-50%);
+  background: var(--color-interface-panel-border);
+}
+
+.grpc-list-handle:hover::before,
+.grpc-list-handle--active::before {
+  background: var(--color-interface-accent);
+  width: 2px;
+}
+
+.grpc-file-input {
+  display: none;
+}
+
+.grpc-message-label {
+  font-size: 12px;
+  padding-left: 2px;
 }
 
 .interface-request-pane {
@@ -162,6 +218,10 @@
   padding-top: 8px;
   overflow-x: hidden;
   overflow-y: auto;
+}
+
+.interface-request-content--fill {
+  overflow: hidden;
 }
 
 .interface-split-handle {
@@ -478,6 +538,26 @@
   width: 100%;
 }
 
+.interface-url-bar__rpc-wrap {
+  flex-shrink: 0;
+  width: 220px;
+  max-width: 38%;
+  border-left: 1px solid var(--color-interface-bar-border);
+}
+
+.interface-url-bar__rpc {
+  height: 100%;
+}
+
+.interface-url-bar__rpc :deep(.menu-select),
+.interface-url-bar__rpc :deep(.menu-select__trigger) {
+  height: 100%;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
 .interface-url-bar__method-wrap {
   flex: 1;
   min-width: 0;
@@ -783,10 +863,12 @@
 }
 
 .interface-body-raw {
+  position: relative;
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .interface-body-raw__host {
@@ -801,4 +883,6 @@
   flex: 1;
   height: 100%;
   min-height: 0;
+  position: relative;
+  overflow: hidden;
 }

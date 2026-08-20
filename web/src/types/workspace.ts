@@ -1,8 +1,19 @@
 export type AppModule = 'api' | 'quick-test' | 'environment' | 'project'
 
-export type HttpProtocol = 'HTTP' | 'HTTPS'
+export type HttpProtocol = 'HTTP' | 'HTTPS' | 'WS' | 'TCP' | 'UDP' | 'GRPC'
 
-export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'HEAD' | 'OPTIONS'
+export type HttpMethod =
+  | 'GET'
+  | 'POST'
+  | 'PUT'
+  | 'DELETE'
+  | 'PATCH'
+  | 'HEAD'
+  | 'OPTIONS'
+  | 'WS'
+  | 'TCP'
+  | 'UDP'
+  | 'GRPC'
 
 export type WorkspaceRole = 1 | 2 | 3 | 4
 

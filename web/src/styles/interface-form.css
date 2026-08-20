@@ -60,6 +60,14 @@
   flex-shrink: 0;
 }
 
+.interface-url-bar__selects--single {
+  width: 220px;
+}
+
+.interface-url-bar__selects--single .interface-url-bar__protocol {
+  width: 100%;
+}
+
 .interface-url-bar__protocol {
   width: 96px;
   flex-shrink: 0;

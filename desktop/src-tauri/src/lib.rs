@@ -1,6 +1,7 @@
 mod commands;
 mod db;
 mod error;
+mod grpc;
 mod nest;
 
 use tauri::Manager;
@@ -12,6 +13,7 @@ use db::Db;
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let data_dir = app
                 .path()
@@ -42,6 +44,12 @@ pub fn run() {
             create_local_folder,
             create_local_interface,
             update_local_interface,
+            parse_proto_source,
+            import_grpc_proto,
+            invoke_grpc,
+            export_apinest,
+            import_apinest,
+            save_json_file,
             reorder_local_interfaces,
             move_reorder_local_interfaces,
             list_local_folders,

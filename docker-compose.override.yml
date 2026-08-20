@@ -2,7 +2,7 @@ services:
   nest:
     image: golang:1.26.3-trixie
     working_dir: /app
-    ports:
+    expose:
       - 3000
     environment:
       TZ: Asia/Shanghai

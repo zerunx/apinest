@@ -10,6 +10,7 @@ import {
 } from '@/api/share'
 import { useLocale } from '@/composables/useLocale'
 import { parseApiId, useWorkspaceContext } from '@/composables/useWorkspaceContext'
+import { methodTone, shortMethodLabel } from '@/utils/http-method'
 import type { ApiTreeNode } from '@/types/workspace'
 
 const props = defineProps<{
@@ -309,9 +310,9 @@ watch(visible, async (open) => {
                 >
                   <span
                     class="http-method-badge"
-                    :class="`http-method-badge--${String(data.method).toLowerCase()}`"
+                    :class="`http-method-badge--${methodTone(String(data.method))}`"
                   >
-                    {{ data.method }}
+                    {{ shortMethodLabel(String(data.method)) }}
                   </span>
                 </span>
                 <span class="project-share-edit__tree-label">{{ data.name }}</span>

@@ -56,8 +56,15 @@ func (Repo) CountInProject(ctx context.Context, projectID int64, ids []int64) (i
 }
 
 func (Repo) NextSortOrder(ctx context.Context, projectID, folderID int64) (int, error) {
-	rows, err := database.DB.API.
-		Query().
+	return nextAPISortOrder(ctx, database.DB.API.Query(), projectID, folderID)
+}
+
+func (Repo) NextSortOrderTx(ctx context.Context, tx *ent.Tx, projectID, folderID int64) (int, error) {
+	return nextAPISortOrder(ctx, tx.API.Query(), projectID, folderID)
+}
+
+func nextAPISortOrder(ctx context.Context, q *ent.APIQuery, projectID, folderID int64) (int, error) {
+	rows, err := q.
 		Where(
 			entapi.ProjectIDEQ(projectID),
 			entapi.FolderIDEQ(folderID),

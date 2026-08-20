@@ -14,6 +14,7 @@ import { formatJsonDocument } from './format-json'
 import { selectedSpaceHighlighter } from './selected-space'
 import { roundedSelectionLayer } from './rounded-selection'
 import { lintExtension } from './json-lint'
+import { searchExtension } from './search-panel'
 import { editorTheme } from './theme'
 
 const INDENT = '    '
@@ -98,6 +99,7 @@ export function createCodeMirror(options: CreateCodeMirrorOptions): CodeMirrorHa
         editable.of(editableExtension(options.readonly ?? false)),
         gutters.of(gutterExtension(showLineNumbers, currentLanguage)),
         keymap.of([...defaultKeymap, ...historyKeymap, ...foldKeymap, indentWithTab]),
+        searchExtension(),
         EditorView.contentAttributes.of({ spellcheck: 'false' }),
         EditorView.updateListener.of((update) => {
           if (syncing || !update.docChanged) return

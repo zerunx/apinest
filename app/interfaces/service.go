@@ -3,6 +3,7 @@ package interfaces
 import (
 	"context"
 	"strings"
+	"unicode/utf8"
 
 	"nest-api/app/folder"
 	"nest-api/app/project"
@@ -118,7 +119,36 @@ func (Service) Create(ctx context.Context, userID int64, params CreateRequest) (
 		return 0, err
 	}
 
-	method := strings.ToUpper(params.Method)
+	sortOrder, err := Repo{}.NextSortOrder(ctx, params.ProjectID, params.FolderID)
+	if err != nil {
+		return 0, err
+	}
+
+	tx, err := database.DB.Tx(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	id, err := InsertInTx(ctx, tx, userID, params.ProjectID, params.FolderID, sortOrder, params)
+	if err != nil {
+		_ = tx.Rollback()
+		return 0, err
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	return id, nil
+}
+
+// InsertInTx creates an interface and its nested fields inside an existing transaction.
+func InsertInTx(ctx context.Context, tx *ent.Tx, userID, projectID, folderID int64, sortOrder int, params CreateRequest) (int64, error) {
+	method := strings.ToUpper(strings.TrimSpace(params.Method))
+	if method == "" {
+		method = "GET"
+	}
+	if len(method) > 10 {
+		method = method[:10]
+	}
 	status := params.Status
 	if status == 0 {
 		status = 1
@@ -133,24 +163,25 @@ func (Service) Create(ctx context.Context, userID int64, params CreateRequest) (
 		bodyDataType = "Object"
 	}
 
-	repo := Repo{}
-	sortOrder, err := repo.NextSortOrder(ctx, params.ProjectID, params.FolderID)
-	if err != nil {
-		return 0, err
+	name := strings.TrimSpace(params.Name)
+	if name == "" {
+		name = "未命名接口"
 	}
-
-	tx, err := database.DB.Tx(ctx)
-	if err != nil {
-		return 0, err
+	if utf8.RuneCountInString(name) > 100 {
+		name = string([]rune(name)[:100])
+	}
+	url := params.URL
+	if len(url) > 500 {
+		url = url[:500]
 	}
 
 	row, err := tx.API.
 		Create().
-		SetProjectID(params.ProjectID).
-		SetFolderID(params.FolderID).
-		SetName(params.Name).
+		SetProjectID(projectID).
+		SetFolderID(folderID).
+		SetName(name).
 		SetMethod(method).
-		SetURL(params.URL).
+		SetURL(url).
 		SetStatus(status).
 		SetSortOrder(sortOrder).
 		SetRequestBodyFormat(bodyFormat).
@@ -160,36 +191,26 @@ func (Service) Create(ctx context.Context, userID int64, params CreateRequest) (
 		SetUpdatedBy(userID).
 		Save(ctx)
 	if err != nil {
-		_ = tx.Rollback()
 		return 0, err
 	}
 
+	repo := Repo{}
 	if err := repo.ReplaceRequestHeaders(ctx, tx, row.ID, params.RequestHeaders); err != nil {
-		_ = tx.Rollback()
 		return 0, err
 	}
 	if err := repo.ReplaceQueryParams(ctx, tx, row.ID, params.QueryParams); err != nil {
-		_ = tx.Rollback()
 		return 0, err
 	}
 	if err := repo.ReplaceBodyFields(ctx, tx, row.ID, params.RequestBody.Fields); err != nil {
-		_ = tx.Rollback()
 		return 0, err
 	}
 	if err := repo.ReplaceResponseHeaders(ctx, tx, row.ID, params.ResponseHeaders); err != nil {
-		_ = tx.Rollback()
 		return 0, err
 	}
 	if err := repo.ReplaceResponseResults(ctx, tx, row.ID, params.ResponseResults); err != nil {
-		_ = tx.Rollback()
 		return 0, err
 	}
 	if err := repo.ReplaceResponseExamples(ctx, tx, row.ID, params.ResponseExamples); err != nil {
-		_ = tx.Rollback()
-		return 0, err
-	}
-
-	if err := tx.Commit(); err != nil {
 		return 0, err
 	}
 	return row.ID, nil

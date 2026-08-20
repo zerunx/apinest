@@ -16,4 +16,5 @@ func Register(r *gin.Engine) {
 	Interface(api)
 	Environment(api)
 	EnvVariable(api)
+	ImportExport(api)
 }

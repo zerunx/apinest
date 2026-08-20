@@ -902,18 +902,29 @@ export function useWorkspaceContext() {
       }
     }
 
-    if (!restoredTabs.length) {
-      ensureModuleDefaultTab(activeModule.value)
-      return
-    }
-
     workspaceTabs.value = restoredTabs
     syncTabLabels()
 
-    const targetId =
-      layout.activeTabId && restoredTabs.some((item) => item.id === layout.activeTabId)
-        ? layout.activeTabId
-        : restoredTabs[restoredTabs.length - 1].id
+    const desiredModule = activeModule.value
+    const moduleTabsList = restoredTabs.filter((item) => getTabModule(item) === desiredModule)
+
+    if (!moduleTabsList.length) {
+      clearTabSelection()
+      ensureModuleDefaultTab(desiredModule)
+      return
+    }
+
+    let targetId: string | null = null
+    if (layout.activeTabId && moduleTabsList.some((item) => item.id === layout.activeTabId)) {
+      targetId = layout.activeTabId
+    } else if (layout.activeTabId) {
+      targetId = moduleTabsList[moduleTabsList.length - 1].id
+    }
+
+    if (!targetId) {
+      clearTabSelection()
+      return
+    }
 
     activateTab(targetId)
 

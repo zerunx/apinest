@@ -11,7 +11,8 @@ import { useSaveShortcut } from '@/composables/useInterfaceEditorDirty'
 import { useLocale } from '@/composables/useLocale'
 import { interfaceStatusKey } from '@/constants/interface-status'
 import { useWorkspaceContext } from '@/composables/useWorkspaceContext'
-import type { AppModule, HttpMethod, WorkspaceTab } from '@/types/workspace'
+import { methodTone, shortMethodLabel } from '@/utils/http-method'
+import type { AppModule, WorkspaceTab } from '@/types/workspace'
 
 const { t } = useLocale()
 const {
@@ -54,15 +55,6 @@ const contextMenu = ref({
   tabId: '',
 })
 
-const methodColors: Record<HttpMethod, string> = {
-  GET: 'get',
-  POST: 'post',
-  PUT: 'put',
-  DELETE: 'delete',
-  PATCH: 'patch',
-  HEAD: 'head',
-  OPTIONS: 'options',
-}
 
 const pageTitle = computed(() => {
   if (activeModuleTab.value) {
@@ -394,9 +386,9 @@ onBeforeUnmount(() => {
           <span
             v-if="tab.kind === 'api' && tab.method"
             class="workspace-main__tab-method"
-            :class="`workspace-main__tab-method--${methodColors[tab.method]}`"
+            :class="`workspace-main__tab-method--${methodTone(tab.method)}`"
           >
-            {{ tab.method }}
+            {{ shortMethodLabel(tab.method) }}
           </span>
           <span class="workspace-main__tab-label">
             {{ tabLabel(tab) }}
@@ -577,9 +569,9 @@ onBeforeUnmount(() => {
                   <template #default="{ row }">
                     <span
                       class="http-method-badge"
-                      :class="`http-method-badge--${row.method.toLowerCase()}`"
+                      :class="`http-method-badge--${methodTone(row.method)}`"
                     >
-                      {{ row.method }}
+                      {{ shortMethodLabel(row.method) }}
                     </span>
                   </template>
                 </el-table-column>
@@ -750,28 +742,44 @@ onBeforeUnmount(() => {
 }
 
 .workspace-main__tab-method--get {
-  color: #61affe;
+  color: var(--method-get);
 }
 
 .workspace-main__tab-method--post {
-  color: #49cc90;
+  color: var(--method-post);
 }
 
 .workspace-main__tab-method--put {
-  color: #fca130;
+  color: var(--method-put);
 }
 
 .workspace-main__tab-method--delete {
-  color: #f93e3e;
+  color: var(--method-delete);
 }
 
 .workspace-main__tab-method--patch {
-  color: #50e3c2;
+  color: var(--method-patch);
 }
 
-.workspace-main__tab-method--head,
+.workspace-main__tab-method--head {
+  color: var(--method-head);
+}
+
 .workspace-main__tab-method--options {
-  color: var(--color-workspace-tab-text);
+  color: var(--method-options);
+}
+
+.workspace-main__tab-method--ws {
+  color: var(--method-ws);
+}
+
+.workspace-main__tab-method--tcp,
+.workspace-main__tab-method--udp {
+  color: var(--method-tcp);
+}
+
+.workspace-main__tab-method--grpc {
+  color: var(--method-rpc);
 }
 
 .workspace-main__tab-label {

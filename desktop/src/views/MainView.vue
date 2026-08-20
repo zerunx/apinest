@@ -22,26 +22,14 @@
           :placeholder="t('search.placeholder')"
           @input="reloadTree"
         />
-        <button
-          type="button"
-          class="search-add"
-          :title="t('create.folder')"
-          @click="openCreateFolder(0, $event)"
-        >
-          <svg
-            class="search-add-icon"
-            viewBox="0 0 24 24"
-            width="16"
-            height="16"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.5"
-            stroke-linecap="round"
-            aria-hidden="true"
-          >
-            <path d="M12 5v14M5 12h14" />
-          </svg>
-        </button>
+        <SplitCreateButton
+          :create-title="t('create.folder')"
+          :import-label="t('importExport.import')"
+          :export-label="t('importExport.export')"
+          @create="openCreateFolder(0, $event)"
+          @import="openImportDialog"
+          @export="exportCurrentProject"
+        />
       </div>
 
       <div class="tree-wrap">
@@ -213,6 +201,11 @@
       @update:open="onSaveBeforeCloseOpenChange"
     />
     <EnvironmentManageDialog v-model:open="envManageOpen" />
+    <ImportApiDialog
+      ref="importDialogRef"
+      v-model:open="importDialogOpen"
+      @submit="onImportSubmit"
+    />
 
     <Teleport to="body">
       <div
@@ -264,6 +257,8 @@ import SelectPicker from '../components/SelectPicker.vue'
 import NameDialog from '../components/NameDialog.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import EnvironmentManageDialog from '../components/EnvironmentManageDialog.vue'
+import ImportApiDialog from '../components/ImportApiDialog.vue'
+import SplitCreateButton from '../components/SplitCreateButton.vue'
 import InterfaceEditor from '../components/InterfaceEditor.vue'
 import CodeSnippetPanel from '../components/CodeSnippetPanel.vue'
 import { useToast } from '../composables/useToast'
@@ -274,6 +269,7 @@ import { useCloseTabShortcut } from '../composables/useCloseTabShortcut'
 import { anchorFromEvent, type DialogAnchor } from '../composables/useDialogAnchor'
 import { useDragResize } from '../composables/useDragResize'
 import { buildCurlFromTabState } from '../utils/build-curl'
+import { safeDownloadName } from '../utils/download-json'
 
 const TAB_LAYOUT_KEY = 'request_tabs_layout'
 
@@ -367,6 +363,8 @@ const dialogAnchor = ref<DialogAnchor | null>(null)
 const editorInitial = ref<Record<string, unknown> | null>(null)
 const editorKey = ref(0)
 const editorRef = ref<InstanceType<typeof InterfaceEditor> | null>(null)
+const importDialogOpen = ref(false)
+const importDialogRef = ref<{ setSubmitting: (value: boolean) => void } | null>(null)
 
 const tabs = ref<RequestTab[]>([])
 const activeTabId = ref('')
@@ -974,6 +972,88 @@ async function confirmCreateFolder(name: string) {
   }
 }
 
+function currentProjectName() {
+  return projects.value.find((item) => item.id === projectId.value)?.name || 'apinest'
+}
+
+function openImportDialog() {
+  if (!workspaceId.value || !projectId.value) {
+    showToast(t('importExport.needProject'), 1500, 'warning')
+    return
+  }
+  importDialogOpen.value = true
+}
+
+async function exportCurrentProject() {
+  await runExport()
+}
+
+async function exportFolder(folderId: number, folderName: string) {
+  await runExport(folderId, folderName)
+}
+
+async function runExport(folderId?: number, folderName?: string) {
+  if (!workspaceId.value || !projectId.value) {
+    showToast(t('importExport.needProject'), 1500, 'warning')
+    return
+  }
+  try {
+    const doc = await invoke<unknown>('export_apinest', {
+      args: {
+        workspace_id: workspaceId.value,
+        project_id: projectId.value,
+        folder_id: folderId ?? null,
+      },
+    })
+    const base = folderName || currentProjectName()
+    const saved = await invoke<boolean>('save_json_file', {
+      args: {
+        default_name: `${safeDownloadName(base)}.apinest.json`,
+        document: doc,
+      },
+    })
+    if (saved) {
+      showToast(t('importExport.exportSuccess'), 1500, 'success')
+    }
+  } catch (e) {
+    showToast(String(e), 1800, 'error')
+  }
+}
+
+async function onImportSubmit(payload: { source: string; document: unknown }) {
+  if (!workspaceId.value || !projectId.value) {
+    showToast(t('importExport.needProject'), 1500, 'warning')
+    return
+  }
+  importDialogRef.value?.setSubmitting(true)
+  try {
+    const result = await invoke<{ folders: number; apis: number }>('import_apinest', {
+      args: {
+        workspace_id: workspaceId.value,
+        project_id: projectId.value,
+        source: payload.source,
+        document: payload.document,
+      },
+    })
+    try {
+      await invoke('sync_now', { args: { workspace_id: workspaceId.value } })
+    } catch {
+      // Local-only projects or offline sessions skip server sync.
+    }
+    await reloadTree()
+    importDialogOpen.value = false
+    showToast(
+      t('importExport.importSuccess', { folders: result.folders, apis: result.apis }),
+      1800,
+      'success',
+    )
+  } catch (e) {
+    showToast(String(e), 1800, 'error')
+  } finally {
+    importDialogRef.value?.setSubmitting(false)
+  }
+}
+
 async function onTreeAction(action: TreeAction) {
   if (action.anchor) setDialogAnchor(undefined, action.anchor)
   if (action.type === 'folder') {
@@ -983,6 +1063,10 @@ async function onTreeAction(action: TreeAction) {
     }
     if (action.action === 'add-subfolder') {
       openCreateFolder(action.id)
+      return
+    }
+    if (action.action === 'export') {
+      await exportFolder(action.id, action.name)
       return
     }
     if (action.action === 'rename') {
@@ -1390,25 +1474,6 @@ async function onSelectApi(id: number, options?: { restore?: boolean }) {
   padding: 0 10px;
   font-size: 13px;
   box-sizing: border-box;
-}
-
-.search-add {
-  width: 28px;
-  height: 28px;
-  flex-shrink: 0;
-  border: 0;
-  border-radius: 6px;
-  color: #fff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  cursor: pointer;
-}
-
-.search-add-icon {
-  display: block;
-  flex-shrink: 0;
 }
 
 .tree-wrap {
