@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import type { HttpMethod, HttpProtocol } from '@/types/workspace'
 import {
   applyProtocolScheme,
@@ -27,6 +27,9 @@ const protocolOptions = computed(() => switchableProtocols(props.protocol, !!pro
 const isProtocolOnly = computed(() => isProtocolOnlySelect(props.protocol))
 const methodOptions = computed(() => methodsForProtocol(props.protocol))
 
+const protocolOpen = ref(false)
+const methodOpen = ref(false)
+
 function onProtocolChange(next: HttpProtocol) {
   emit('update:protocol', next)
   const allowed = methodsForProtocol(next)
@@ -36,6 +39,17 @@ function onProtocolChange(next: HttpProtocol) {
   const nextUrl = applyProtocolScheme(props.url, next)
   if (nextUrl !== props.url) {
     emit('update:url', nextUrl)
+  }
+}
+
+function onMenuVisible(open: boolean, which: 'protocol' | 'method') {
+  if (which === 'protocol') protocolOpen.value = open
+  else methodOpen.value = open
+  if (!open) {
+    void nextTick(() => {
+      const el = document.activeElement
+      if (el instanceof HTMLElement) el.blur()
+    })
   }
 }
 </script>
@@ -49,9 +63,11 @@ function onProtocolChange(next: HttpProtocol) {
       <el-select
         :model-value="protocol"
         class="interface-url-bar__protocol"
+        :class="{ 'is-dropdown-visible': protocolOpen }"
         size="default"
         :disabled="readonly"
         popper-class="app-action-dropdown"
+        @visible-change="onMenuVisible($event, 'protocol')"
         @update:model-value="onProtocolChange"
       >
         <el-option
@@ -65,9 +81,11 @@ function onProtocolChange(next: HttpProtocol) {
         v-if="!isProtocolOnly"
         :model-value="method"
         class="interface-url-bar__method"
+        :class="{ 'is-dropdown-visible': methodOpen }"
         size="default"
         :disabled="readonly"
         popper-class="app-action-dropdown"
+        @visible-change="onMenuVisible($event, 'method')"
         @update:model-value="emit('update:method', $event)"
       >
         <el-option v-for="item in methodOptions" :key="item" :label="item" :value="item" />

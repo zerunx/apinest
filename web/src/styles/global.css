@@ -2,6 +2,7 @@
 :root[data-theme='light'] {
   --color-primary: #007acc;
   --color-primary-light: #1a8ad4;
+  --color-primary-hover: color-mix(in srgb, var(--color-primary) 72%, #000);
   --color-bg: #f3f3f3;
   --color-surface: #ffffff;
   --color-sidebar: #fafafa;
@@ -49,6 +50,7 @@
   --el-border-color: #e0e0e0;
   --el-border-color-light: #ebebeb;
   --el-input-text-color: #333333;
+  --el-mask-color: color-mix(in srgb, var(--color-workspace-content) 92%, transparent);
 
   --color-workspace-content: #f3f3f3;
   --color-workspace-elevated: #ffffff;
@@ -101,6 +103,7 @@
 :root[data-theme='dark'] {
   --color-primary: #007acc;
   --color-primary-light: #4da8e8;
+  --color-primary-hover: color-mix(in srgb, var(--color-primary) 72%, #000);
   --color-bg: #1a1a1a;
   --color-surface: #242424;
   --color-sidebar: #242424;
@@ -148,6 +151,7 @@
   --el-border-color: #3a3a3a;
   --el-border-color-light: #444444;
   --el-input-text-color: #e8e8e8;
+  --el-mask-color: color-mix(in srgb, var(--color-workspace-content) 92%, transparent);
 
   --color-workspace-content: #212121;
   --color-workspace-elevated: #2a2a2a;
@@ -351,19 +355,22 @@ a {
 }
 
 .el-button:not(.el-button--primary):not(.el-button--success):not(.el-button--warning):not(.el-button--danger):not(.el-button--info):not(.el-button--text) {
-  --el-button-hover-bg-color: var(--color-hover);
+  --el-button-hover-bg-color: color-mix(in srgb, var(--color-text) 18%, var(--color-surface));
   --el-button-hover-border-color: var(--color-border);
   --el-button-hover-text-color: var(--color-text);
-  --el-button-active-bg-color: var(--color-hover);
+  --el-button-active-bg-color: color-mix(in srgb, var(--color-text) 18%, var(--color-surface));
   --el-button-active-border-color: var(--color-border);
   --el-button-active-text-color: var(--color-text);
 }
 
-.el-button--primary {
+.el-button--primary:not(.is-link):not(.is-text):not(.el-button--text) {
   --el-button-bg-color: var(--color-primary);
   --el-button-border-color: var(--color-primary);
-  --el-button-hover-bg-color: var(--color-primary-light);
-  --el-button-hover-border-color: var(--color-primary-light);
+  --el-button-hover-bg-color: var(--color-primary-hover);
+  --el-button-hover-border-color: var(--color-primary-hover);
+  --el-button-hover-text-color: #fff;
+  --el-button-active-bg-color: color-mix(in srgb, var(--color-primary) 64%, #000);
+  --el-button-active-border-color: color-mix(in srgb, var(--color-primary) 64%, #000);
 }
 
 .app-logo {
@@ -603,6 +610,45 @@ a {
   margin-bottom: auto;
 }
 
+.el-dialog__header,
+.el-message-box__header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-right: 0;
+}
+
+.el-dialog__headerbtn,
+.el-message-box__headerbtn {
+  top: 50%;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  border-radius: 6px;
+  font-size: 18px;
+  transform: translateY(-50%);
+}
+
+.el-dialog__headerbtn .el-dialog__close,
+.el-message-box__headerbtn .el-message-box__close {
+  font-size: 18px;
+}
+
+.el-dialog__headerbtn:hover,
+.el-message-box__headerbtn:hover {
+  background-color: var(--color-workspace-menu-hover);
+}
+
+.el-dialog__headerbtn:hover .el-dialog__close,
+.el-message-box__headerbtn:hover .el-message-box__close {
+  color: var(--color-text);
+}
+
 .folder-action-dropdown.el-popper,
 .app-action-dropdown.el-popper {
   padding: 6px 0;
@@ -794,6 +840,10 @@ a {
 .workspace-action-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+}
+
+.workspace-action-btn:has(.workspace-action-btn__plus) {
   padding-left: 10px !important;
   padding-right: 14px !important;
 }
@@ -896,6 +946,38 @@ a {
   padding: 0 12px;
   height: 40px;
   font-size: 14px;
+}
+
+.workspace-data-table .el-button.is-link {
+  display: inline-flex;
+  flex-shrink: 0;
+  height: auto;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.workspace-data-table .el-button.is-link + .el-button.is-link {
+  margin-left: 4px;
+}
+
+.workspace-data-table td .cell:has(.el-button.is-link) {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.workspace-data-table .el-button.is-link:not(.is-disabled):hover,
+.workspace-data-table .el-button.is-link:not(.is-disabled):focus {
+  background-color: color-mix(in srgb, var(--color-primary) 18%, transparent);
+  color: var(--color-primary);
+}
+
+.workspace-data-table .el-button.is-link.el-button--danger:not(.is-disabled):hover,
+.workspace-data-table .el-button.is-link.el-button--danger:not(.is-disabled):focus {
+  background-color: color-mix(in srgb, var(--color-danger) 18%, transparent);
+  color: var(--color-danger);
 }
 
 .workspace-data-table .el-table__header .el-table__cell {

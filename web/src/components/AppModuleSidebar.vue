@@ -58,7 +58,7 @@ const modules: { key: AppModule; icon: typeof Connection; labelKey: string }[] =
   width: 100%;
   min-height: 44px;
   border: none;
-  border-radius: 10px;
+  border-radius: 6px;
   background: transparent;
   color: var(--color-text-secondary);
   cursor: pointer;

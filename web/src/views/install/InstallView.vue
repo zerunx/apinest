@@ -509,15 +509,23 @@ onMounted(async () => {
   flex-direction: column;
   color-scheme: light;
   --color-primary: #2563eb;
+  --color-primary-light: #3b82f6;
+  --color-hover: #f1f5f9;
   --color-text: #1e293b;
   --color-text-secondary: #64748b;
   --color-border: #e2e8f0;
   --color-surface: #ffffff;
   --shadow-card: 0 12px 32px rgba(15, 23, 42, 0.08);
-  /* Override global dark theme so Element Plus result text stays readable */
+  /* Keep Element Plus on light tokens even if html data-theme is dark */
   --el-text-color-primary: #0f172a;
   --el-text-color-regular: #475569;
   --el-text-color-secondary: #64748b;
+  --el-fill-color-blank: #ffffff;
+  --el-fill-color-light: #f1f5f9;
+  --el-fill-color-lighter: #f8fafc;
+  --el-color-primary-light-9: #eff6ff;
+  --el-button-hover-bg-color: #eff6ff;
+  --el-button-hover-text-color: #2563eb;
   color: var(--color-text);
   background: #f8fafc;
 }
@@ -871,6 +879,18 @@ onMounted(async () => {
 
 .install-credentials__row--clickable:hover {
   background: #f8fafc;
+}
+
+.install-credentials :deep(.el-button.is-text) {
+  --el-button-hover-bg-color: #eff6ff;
+  --el-button-hover-text-color: #2563eb;
+  --el-fill-color-light: #eff6ff;
+}
+
+.install-credentials :deep(.el-button.is-text:hover),
+.install-credentials :deep(.el-button.is-text:focus) {
+  background-color: #eff6ff !important;
+  color: #2563eb !important;
 }
 
 .install-credentials__label {

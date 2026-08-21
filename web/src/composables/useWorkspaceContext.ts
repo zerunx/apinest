@@ -1,4 +1,4 @@
-import { computed, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   createFolder,
@@ -44,6 +44,7 @@ const environmentVariables = ref<EnvironmentVariableItem[]>([])
 const loadingWorkspaces = ref(false)
 const loadingProjects = ref(false)
 const loadingApiTree = ref(false)
+const deferProjectTree = ref(false)
 const loadingInterfaces = ref(false)
 const loadingEnvironments = ref(false)
 const loadingEnvironmentVariables = ref(false)
@@ -70,6 +71,8 @@ const workspaceTabs = ref<WorkspaceTab[]>([])
 const activeTabId = ref<string | null>(storedLayout.activeTabId ?? null)
 /** Bumps each time "Add API" is opened so the create form can reset kept-alive state. */
 const createApiSessionKey = ref(0)
+/** Keep the create editor mounted after first save so panels/form stay as-is. */
+const createFormSessionByApiId = reactive<Record<number, number>>({})
 let navigationHydrated = false
 let bootstrapComplete = false
 
@@ -81,6 +84,30 @@ export function parseFolderId(nodeId: string): number | null {
 export function parseApiId(nodeId: string): number | null {
   const match = nodeId.match(/^api-(\d+)$/)
   return match ? Number(match[1]) : null
+}
+
+function unbindCreateFormSessions(tabIds: Iterable<string>) {
+  for (const tabId of tabIds) {
+    const apiId = parseApiId(tabId)
+    if (apiId != null) delete createFormSessionByApiId[apiId]
+  }
+}
+
+function usesCreateFormEditor(tab: WorkspaceTab | null | undefined) {
+  if (!tab) return false
+  if (tab.kind === 'create-api') return true
+  if (tab.kind !== 'api') return false
+  const apiId = parseApiId(tab.apiId ?? tab.id)
+  return apiId != null && createFormSessionByApiId[apiId] != null
+}
+
+function createFormCacheKey(tab: WorkspaceTab | null | undefined) {
+  if (tab?.kind === 'api') {
+    const apiId = parseApiId(tab.apiId ?? tab.id)
+    const session = apiId != null ? createFormSessionByApiId[apiId] : undefined
+    if (session != null) return `draft-${session}`
+  }
+  return `draft-${createApiSessionKey.value}`
 }
 
 function findNodeById(nodes: ApiTreeNode[], id: string): ApiTreeNode | null {
@@ -505,6 +532,11 @@ export function useWorkspaceContext() {
   }
 
   function ensureModuleDefaultTab(module: AppModule) {
+    if (module === 'environment') {
+      openEnvSectionTab('list')
+      return
+    }
+
     const tabs = workspaceTabs.value.filter((item) => getTabModule(item) === module)
     if (tabs.length > 0) {
       const activeInModule = tabs.find((item) => item.id === activeTabId.value)
@@ -517,9 +549,6 @@ export function useWorkspaceContext() {
     switch (module) {
       case 'project':
         openSpaceSectionTab('workspaces')
-        break
-      case 'environment':
-        openEnvSectionTab('list')
         break
       case 'quick-test':
         openQuickTestTab()
@@ -541,6 +570,7 @@ export function useWorkspaceContext() {
     if (moduleIndex === -1) return
 
     const wasActive = activeTabId.value === tabId
+    unbindCreateFormSessions([tabId])
     workspaceTabs.value = workspaceTabs.value.filter((item) => item.id !== tabId)
 
     if (!wasActive) {
@@ -577,6 +607,7 @@ export function useWorkspaceContext() {
         .map((item) => item.id),
     )
     const removedActive = !!activeTabId.value && removeIds.has(activeTabId.value)
+    unbindCreateFormSessions(removeIds)
     workspaceTabs.value = workspaceTabs.value.filter((item) => !removeIds.has(item.id))
 
     if (removedActive) {
@@ -599,6 +630,7 @@ export function useWorkspaceContext() {
         .map((item) => item.id),
     )
     const removedActive = !!activeTabId.value && removeIds.has(activeTabId.value)
+    unbindCreateFormSessions(removeIds)
     workspaceTabs.value = workspaceTabs.value.filter((item) => !removeIds.has(item.id))
 
     if (removedActive) {
@@ -611,6 +643,10 @@ export function useWorkspaceContext() {
   function closeOtherTabs(tabId: string) {
     if (!workspaceTabs.value.some((item) => item.id === tabId)) return
     const module = activeModule.value
+    const removedIds = workspaceTabs.value
+      .filter((item) => getTabModule(item) === module && item.id !== tabId && item.closable !== false)
+      .map((item) => item.id)
+    unbindCreateFormSessions(removedIds)
 
     workspaceTabs.value = workspaceTabs.value.filter((item) => {
       if (getTabModule(item) !== module) return true
@@ -621,6 +657,11 @@ export function useWorkspaceContext() {
 
   function closeAllTabs() {
     const module = activeModule.value
+    const removedIds = workspaceTabs.value
+      .filter((item) => getTabModule(item) === module && item.closable !== false)
+      .map((item) => item.id)
+    unbindCreateFormSessions(removedIds)
+
     workspaceTabs.value = workspaceTabs.value.filter(
       (item) => getTabModule(item) !== module || item.closable === false,
     )
@@ -771,6 +812,7 @@ export function useWorkspaceContext() {
   async function loadApiTree(options?: { silent?: boolean }) {
     if (!activeWorkspaceId.value || !activeProjectId.value) {
       apiTree.value = []
+      deferProjectTree.value = false
       return
     }
 
@@ -780,6 +822,7 @@ export function useWorkspaceContext() {
       apiTree.value = await fetchFolderTree(activeWorkspaceId.value, activeProjectId.value)
     } finally {
       if (!silent) loadingApiTree.value = false
+      deferProjectTree.value = false
     }
 
     const active = workspaceTabs.value.find((item) => item.id === activeTabId.value)
@@ -1002,6 +1045,7 @@ export function useWorkspaceContext() {
 
   function selectProject(id: number | null) {
     if (activeProjectId.value === id) return
+    deferProjectTree.value = activeProjectId.value == null && id != null
     activeProjectId.value = id
     resetWorkspaceTabs()
     expandedNodeIds.value = new Set()
@@ -1010,6 +1054,7 @@ export function useWorkspaceContext() {
       apiTree.value = []
       interfaces.value = []
       environments.value = []
+      deferProjectTree.value = false
     }
     persistLayoutState()
   }
@@ -1123,14 +1168,15 @@ export function useWorkspaceContext() {
       dirty: false,
     }
 
-    // Keep the editor open: replace "new API" tab with the created API detail tab
+    createFormSessionByApiId[created.id] = createApiSessionKey.value
+
+    // Keep the same create editor: replace the draft tab with the created API tab
     const createIndex = workspaceTabs.value.findIndex((item) => item.id === CREATE_API_TAB_ID)
     if (createIndex >= 0) {
       workspaceTabs.value.splice(createIndex, 1, apiTab)
     } else {
       upsertTab(apiTab)
     }
-    openNextApiInEdit.value = true
     activateTab(apiTabId)
     return created.id
   }
@@ -1311,6 +1357,7 @@ export function useWorkspaceContext() {
     loadingWorkspaces,
     loadingProjects,
     loadingApiTree,
+    deferProjectTree,
     loadingInterfaces,
     loadingEnvironments,
     loadingEnvironmentVariables,
@@ -1351,6 +1398,8 @@ export function useWorkspaceContext() {
     setActiveTabDirty,
     setTabDirty,
     createApiSessionKey,
+    createFormCacheKey,
+    usesCreateFormEditor,
     openNextApiInEdit,
     CREATE_API_TAB_ID,
     toggleNode,

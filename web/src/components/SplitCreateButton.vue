@@ -146,9 +146,10 @@ onBeforeUnmount(() => {
   width: 20px;
 }
 
+.split-create__plus:hover,
 .split-create__caret:hover,
 .split-create__caret.is-open {
-  background: rgba(0, 0, 0, 0.22);
+  background: var(--color-primary-hover);
 }
 
 .split-create__rule {

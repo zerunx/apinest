@@ -476,20 +476,19 @@ watch(visible, async (open) => {
 }
 
 .project-share-edit__btn:hover {
-  background: var(--color-hover);
+  background: color-mix(in srgb, var(--color-text) 18%, var(--color-surface));
 }
 
 .project-share-edit__btn--primary {
-  background: var(--color-text);
-  border-color: var(--color-text);
-  color: var(--color-bg);
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
 }
 
 .project-share-edit__btn--primary:hover {
-  opacity: 0.88;
-  background: var(--color-text);
-  border-color: var(--color-text);
-  color: var(--color-bg);
+  background: color-mix(in srgb, var(--color-primary) 72%, #000);
+  border-color: color-mix(in srgb, var(--color-primary) 72%, #000);
+  color: #fff;
 }
 
 .project-share-edit__btn--primary:disabled {
@@ -527,7 +526,16 @@ watch(visible, async (open) => {
   right: 16px;
   width: 28px;
   height: 28px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
   transform: translateY(-50%);
+}
+
+.project-share-edit-dialog .el-dialog__headerbtn:hover {
+  background-color: var(--color-workspace-menu-hover);
 }
 
 .project-share-edit-dialog .el-dialog__headerbtn .el-dialog__close {

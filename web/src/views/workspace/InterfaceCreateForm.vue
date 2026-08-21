@@ -1,5 +1,5 @@
 ﻿<script setup lang="ts">
-import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import InterfaceEditorPanels from '@/interface/InterfaceEditorPanels.vue'
 import InterfaceSaveButton from '@/interface/InterfaceSaveButton.vue'
@@ -24,6 +24,7 @@ const {
   apiTree,
   selectedFolder,
   submitCreateInterface,
+  submitUpdateInterface,
   parseFolderId,
   setTabDirty,
   createApiSessionKey,
@@ -41,12 +42,27 @@ function clearSaveUiTimer() {
   }
 }
 const form = reactive(createEmptyInterfaceEditorForm({ method: 'POST', status: 1 }))
+const savedInterfaceId = ref<number | null>(null)
+const folderMenuOpen = ref(false)
+const editorTabId = computed(() =>
+  savedInterfaceId.value ? `api-${savedInterfaceId.value}` : CREATE_API_TAB_ID,
+)
+
+function onFolderMenuVisible(open: boolean) {
+  folderMenuOpen.value = open
+  if (!open) {
+    void nextTick(() => {
+      const el = document.activeElement
+      if (el instanceof HTMLElement) el.blur()
+    })
+  }
+}
 
 const folderOptions = computed(() => collectFolderOptions(apiTree.value, parseFolderId))
 
 const { beginSuppress, captureBaseline } = useInterfaceEditorDirty({
   getSnapshot: () => interfaceEditorSnapshot(form),
-  setDirty: (dirty) => setTabDirty(CREATE_API_TAB_ID, dirty),
+  setDirty: (dirty) => setTabDirty(editorTabId.value, dirty),
   enabled: () => !saving.value,
   watchSource: form,
 })
@@ -62,6 +78,7 @@ function resolveFolderId(): number | null {
 }
 
 async function resetForNewApi() {
+  savedInterfaceId.value = null
   beginSuppress()
   resetInterfaceEditorForm(form, {
     method: 'POST',
@@ -78,7 +95,7 @@ watch(createApiSessionKey, () => {
 }, { immediate: true })
 
 watch(selectedFolder, (folder) => {
-  if (!folder) return
+  if (savedInterfaceId.value || !folder) return
   const nextFolderId = parseFolderId(folder.id)
   if (nextFolderId != null && form.folderId !== nextFolderId) {
     form.folderId = nextFolderId
@@ -100,11 +117,19 @@ async function handleSave(): Promise<boolean> {
   clearSaveUiTimer()
   saveUi.value = 'saving'
   saving.value = true
+  beginSuppress()
   try {
-    await submitCreateInterface({
+    const payload = {
       ...buildInterfaceSavePayload(form),
       folder_id: folderId,
-    })
+    }
+    if (savedInterfaceId.value) {
+      await submitUpdateInterface(savedInterfaceId.value, payload)
+    } else {
+      const createdId = await submitCreateInterface(payload)
+      savedInterfaceId.value = createdId ?? null
+    }
+    await captureBaseline()
     saveUi.value = 'saved'
     saveUiTimer = setTimeout(() => {
       saveUi.value = 'idle'
@@ -149,9 +174,11 @@ defineExpose({
             <el-select
               v-model="form.folderId"
               class="interface-meta-row__folder"
+              :class="{ 'is-dropdown-visible': folderMenuOpen }"
               :placeholder="t('workspace.selectFolder')"
               size="default"
               popper-class="app-action-dropdown"
+              @visible-change="onFolderMenuVisible"
             >
               <el-option
                 v-for="item in folderOptions"

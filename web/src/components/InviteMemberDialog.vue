@@ -192,8 +192,8 @@ watch(visible, (open) => {
 }
 
 .invite-member-dialog__btn--primary:hover {
-  opacity: 0.9;
-  background: var(--color-text);
+  background: color-mix(in srgb, var(--color-text) 72%, #000);
+  border-color: color-mix(in srgb, var(--color-text) 72%, #000);
 }
 </style>
 
@@ -225,11 +225,20 @@ watch(visible, (open) => {
   right: 16px;
   width: 28px;
   height: 28px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
   transform: translateY(-50%);
 }
 
+.invite-member-dialog .el-dialog__headerbtn:hover {
+  background-color: var(--color-workspace-menu-hover);
+}
+
 .invite-member-dialog .el-dialog__headerbtn .el-dialog__close {
-  font-size: 20px;
+  font-size: 18px;
   color: var(--color-text);
   opacity: 0.85;
 }

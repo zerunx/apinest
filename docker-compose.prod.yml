@@ -1,19 +1,13 @@
 services:
   nest:
-    image: nest:latest
+    image: zerunx/nest:latest
     expose:
       - 3000
     volumes:
-      - /data/www/nest/runtime/:/app/runtime
+      - /data/docker/nest/runtime/:/app/runtime
     restart: unless-stopped
-    networks:
-      - nest-network
-      - common-network
 
 networks:
-  nest-network:
+  default:
     external: true
-    name: nest-network
-
-  common-network:
-    external: true
+    name: common-network

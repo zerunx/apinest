@@ -39,6 +39,8 @@ const {
   closeTabsRight,
   closeOtherTabs,
   closeAllTabs,
+  usesCreateFormEditor,
+  createFormCacheKey,
 } = useWorkspaceContext()
 
 const moduleTitleMap: Record<AppModule, string> = {
@@ -90,7 +92,7 @@ const showCreateForm = computed(
   () =>
     activeModule.value === 'api' &&
     contextMode.value === 'project' &&
-    activeModuleTab.value?.kind === 'create-api',
+    usesCreateFormEditor(activeModuleTab.value),
 )
 
 const showFolderView = computed(
@@ -105,7 +107,8 @@ const showApiDetail = computed(
   () =>
     activeModule.value === 'api' &&
     contextMode.value === 'project' &&
-    activeModuleTab.value?.kind === 'api',
+    activeModuleTab.value?.kind === 'api' &&
+    !usesCreateFormEditor(activeModuleTab.value),
 )
 
 const showApiWorkspacePanels = computed(
@@ -495,6 +498,7 @@ onBeforeUnmount(() => {
         <keep-alive>
           <InterfaceCreateForm
             v-if="showCreateForm"
+            :key="createFormCacheKey(activeModuleTab)"
             ref="createFormRef"
           />
         </keep-alive>

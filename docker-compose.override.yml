@@ -15,9 +15,6 @@ services:
       - build-cache:/root/.cache/go-build
     command: go run cmd/api/main.go
     restart: unless-stopped
-    networks:
-      - default
-      - common-network
 
 volumes:
   mod-cache:
@@ -26,7 +23,4 @@ volumes:
 networks:
   default:
     external: true
-    name: nest-network
-
-  common-network:
-    external: true
+    name: common-network

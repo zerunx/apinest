@@ -7,11 +7,16 @@ web/node_modules
 web/dist
 web/pnpm-lock.yaml
 
-# local runtime / docker volumes
+# desktop
+desktop
+
+# docker volumes
 docker/postgres/data
 docker/valkey/data
 docker/caddy/data
 docker/caddy/config
+
+# local runtime
 runtime
 
 # docs / ide

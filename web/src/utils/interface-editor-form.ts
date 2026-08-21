@@ -133,12 +133,8 @@ export function buildInterfaceSavePayload(form: InterfaceEditorFormState) {
   }
 }
 
-/** Stable snapshot for dirty comparison (ignores trailing empty editor rows via compact helpers). */
 export function interfaceEditorSnapshot(form: InterfaceEditorFormState) {
-  return JSON.stringify({
-    protocol: form.protocol,
-    ...buildInterfaceSavePayload(form),
-  })
+  return JSON.stringify(buildInterfaceSavePayload(form))
 }
 
 export function hasRequestHeadersContent(headers: ParamRow[]): boolean {

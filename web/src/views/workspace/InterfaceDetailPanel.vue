@@ -1,5 +1,5 @@
 ﻿<script setup lang="ts">
-import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { CopyDocument } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { fetchInterfaceDetail } from '@/api/interface'
@@ -53,10 +53,21 @@ const {
 } = useWorkspaceContext()
 
 const mode = ref<DetailMode>('doc')
+const folderMenuOpen = ref(false)
 const loading = ref(false)
 const saving = ref(false)
 const saveUi = ref<'idle' | 'saving' | 'saved'>('idle')
 let saveUiTimer: ReturnType<typeof setTimeout> | null = null
+
+function onFolderMenuVisible(open: boolean) {
+  folderMenuOpen.value = open
+  if (!open) {
+    void nextTick(() => {
+      const el = document.activeElement
+      if (el instanceof HTMLElement) el.blur()
+    })
+  }
+}
 
 function clearSaveUiTimer() {
   if (saveUiTimer) {
@@ -377,9 +388,11 @@ defineExpose({
               <el-select
                 v-model="form.folderId"
                 class="interface-meta-row__folder"
+                :class="{ 'is-dropdown-visible': folderMenuOpen }"
                 :placeholder="t('workspace.selectFolder')"
                 size="default"
                 popper-class="app-action-dropdown"
+                @visible-change="onFolderMenuVisible"
               >
                 <el-option
                   v-for="item in folderOptions"

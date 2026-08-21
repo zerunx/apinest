@@ -207,6 +207,7 @@ watch(activeProjectId, () => {
       v-model="dialogVisible"
       :title="dialogMode === 'create' ? t('environment.create') : t('environment.rename')"
       width="420px"
+      class="environment-dialog"
       destroy-on-close
     >
       <el-form label-position="top" @submit.prevent="handleSubmit">
@@ -266,5 +267,77 @@ watch(activeProjectId, () => {
 .environment-manage :deep(.el-dialog .el-form-item__label) {
   color: var(--color-text);
   font-weight: 500;
+}
+</style>
+
+<style>
+.environment-dialog.el-dialog {
+  --el-dialog-padding-primary: 0;
+  padding: 0;
+}
+
+.environment-dialog .el-dialog__header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-right: 0;
+  padding: 16px 52px 16px 24px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.environment-dialog .el-dialog__title {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--color-text);
+}
+
+.environment-dialog .el-dialog__body {
+  padding: 20px 24px;
+}
+
+.environment-dialog .el-dialog__footer {
+  padding: 16px 24px;
+  border-top: 1px solid var(--color-border);
+}
+
+.environment-dialog .el-dialog__headerbtn {
+  top: 50%;
+  right: 16px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  transform: translateY(-50%);
+}
+
+.environment-dialog .el-dialog__headerbtn:hover {
+  background-color: var(--color-workspace-menu-hover);
+}
+
+.environment-dialog .el-dialog__headerbtn .el-dialog__close {
+  font-size: 18px;
+  color: var(--color-text);
+  opacity: 0.85;
+}
+
+.environment-dialog .el-dialog__headerbtn:hover .el-dialog__close {
+  color: var(--color-text);
+  opacity: 1;
+}
+
+.environment-dialog .el-button:not(.el-button--primary) {
+  --el-button-hover-bg-color: color-mix(in srgb, var(--color-text) 18%, var(--color-surface));
+  --el-button-hover-border-color: var(--color-border);
+  --el-button-hover-text-color: var(--color-text);
+}
+
+.environment-dialog .el-button--primary {
+  --el-button-hover-bg-color: color-mix(in srgb, var(--color-primary) 72%, #000);
+  --el-button-hover-border-color: color-mix(in srgb, var(--color-primary) 72%, #000);
+  --el-button-hover-text-color: #fff;
 }
 </style>

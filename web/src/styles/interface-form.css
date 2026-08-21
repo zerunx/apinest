@@ -120,8 +120,8 @@
 }
 
 .interface-url-actions__save:hover:not(:disabled):not(.is-saved) {
-  background: var(--color-primary-light);
-  border-color: var(--color-primary-light);
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
   color: #fff;
 }
 
@@ -232,8 +232,12 @@
 }
 
 .interface-url-bar .el-select__wrapper:hover,
-.interface-url-bar .el-select__wrapper.is-focused,
 .interface-url-bar .el-input__wrapper:hover,
+.interface-url-bar .el-input__wrapper.is-focus {
+  background: var(--color-interface-field-hover-bg) !important;
+}
+
+.interface-url-bar .el-select.is-dropdown-visible .el-select__wrapper,
 .interface-url-bar .el-input__wrapper.is-focus {
   box-shadow: inset 0 0 0 1px var(--color-interface-focus-ring) !important;
   background: var(--color-interface-field-hover-bg) !important;
@@ -292,8 +296,11 @@
 }
 
 .interface-meta-row__folder .el-select__wrapper:hover,
-.interface-meta-row__folder .el-select__wrapper.is-focused,
-.interface-meta-row__name .el-input__wrapper:hover,
+.interface-meta-row__name .el-input__wrapper:hover {
+  background: var(--color-interface-field-hover-bg) !important;
+}
+
+.interface-meta-row__folder.is-dropdown-visible .el-select__wrapper,
 .interface-meta-row__name .el-input__wrapper.is-focus {
   box-shadow: inset 0 0 0 1px var(--color-interface-focus-ring) !important;
   background: var(--color-interface-field-hover-bg) !important;

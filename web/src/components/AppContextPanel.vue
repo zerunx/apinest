@@ -27,6 +27,7 @@ const {
   selectedFolderId,
   loadingProjects,
   loadingApiTree,
+  deferProjectTree,
   selectProject,
   selectFolder,
   selectApi,
@@ -54,6 +55,9 @@ const importDialogOpen = ref(false)
 const importDialogRef = ref<{ setSubmitting: (value: boolean) => void; close: () => void } | null>(null)
 
 const searchQuery = ref('')
+const showProjectList = computed(
+  () => contextMode.value === 'workspace' || deferProjectTree.value,
+)
 
 type FlatApiNode = {
   node: ApiTreeNode
@@ -645,7 +649,12 @@ onBeforeUnmount(() => {
     </div>
 
     <!-- Project list (workspace mode) -->
-    <div v-else-if="contextMode === 'workspace'" class="context-panel__body" v-loading="loadingProjects">
+    <div
+      v-else-if="showProjectList"
+      class="context-panel__body"
+      v-loading="loadingProjects"
+      element-loading-background="var(--color-workspace-content)"
+    >
       <ul class="context-panel__list">
         <li
           v-for="item in filteredProjects"
@@ -668,7 +677,12 @@ onBeforeUnmount(() => {
     </div>
 
     <!-- API tree (project mode) -->
-    <div v-else class="context-panel__body" v-loading="loadingApiTree">
+    <div
+      v-else
+      class="context-panel__body"
+      v-loading="loadingApiTree"
+      element-loading-background="var(--color-workspace-content)"
+    >
       <ul class="context-panel__tree">
         <li
           v-for="{ node, depth, parentFolderId } in flatApiNodes"
@@ -958,6 +972,10 @@ onBeforeUnmount(() => {
   overscroll-behavior: contain;
   padding: 0;
   background: var(--color-workspace-content);
+}
+
+.context-panel__body :deep(.el-loading-mask) {
+  background-color: var(--color-workspace-content);
 }
 
 .context-panel__list,

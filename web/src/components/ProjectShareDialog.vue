@@ -314,7 +314,7 @@ watch(visible, (open) => {
 }
 
 .project-share-dialog__action:hover {
-  background: var(--color-hover);
+  background: color-mix(in srgb, var(--color-text) 14%, transparent);
   color: var(--color-text);
 }
 
@@ -348,7 +348,16 @@ watch(visible, (open) => {
   right: 16px;
   width: 28px;
   height: 28px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
   transform: translateY(-50%);
+}
+
+.project-share-dialog .el-dialog__headerbtn:hover {
+  background-color: var(--color-workspace-menu-hover);
 }
 
 .project-share-dialog .el-dialog__headerbtn .el-dialog__close {
