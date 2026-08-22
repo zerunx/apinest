@@ -620,8 +620,7 @@ a {
 
 .el-dialog__headerbtn,
 .el-message-box__headerbtn {
-  top: 50%;
-  right: 8px;
+  top: 25%;
   width: 28px;
   height: 28px;
   padding: 0;
