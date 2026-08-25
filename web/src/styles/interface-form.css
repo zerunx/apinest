@@ -374,6 +374,10 @@
   grid-template-rows: 1fr;
 }
 
+.interface-detail__panels--instant .interface-panel__collapse {
+  transition: none;
+}
+
 .interface-panel__collapse > .interface-panel__body {
   min-height: 0;
   overflow: hidden;
@@ -882,23 +886,28 @@
 .interface-body-raw__host {
   flex: 1;
   width: 100%;
-  height: 100% !important;
-  min-height: 100% !important;
+  height: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
-.interface-body-raw__editor .cm-editor,
-.interface-body-raw__editor .cm-scroller {
+.interface-body-raw__editor .cm-editor {
   flex: 1;
   width: 100%;
-  height: 100% !important;
-  min-height: 100% !important;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.interface-body-raw__editor .cm-scroller {
+  min-height: 0;
 }
 
 .interface-body-raw__editor .cm-content,
 .interface-body-raw__editor .cm-gutters {
-  min-height: 100% !important;
+  min-height: 100%;
 }
 
 /* Param table */
@@ -931,9 +940,13 @@
 
 .interface-param-table__col-name .el-input,
 .interface-param-table__col-name .el-autocomplete,
+.interface-param-table__col-name .interface-param-table__native-input,
 .interface-param-table__col-type .el-select,
+.interface-param-table__col-type .interface-param-table__native-select,
 .interface-param-table__col-desc .el-input,
-.interface-param-table__col-example .el-input {
+.interface-param-table__col-desc .interface-param-table__native-input,
+.interface-param-table__col-example .el-input,
+.interface-param-table__col-example .interface-param-table__native-input {
   width: 100%;
 }
 
@@ -1185,6 +1198,51 @@
   background: transparent !important;
 }
 
+.interface-param-table__native-input,
+.interface-param-table__native-select {
+  box-sizing: border-box;
+  height: 32px;
+  margin: 0;
+  padding: 0 8px;
+  border: none;
+  border-radius: var(--color-interface-input-radius);
+  background: transparent;
+  color: var(--color-interface-field-text);
+  font: inherit;
+  font-size: 13px;
+  line-height: 32px;
+  outline: none;
+}
+
+.interface-param-table__native-select {
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23888' d='M3 4.5 6 8l3-3.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  padding-right: 22px;
+}
+
+.interface-param-table__native-input::placeholder {
+  color: var(--color-interface-placeholder);
+  opacity: 1;
+}
+
+.interface-param-table__native-input:hover,
+.interface-param-table__native-select:hover,
+.interface-param-table__native-input:focus,
+.interface-param-table__native-select:focus {
+  box-shadow: inset 0 0 0 1px var(--color-interface-focus-ring);
+}
+
+.interface-param-table__native-check {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--color-interface-accent);
+  cursor: pointer;
+}
+
 .interface-param-table .el-checkbox {
   height: auto;
 }
@@ -1267,6 +1325,71 @@
   display: flex;
   align-items: center;
   min-width: 0;
+}
+
+.interface-param-table__name-cell .el-input,
+.interface-param-table__name-cell .interface-param-table__native-input,
+.interface-param-table__name-cell .interface-doc-copyable {
+  flex: 1;
+  min-width: 0;
+}
+
+.interface-param-table__tree-indent {
+  display: flex;
+  flex-shrink: 0;
+}
+
+.interface-param-table__tree-line {
+  width: 16px;
+  flex-shrink: 0;
+}
+
+.interface-param-table__tree-toggle {
+  position: relative;
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  margin-right: 6px;
+  padding: 0;
+  flex-shrink: 0;
+  border: 1px solid var(--color-text-secondary);
+  border-radius: 2px;
+  background: var(--color-workspace-content);
+  color: var(--color-interface-field-text);
+  cursor: pointer;
+}
+
+.interface-param-table__tree-toggle::before,
+.interface-param-table__tree-toggle::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  background: currentColor;
+  border-radius: 1px;
+}
+
+.interface-param-table__tree-toggle::before {
+  width: 7px;
+  height: 1.5px;
+}
+
+.interface-param-table__tree-toggle[aria-expanded='false']::after {
+  width: 1.5px;
+  height: 7px;
+}
+
+.interface-param-table__tree-toggle:hover {
+  border-color: var(--color-interface-field-text);
+  color: var(--color-interface-field-text);
+}
+
+.interface-param-table__tree-spacer {
+  width: 16px;
+  height: 16px;
+  margin-right: 6px;
+  flex-shrink: 0;
 }
 
 .interface-param-table__field-actions {

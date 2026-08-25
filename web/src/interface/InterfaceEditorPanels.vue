@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, watch } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { ArrowDown } from '@element-plus/icons-vue'
 import InterfaceRequestParams from '@/interface/InterfaceRequestParams.vue'
 import InterfaceParamTable from '@/interface/InterfaceParamTable.vue'
@@ -78,6 +78,10 @@ const openPanels = reactive<Record<PanelKey, boolean>>({
   responseExample: false,
 })
 
+/** Keep the edit request tree after first open so doc ↔ edit does not remount it. */
+const editMounted = ref(!props.readonly)
+const skipCollapseAnim = ref(false)
+
 const hasHeaders = computed(() => hasRequestHeadersContent(props.requestHeaders))
 const hasQuery = computed(() => hasQueryParamsContent(props.queryParams))
 const hasBody = computed(() => hasRequestBodyContent(props.requestBody))
@@ -114,21 +118,48 @@ function togglePanel(key: PanelKey) {
   openPanels[key] = !openPanels[key]
 }
 
+function withInstantCollapse(apply: () => void) {
+  skipCollapseAnim.value = true
+  apply()
+  void nextTick(() => {
+    skipCollapseAnim.value = false
+  })
+}
+
+watch(
+  () => props.panelStateKey,
+  () => {
+    editMounted.value = !props.readonly
+  },
+)
+
+watch(
+  () => props.readonly,
+  (readonly) => {
+    if (!readonly) editMounted.value = true
+  },
+)
+
 // First open of an API / create session / doc|edit view: empty panels stay closed.
 // After that, only the summary click changes open state.
 watch(
   () => [props.panelStateKey, props.defaultOpen, props.readonly, props.ready] as const,
   () => {
     if (!props.ready) return
-    if (props.defaultOpen) expandAllPanels()
-    else syncOpenFromContent()
+    withInstantCollapse(() => {
+      if (props.defaultOpen) expandAllPanels()
+      else syncOpenFromContent()
+    })
   },
   { immediate: true },
 )
 </script>
 
 <template>
-  <div class="interface-detail__panels">
+  <div
+    class="interface-detail__panels"
+    :class="{ 'interface-detail__panels--instant': skipCollapseAnim }"
+  >
     <template v-if="readonly">
       <section
         v-if="hasHeaders"
@@ -207,7 +238,8 @@ watch(
     </template>
 
     <section
-      v-else
+      v-if="editMounted"
+      v-show="!readonly"
       class="interface-panel"
       :class="{ 'interface-panel--open': openPanels.requestParams }"
     >

@@ -312,14 +312,18 @@ async function handleTabClose(tab: WorkspaceTab, event?: MouseEvent) {
   closeTab(tab.id)
 }
 
-type EditorSaveHandle = { save: () => void | boolean | Promise<void | boolean> }
+type EditorSaveHandle = { save: () => boolean | Promise<boolean> }
 const createFormRef = ref<EditorSaveHandle | null>(null)
 const detailFormRef = ref<EditorSaveHandle | null>(null)
 
 useSaveShortcut(
-  () => {
-    if (showCreateForm.value) return createFormRef.value?.save()
-    if (showApiDetail.value) return detailFormRef.value?.save()
+  async () => {
+    const result = showCreateForm.value
+      ? await createFormRef.value?.save()
+      : showApiDetail.value
+        ? await detailFormRef.value?.save()
+        : false
+    if (result) ElMessage.success(t('common.saved'))
   },
   () => showCreateForm.value || showApiDetail.value,
 )

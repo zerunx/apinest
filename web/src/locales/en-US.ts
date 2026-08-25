@@ -143,6 +143,8 @@ export default {
       addRow: 'Add row',
       addChildField: 'Add child field',
       addSiblingField: 'Add sibling field',
+      expandField: 'Expand',
+      collapseField: 'Collapse',
       toggleAllRequired: 'Mark all required',
       clearAllRequired: 'Clear all required',
       sort: 'Sort',

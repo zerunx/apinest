@@ -508,7 +508,7 @@ export default {
   background: transparent;
   text-align: left;
   padding: 0 4px 0 0;
-  border-radius: 0;
+  border-radius: var(--radius);
   cursor: pointer;
   user-select: none;
   position: relative;

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { Delete, Plus } from '@element-plus/icons-vue'
 import { useTableRowDrag } from '@/composables/useTableRowDrag'
 import { useLocale } from '@/composables/useLocale'
@@ -34,9 +34,40 @@ const { t } = useLocale()
 
 const fieldTypeOptions = ['string', 'number', 'boolean', 'object', 'array', 'file']
 
-const flatRows = computed(() => flattenFieldTree(props.modelValue))
+const collapsedKeys = ref(new Set<string>())
+
+function pathKey(path: number[]) {
+  return path.join('-')
+}
+
+function isCollapsed(path: number[]) {
+  return collapsedKeys.value.has(pathKey(path))
+}
+
+function toggleCollapsed(path: number[]) {
+  const key = pathKey(path)
+  const next = new Set(collapsedKeys.value)
+  if (next.has(key)) next.delete(key)
+  else next.add(key)
+  collapsedKeys.value = next
+}
+
+function expandPath(path: number[]) {
+  const key = pathKey(path)
+  if (!collapsedKeys.value.has(key)) return
+  const next = new Set(collapsedKeys.value)
+  next.delete(key)
+  collapsedKeys.value = next
+}
+
+const allRows = computed(() => flattenFieldTree(props.modelValue))
 const displayRows = computed(() =>
-  props.readonly ? flattenFieldTree(compactFieldTree(props.modelValue)) : flatRows.value,
+  flattenFieldTree(
+    props.readonly ? compactFieldTree(props.modelValue) : props.modelValue,
+    0,
+    [],
+    collapsedKeys.value,
+  ),
 )
 
 function requiredLabel(required: boolean) {
@@ -49,13 +80,21 @@ function typeLabel(type: string) {
   return `[${type || 'string'}]`
 }
 
+function nativeValue(event: Event) {
+  return (event.target as HTMLInputElement | HTMLSelectElement).value
+}
+
+function nativeChecked(event: Event) {
+  return (event.target as HTMLInputElement).checked
+}
+
 const allFilledRequired = computed(
-  () => flatRows.value.length > 0 && flatRows.value.every((row) => row.node.required),
+  () => allRows.value.length > 0 && allRows.value.every((row) => row.node.required),
 )
 
 const requiredIndeterminate = computed(() => {
-  const requiredCount = flatRows.value.filter((row) => row.node.required).length
-  return requiredCount > 0 && requiredCount < flatRows.value.length
+  const requiredCount = allRows.value.filter((row) => row.node.required).length
+  return requiredCount > 0 && requiredCount < allRows.value.length
 })
 
 const requiredHeaderTooltip = computed(() =>
@@ -78,6 +117,7 @@ function removeRow(path: number[]) {
 }
 
 function addChild(path: number[]) {
+  expandPath(path)
   syncTree(addChildAtPath(props.modelValue, path))
 }
 
@@ -91,14 +131,14 @@ function toggleAllRequired() {
 
 function canDragRow(flatIndex: number) {
   if (props.readonly) return false
-  const row = flatRows.value[flatIndex]
-  if (!row || isTrailingPlaceholderRow(row, flatRows.value)) return false
+  const row = displayRows.value[flatIndex]
+  if (!row || isTrailingPlaceholderRow(row, displayRows.value)) return false
   return hasFieldContent(row.node)
 }
 
 function reorderRows(fromFlatIndex: number, toFlatIndex: number) {
-  const from = flatRows.value[fromFlatIndex]
-  const to = flatRows.value[toFlatIndex]
+  const from = displayRows.value[fromFlatIndex]
+  const to = displayRows.value[toFlatIndex]
   if (!from || !to || !areSiblingPaths(from.path, to.path)) return
   const parentPath = siblingParentPath(from.path)
   const fromIndex = from.path[from.path.length - 1]
@@ -201,100 +241,111 @@ defineExpose({ compact: () => compactFieldTree(props.modelValue) })
           </span>
         </td>
         <td class="interface-param-table__col-name">
-          <div class="interface-param-table__name-cell" :style="{ paddingLeft: `${row.depth * 20}px` }">
+          <div class="interface-param-table__name-cell">
+            <span
+              v-if="row.depth > 0"
+              class="interface-param-table__tree-indent"
+              aria-hidden="true"
+            >
+              <i
+                v-for="step in row.depth"
+                :key="step"
+                class="interface-param-table__tree-line"
+              />
+            </span>
+            <button
+              v-if="row.hasChildren"
+              type="button"
+              class="interface-param-table__tree-toggle"
+              :aria-label="
+                isCollapsed(row.path)
+                  ? t('workspace.interfaceForm.expandField')
+                  : t('workspace.interfaceForm.collapseField')
+              "
+              :aria-expanded="!isCollapsed(row.path)"
+              @click.stop="toggleCollapsed(row.path)"
+            />
+            <span v-else class="interface-param-table__tree-spacer" aria-hidden="true" />
             <InterfaceDocCopyCell v-if="readonly" :value="row.node.name" />
-            <el-input
+            <input
               v-else
-              :model-value="row.node.name"
+              class="interface-param-table__native-input"
+              :value="row.node.name"
               :placeholder="t('workspace.interfaceForm.paramName')"
-              @update:model-value="updateRow(row.path, { name: $event })"
+              @input="updateRow(row.path, { name: nativeValue($event) })"
             />
           </div>
         </td>
         <td class="interface-param-table__col-type">
           <span v-if="readonly" class="interface-param-table__text">{{ typeLabel(row.node.type) }}</span>
-          <el-select
+          <select
             v-else
-            :model-value="row.node.type"
-            popper-class="app-action-dropdown"
-            @update:model-value="updateRow(row.path, { type: $event })"
+            class="interface-param-table__native-select"
+            :value="row.node.type"
+            @change="updateRow(row.path, { type: nativeValue($event) })"
           >
-            <el-option v-for="type in fieldTypeOptions" :key="type" :label="type" :value="type" />
-          </el-select>
+            <option v-for="type in fieldTypeOptions" :key="type" :value="type">{{ type }}</option>
+          </select>
         </td>
         <td class="interface-param-table__center">
           <span v-if="readonly" class="interface-param-table__text">{{ requiredLabel(row.node.required) }}</span>
-          <el-checkbox
+          <input
             v-else
-            :model-value="row.node.required"
-            @update:model-value="updateRow(row.path, { required: $event })"
+            type="checkbox"
+            class="interface-param-table__native-check"
+            :checked="row.node.required"
+            @change="updateRow(row.path, { required: nativeChecked($event) })"
           />
         </td>
         <td class="interface-param-table__col-desc">
           <InterfaceDocCopyCell v-if="readonly" :value="row.node.description" />
-          <el-input
+          <input
             v-else
-            :model-value="row.node.description"
+            class="interface-param-table__native-input"
+            :value="row.node.description"
             :placeholder="t('workspace.interfaceForm.paramDescPlaceholder')"
-            @update:model-value="updateRow(row.path, { description: $event })"
+            @input="updateRow(row.path, { description: nativeValue($event) })"
           />
         </td>
         <td class="interface-param-table__col-example">
           <InterfaceDocCopyCell v-if="readonly" :value="row.node.example" />
-          <el-input
+          <input
             v-else
-            :model-value="row.node.example"
+            class="interface-param-table__native-input"
+            :value="row.node.example"
             :placeholder="t('workspace.interfaceForm.example')"
-            @update:model-value="updateRow(row.path, { example: $event })"
+            @input="updateRow(row.path, { example: nativeValue($event) })"
           />
         </td>
         <td v-if="!readonly" class="interface-param-table__actions">
           <div v-if="hasFieldContent(row.node)" class="interface-param-table__field-actions">
-            <el-tooltip
-              :content="t('workspace.interfaceForm.addSiblingField')"
-              placement="top"
-              :show-after="0"
-              :hide-after="0"
+            <button
+              type="button"
+              class="interface-param-table__icon-btn"
+              :title="t('workspace.interfaceForm.addSiblingField')"
+              :aria-label="t('workspace.interfaceForm.addSiblingField')"
+              @click="addSibling(row.path)"
             >
-              <button
-                type="button"
-                class="interface-param-table__icon-btn"
-                :aria-label="t('workspace.interfaceForm.addSiblingField')"
-                @click="addSibling(row.path)"
-              >
-                <el-icon :size="14"><Plus /></el-icon>
-              </button>
-            </el-tooltip>
-            <el-tooltip
-              :content="t('workspace.interfaceForm.addChildField')"
-              placement="top"
-              :show-after="0"
-              :hide-after="0"
+              <el-icon :size="14"><Plus /></el-icon>
+            </button>
+            <button
+              type="button"
+              class="interface-param-table__icon-btn interface-param-table__icon-btn--boxed"
+              :title="t('workspace.interfaceForm.addChildField')"
+              :aria-label="t('workspace.interfaceForm.addChildField')"
+              @click="addChild(row.path)"
             >
-              <button
-                type="button"
-                class="interface-param-table__icon-btn interface-param-table__icon-btn--boxed"
-                :aria-label="t('workspace.interfaceForm.addChildField')"
-                @click="addChild(row.path)"
-              >
-                <el-icon :size="12"><Plus /></el-icon>
-              </button>
-            </el-tooltip>
-            <el-tooltip
-              :content="t('common.delete')"
-              placement="top"
-              :show-after="0"
-              :hide-after="0"
+              <el-icon :size="12"><Plus /></el-icon>
+            </button>
+            <button
+              type="button"
+              class="interface-param-table__delete"
+              :title="t('common.delete')"
+              :aria-label="t('common.delete')"
+              @click="removeRow(row.path)"
             >
-              <button
-                type="button"
-                class="interface-param-table__delete"
-                :aria-label="t('common.delete')"
-                @click="removeRow(row.path)"
-              >
-                <el-icon :size="14"><Delete /></el-icon>
-              </button>
-            </el-tooltip>
+              <el-icon :size="14"><Delete /></el-icon>
+            </button>
           </div>
         </td>
       </tr>

@@ -86,13 +86,13 @@ export function useSaveShortcut(
 
   function startListening() {
     if (listening.value) return
-    window.addEventListener('keydown', onKeydown)
+    window.addEventListener('keydown', onKeydown, true)
     listening.value = true
   }
 
   function stopListening() {
     if (!listening.value) return
-    window.removeEventListener('keydown', onKeydown)
+    window.removeEventListener('keydown', onKeydown, true)
     listening.value = false
   }
 

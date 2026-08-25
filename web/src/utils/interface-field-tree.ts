@@ -17,6 +17,7 @@ export interface FlatFieldRow {
   node: FieldTreeNode
   depth: number
   path: number[]
+  hasChildren: boolean
 }
 
 export function emptyFieldNode(parentId = 0): FieldTreeNode {
@@ -77,14 +78,20 @@ export function ensureTrailingEmptyRoot(nodes: FieldTreeNode[]): FieldTreeNode[]
   return tree
 }
 
-export function flattenFieldTree(nodes: FieldTreeNode[], depth = 0, pathPrefix: number[] = []): FlatFieldRow[] {
+export function flattenFieldTree(
+  nodes: FieldTreeNode[],
+  depth = 0,
+  pathPrefix: number[] = [],
+  collapsedKeys?: Set<string>,
+): FlatFieldRow[] {
   const result: FlatFieldRow[] = []
   for (let i = 0; i < nodes.length; i++) {
     const path = [...pathPrefix, i]
     const node = nodes[i]
-    result.push({ node, depth, path })
-    if (node.children?.length) {
-      result.push(...flattenFieldTree(node.children, depth + 1, path))
+    const hasChildren = Array.isArray(node.children) && node.children.length > 0
+    result.push({ node, depth, path, hasChildren })
+    if (hasChildren && !collapsedKeys?.has(path.join('-'))) {
+      result.push(...flattenFieldTree(node.children ?? [], depth + 1, path, collapsedKeys))
     }
   }
   return result

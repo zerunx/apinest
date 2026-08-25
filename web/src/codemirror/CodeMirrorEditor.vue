@@ -102,21 +102,17 @@ defineExpose({ formatContent })
 .cm-host {
   display: flex;
   flex-direction: column;
+  min-height: 0;
   height: 100%;
-  min-height: 100%;
   cursor: text;
 }
 
 .cm-host .cm-editor {
   flex: 1;
   height: 100%;
-  min-height: 100%;
-}
-
-.cm-host .cm-scroller {
-  min-height: 100%;
-  height: 100%;
-  align-items: stretch !important;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
 }
 
 .cm-host .cm-content,

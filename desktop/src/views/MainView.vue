@@ -263,7 +263,7 @@ import InterfaceEditor from '../components/InterfaceEditor.vue'
 import CodeSnippetPanel from '../components/CodeSnippetPanel.vue'
 import { useToast } from '../composables/useToast'
 import type { TreeAction, TreeApiDragPayload } from '../components/TreeNode.vue'
-import type { HeaderPair, InterfaceRow, TreeItem } from '../types'
+import type { HeaderPair, InterfaceRow, SendResponse, TreeItem } from '../types'
 import { useSaveShortcut } from '../composables/useSaveShortcut'
 import { useCloseTabShortcut } from '../composables/useCloseTabShortcut'
 import { anchorFromEvent, type DialogAnchor } from '../composables/useDialogAnchor'
@@ -293,6 +293,16 @@ type RequestTab = {
   snapshot: string
   mode: 'create' | 'edit' | 'blank'
   detail: Record<string, unknown> | null
+  lastResponse: SendResponse | null
+  requestPaneTab: 'params' | 'authorization' | 'headers' | 'body' | 'message' | 'metadata'
+}
+
+function cloneSendResponse(res: SendResponse | null | undefined): SendResponse | null {
+  if (!res) return null
+  return {
+    ...res,
+    headers: (res.headers ?? []).map((h) => ({ ...h })),
+  }
 }
 
 const { t } = useI18n()
@@ -412,11 +422,16 @@ function editorSnapshot(): string {
   return editorRef.value?.getSnapshot() ?? ''
 }
 
+function tabIsDirty(tab: RequestTab, snap: string): boolean {
+  if (tab.mode === 'create') return true
+  if (editorRef.value?.isDirty?.()) return true
+  return !!tab.snapshot && snap !== tab.snapshot
+}
+
 function tabStateFromEditor(tab: RequestTab): RequestTab | null {
   if (!editorRef.value) return null
   const state = editorRef.value.exportTabState()
   const snap = editorSnapshot()
-  const dirty = tab.snapshot ? snap !== tab.snapshot : false
   return {
     ...tab,
     name: state.name,
@@ -430,8 +445,10 @@ function tabStateFromEditor(tab: RequestTab): RequestTab | null {
     headers: defaultHeaders(),
     body: String((state.detail as { request_body?: { raw?: string } }).request_body?.raw ?? ''),
     interfaceId: activeInterfaceId.value,
-    dirty,
-    snapshot: dirty ? tab.snapshot : snap,
+    lastResponse: cloneSendResponse(state.lastResponse),
+    requestPaneTab: state.requestPaneTab ?? tab.requestPaneTab ?? 'body',
+    dirty: tabIsDirty(tab, snap),
+    snapshot: tab.snapshot,
   }
 }
 
@@ -442,16 +459,20 @@ function replaceActiveTab(next: RequestTab) {
 
 function syncTabSnapshotFromEditor() {
   const tab = activeTab.value
-  if (!tab || !editorRef.value) return
+  const editor = editorRef.value
+  if (!tab || !editor) return
   const snap = editorSnapshot()
-  if (tab.dirty && tab.snapshot) {
+  if (tab.snapshot) {
+    editor.setBaseline(tab.snapshot)
     replaceActiveTab(tabStateFromEditor(tab) ?? tab)
     return
   }
+  editor.syncBaseline()
+  const baseline = editor.getSnapshot() || snap
   replaceActiveTab({
-    ...(tabStateFromEditor(tab) ?? tab),
-    snapshot: snap,
-    dirty: false,
+    ...(tabStateFromEditor({ ...tab, snapshot: baseline }) ?? tab),
+    snapshot: baseline,
+    dirty: tab.mode === 'create',
   })
 }
 
@@ -469,10 +490,12 @@ function createApiTab(folderId?: number): RequestTab {
     interfaceId: null,
     folderId: resolvedFolderId,
     ...data,
-    dirty: false,
+    dirty: true,
     snapshot: '',
     mode: 'create',
     detail: { folder_id: resolvedFolderId },
+    lastResponse: null,
+    requestPaneTab: 'body',
   }
 }
 
@@ -498,6 +521,8 @@ function applyTabToForm(tab: RequestTab, options?: { remount?: boolean }) {
       ...(tab.detail ?? {}),
       ...(folderId != null ? { folder_id: folderId } : {}),
     },
+    lastResponse: cloneSendResponse(tab.lastResponse),
+    requestPaneTab: tab.requestPaneTab ?? 'body',
   }
   if (options?.remount !== false) {
     editorKey.value += 1
@@ -505,10 +530,12 @@ function applyTabToForm(tab: RequestTab, options?: { remount?: boolean }) {
 }
 
 function onEditorReady() {
-  void nextTick().then(() => {
-    syncTabSnapshotFromEditor()
-    refreshCurlText()
-  })
+  void nextTick()
+    .then(() => nextTick())
+    .then(() => {
+      syncTabSnapshotFromEditor()
+      refreshCurlText()
+    })
 }
 
 async function refreshCurlText() {
@@ -1156,6 +1183,8 @@ async function onInterfaceSaved(id: number) {
         url: state.url,
         folderId,
         detail: state.detail as Record<string, unknown>,
+        lastResponse: cloneSendResponse(state.lastResponse),
+        requestPaneTab: state.requestPaneTab ?? active.requestPaneTab ?? 'body',
         snapshot: snap,
         dirty: false,
       })
@@ -1405,6 +1434,8 @@ async function onSelectApi(id: number, options?: { restore?: boolean }) {
     snapshot: '',
     mode: 'edit',
     detail,
+    lastResponse: null,
+    requestPaneTab: 'body',
   }
   tabs.value.push(tab)
   activeTabId.value = tab.id
@@ -1503,7 +1534,7 @@ async function onSelectApi(id: number, options?: { restore?: boolean }) {
   min-height: 42px;
   padding: 6px 10px 6px 8px;
   border-bottom: 1px solid var(--color-border);
-  background: var(--color-bg);
+  background: var(--color-sidebar);
 }
 
 .req-tabs {
@@ -1528,7 +1559,7 @@ async function onSelectApi(id: number, options?: { restore?: boolean }) {
   align-items: center;
   gap: 6px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--color-text-secondary);
   padding: 0 6px 0 10px;
@@ -1537,8 +1568,8 @@ async function onSelectApi(id: number, options?: { restore?: boolean }) {
   flex-shrink: 0;
 }
 
-.req-tab:hover {
-  background: var(--color-hover);
+.req-tab:hover:not(.active) {
+  background: color-mix(in srgb, var(--color-text) 10%, var(--color-sidebar));
   color: var(--color-text);
 }
 
@@ -1547,34 +1578,47 @@ async function onSelectApi(id: number, options?: { restore?: boolean }) {
   color: var(--color-text);
 }
 
-.req-tab.dirty .req-tab-name,
-.req-tab.dirty .method {
-  font-style: italic;
-}
-
 .req-tab-name {
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .req-tab-close {
+  position: relative;
   width: 18px;
   height: 18px;
   border-radius: 4px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  display: inline-grid;
+  place-items: center;
   font-size: 16px;
-  line-height: 1;
+  line-height: 0;
   padding: 0;
   opacity: 0.35;
   flex-shrink: 0;
-  transform: translateY(-0.5px);
+  transform: translateY(-1px);
 }
 
 .req-tab:hover .req-tab-close,
-.req-tab.active .req-tab-close {
+.req-tab.active:not(.dirty) .req-tab-close {
   opacity: 0.85;
+}
+
+.req-tab.dirty:not(:hover) .req-tab-close {
+  color: transparent;
+  opacity: 1;
+  transform: none;
+}
+
+.req-tab.dirty:not(:hover) .req-tab-close::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  transform: translate(-50%, -50%);
 }
 
 .req-tab-close:hover {
@@ -1586,7 +1630,7 @@ async function onSelectApi(id: number, options?: { restore?: boolean }) {
   width: 26px;
   height: 26px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--color-text-secondary);
   font-size: 18px;
@@ -1599,7 +1643,7 @@ async function onSelectApi(id: number, options?: { restore?: boolean }) {
 }
 
 .tab-add:hover {
-  background: var(--color-hover);
+  background: color-mix(in srgb, var(--color-text) 10%, var(--color-sidebar));
   color: var(--color-text);
 }
 
@@ -1624,7 +1668,7 @@ async function onSelectApi(id: number, options?: { restore?: boolean }) {
 }
 
 .code-toggle:hover {
-  background: var(--color-hover);
+  background: color-mix(in srgb, var(--color-text) 10%, var(--color-sidebar));
   color: var(--color-text);
 }
 

@@ -126,7 +126,7 @@ onBeforeUnmount(() => {
   height: 28px;
   border-radius: 4px;
   overflow: hidden;
-  background: rgb(0, 122, 204);
+  background: var(--color-primary);
   color: #fff;
 }
 
@@ -155,9 +155,10 @@ onBeforeUnmount(() => {
   width: 18px;
 }
 
+.split-create__plus:hover,
 .split-create__caret:hover,
 .split-create__caret.is-open {
-  background: rgba(0, 0, 0, 0.22);
+  background: var(--color-primary-hover);
 }
 
 .split-create__rule {

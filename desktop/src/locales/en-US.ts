@@ -176,6 +176,8 @@ export default {
   'response.empty': 'Send a request to see the response',
   'response.status': 'Status',
   'response.time': 'Time',
+  'response.body': 'Body',
+  'response.headers': 'Headers',
   'response.bodyJson': 'JSON',
   'response.bodyText': 'Text',
   'tree.empty': 'No data yet. Sync from Settings.',

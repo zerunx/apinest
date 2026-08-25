@@ -143,6 +143,8 @@ export default {
       addRow: '添加一行',
       addChildField: '添加子级字段',
       addSiblingField: '添加同级字段',
+      expandField: '展开',
+      collapseField: '收起',
       toggleAllRequired: '全部设为必填',
       clearAllRequired: '全部取消必填',
       sort: '排序',

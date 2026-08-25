@@ -237,15 +237,15 @@ watch(interfaceId, (id) => {
   if (id) void loadDetail()
 }, { immediate: true })
 
-async function handleSave() {
-  if (!interfaceId.value || readOnly.value || saveUi.value === 'saving' || loading.value) return
+async function handleSave(): Promise<boolean> {
+  if (!interfaceId.value || readOnly.value || saveUi.value === 'saving' || loading.value) return false
   if (!form.name.trim()) {
     ElMessage.warning(t('workspace.nameRequired'))
-    return
+    return false
   }
   if (!form.folderId) {
     ElMessage.warning(t('workspace.folderRequired'))
-    return
+    return false
   }
 
   clearSaveUiTimer()
@@ -261,9 +261,11 @@ async function handleSave() {
       saveUi.value = 'idle'
       saveUiTimer = null
     }, 1400)
+    return true
   } catch (error) {
     saveUi.value = 'idle'
     ElMessage.error(error instanceof Error ? error.message : t('workspace.updateApiFailed'))
+    return false
   } finally {
     saving.value = false
   }

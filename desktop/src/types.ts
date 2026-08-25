@@ -51,6 +51,7 @@ export type SendResponse = {
   body: string
   duration_ms: number
   history_id: number
+  error?: boolean
 }
 
 export type SyncResult = {

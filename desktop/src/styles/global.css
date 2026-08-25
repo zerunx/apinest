@@ -2,10 +2,11 @@
 :root[data-theme='light'] {
   --color-primary: #007acc;
   --color-primary-light: #1a8ad4;
+  --color-primary-hover: color-mix(in srgb, var(--color-primary) 72%, #000);
   --color-bg: #f3f3f3;
   --color-surface: #ffffff;
   --color-content: #ececec;
-  --color-tab-active: #ffffff;
+  --color-tab-active: color-mix(in srgb, var(--color-text) 10%, var(--color-sidebar));
   --color-sidebar: #fafafa;
   --color-topbar: #ffffff;
   --color-titlebar: #ffffff;
@@ -44,8 +45,9 @@
 }
 
 :root[data-theme='dark'] {
-  --color-primary: #4da8e8;
-  --color-primary-light: #6bb8ec;
+  --color-primary: #007acc;
+  --color-primary-light: #4da8e8;
+  --color-primary-hover: color-mix(in srgb, var(--color-primary) 72%, #000);
   --color-bg: #1a1a1a;
   --color-surface: #242424;
   --color-content: #111111;
@@ -146,10 +148,14 @@ button {
   background: var(--color-surface);
   border-radius: var(--radius);
   padding: 6px 12px;
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease;
 }
 
-.btn:hover {
-  background: var(--color-hover);
+.btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-text) 18%, var(--color-surface));
 }
 
 .btn-primary {
@@ -157,31 +163,39 @@ button {
   align-items: center;
   justify-content: center;
   line-height: 1;
-  background: rgb(0, 122, 204);
-  border-color: rgb(0, 122, 204);
+  background: var(--color-primary);
+  border-color: var(--color-primary);
   color: #fff;
 }
 
-.btn-primary:hover {
-  background: #1a8ad4;
-  border-color: #1a8ad4;
+.btn-primary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+  color: #fff;
 }
 
-:root[data-theme='dark'] .btn-primary:hover {
-  background: #4da8e8;
-  border-color: #4da8e8;
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+  color: #fff;
 }
 
 .search-add {
-  background: rgb(0, 122, 204);
+  background: var(--color-primary);
 }
 
-.search-add:hover {
-  background: #1a8ad4;
-}
-
-:root[data-theme='dark'] .search-add:hover {
-  background: #4da8e8;
+.search-add:hover:not(:disabled) {
+  background: var(--color-primary-hover);
 }
 
 .btn-danger {

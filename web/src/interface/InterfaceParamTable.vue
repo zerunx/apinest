@@ -74,6 +74,14 @@ function typeLabel(type: string) {
   return `[${type || 'string'}]`
 }
 
+function nativeValue(event: Event) {
+  return (event.target as HTMLInputElement | HTMLSelectElement).value
+}
+
+function nativeChecked(event: Event) {
+  return (event.target as HTMLInputElement).checked
+}
+
 function syncRows(rows: ParamRow[]) {
   const normalized = props.readonly ? rows : ensureTrailingEmptyRow(rows)
   emit('update:modelValue', normalized)
@@ -216,48 +224,53 @@ defineExpose({ compact: () => compactParamRows(props.modelValue) })
             popper-class="app-action-dropdown"
             @update:model-value="updateRow(index, { name: $event ?? '' })"
           />
-          <el-input
+          <input
             v-else
-            :model-value="row.name"
+            class="interface-param-table__native-input"
+            :value="row.name"
             :placeholder="nameColumnPlaceholder"
-            @update:model-value="updateRow(index, { name: $event })"
+            @input="updateRow(index, { name: nativeValue($event) })"
           />
         </td>
         <td class="interface-param-table__col-type">
           <span v-if="readonly" class="interface-param-table__text">{{ typeLabel(row.type) }}</span>
-          <el-select
+          <select
             v-else
-            :model-value="row.type"
-            popper-class="app-action-dropdown"
-            @update:model-value="updateRow(index, { type: $event })"
+            class="interface-param-table__native-select"
+            :value="row.type"
+            @change="updateRow(index, { type: nativeValue($event) })"
           >
-            <el-option v-for="type in fieldTypeOptions" :key="type" :label="type" :value="type" />
-          </el-select>
+            <option v-for="type in fieldTypeOptions" :key="type" :value="type">{{ type }}</option>
+          </select>
         </td>
         <td class="interface-param-table__center">
           <span v-if="readonly" class="interface-param-table__text">{{ requiredLabel(row.required) }}</span>
-          <el-checkbox
+          <input
             v-else
-            :model-value="row.required"
-            @update:model-value="updateRow(index, { required: $event })"
+            type="checkbox"
+            class="interface-param-table__native-check"
+            :checked="row.required"
+            @change="updateRow(index, { required: nativeChecked($event) })"
           />
         </td>
         <td class="interface-param-table__col-desc">
           <InterfaceDocCopyCell v-if="readonly" :value="row.description" />
-          <el-input
+          <input
             v-else
-            :model-value="row.description"
+            class="interface-param-table__native-input"
+            :value="row.description"
             :placeholder="t('workspace.interfaceForm.paramDescPlaceholder')"
-            @update:model-value="updateRow(index, { description: $event })"
+            @input="updateRow(index, { description: nativeValue($event) })"
           />
         </td>
         <td class="interface-param-table__col-example">
           <InterfaceDocCopyCell v-if="readonly" :value="row.example" />
-          <el-input
+          <input
             v-else
-            :model-value="row.example"
+            class="interface-param-table__native-input"
+            :value="row.example"
             :placeholder="t('workspace.interfaceForm.example')"
-            @update:model-value="updateRow(index, { example: $event })"
+            @input="updateRow(index, { example: nativeValue($event) })"
           />
         </td>
         <td v-if="!readonly" class="interface-param-table__actions">

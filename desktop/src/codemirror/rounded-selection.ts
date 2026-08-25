@@ -28,11 +28,114 @@ function markerTop(view: EditorView, documentY: number): number {
 
 function withLineHeight(view: EditorView, pos: number, rect: SelRect): SelRect {
   const block = view.lineBlockAt(pos)
+  const fullHeight = block.height * view.scaleY
+  const rowHeight = view.defaultLineHeight * view.scaleY
+  if (fullHeight > rowHeight * 1.4) {
+    return rect
+  }
   return {
     ...rect,
     top: markerTop(view, block.top),
-    height: block.height * view.scaleY,
+    height: fullHeight,
   }
+}
+
+/** Map a wrap-row rect onto the editor's line-height grid so wrapped and
+ *  unwrapped rows share the same height. Do not stretch to the line block —
+ *  that block can be a few pixels taller than N rows and shows up as extra
+ *  height under the last wrap while dragging. */
+function snapToVisualRow(rect: SelRect, lineTop: number, rowHeight: number): SelRect {
+  const idx = Math.max(0, Math.round((rect.top + rect.height / 2 - lineTop) / rowHeight))
+  return { ...rect, top: lineTop + idx * rowHeight, height: rowHeight }
+}
+
+function layerLeft(view: EditorView): number {
+  const rect = view.scrollDOM.getBoundingClientRect()
+  return rect.left - view.scrollDOM.scrollLeft * view.scaleX
+}
+
+function posLeft(view: EditorView, pos: number): number | null {
+  const coords = view.coordsAtPos(pos, 1)
+  if (!coords) return null
+  return coords.left - layerLeft(view)
+}
+
+/** One rect per visual wrap row (same top). */
+function mergeVisualRows(pieces: SelRect[]): SelRect[] {
+  if (pieces.length <= 1) return pieces
+  const rows: SelRect[] = []
+  const sorted = [...pieces].sort((a, b) => a.top - b.top || a.left - b.left)
+  for (const piece of sorted) {
+    const row = rows[rows.length - 1]
+    if (row && Math.abs(row.top - piece.top) <= ALIGN_EPS) {
+      const right = Math.max(rectRight(row), rectRight(piece))
+      row.left = Math.min(row.left, piece.left)
+      row.width = right - row.left
+      row.height = Math.max(row.height, piece.height)
+    } else {
+      rows.push({ ...piece })
+    }
+  }
+  return rows
+}
+
+/**
+ * Fill hanging wrap-row gaps so a partial drag through later lines keeps a
+ * straight left edge. Do not stretch to the content right — that paints an
+ * extra full-width slab on the following lines (图一).
+ */
+function completeLineSelection(
+  view: EditorView,
+  pieces: SelRect[],
+  lineFrom: number,
+  rangeStart: number,
+): SelRect[] {
+  if (!pieces.length) return pieces
+  const rows = mergeVisualRows(pieces)
+  const lineLeft = posLeft(view, lineFrom)
+  if (lineLeft == null) return rows
+  const fromLineStart = rangeStart === lineFrom
+  for (let i = 0; i < rows.length; i += 1) {
+    const row = rows[i]
+    const fillLeft = fromLineStart || i > 0
+    if (fillLeft && lineLeft < row.left - ALIGN_EPS) {
+      const rowRight = rectRight(row)
+      row.width = rowRight - lineLeft
+      row.left = lineLeft
+    }
+  }
+  return rows
+}
+
+function rangePieces(view: EditorView, from: number, to: number) {
+  if (from >= to) return []
+  return RectangleMarker.forRange(view, 'cm-roundedSelection', EditorSelection.range(from, to))
+}
+
+/** End of the visual wrap row that contains `pos` (exclusive). */
+function wrapRowEnd(view: EditorView, pos: number, lineTo: number): number {
+  const next = view.moveToLineBoundary(EditorSelection.cursor(pos, 1), true, true).head
+  if (next > pos) return Math.min(lineTo, next)
+  return Math.min(lineTo, pos + 1)
+}
+
+/**
+ * Measure each wrap row on its own. `RectangleMarker.forRange` across wrap
+ * points inserts a full-width "between" rect, which looks like an extra
+ * background layer on the row below the caret.
+ */
+function wrappedRangePieces(view: EditorView, start: number, end: number, lineTo: number) {
+  const pieces: ReturnType<typeof RectangleMarker.forRange> = []
+  let pos = start
+  let guard = 0
+  while (pos < end && guard < 10000) {
+    guard += 1
+    const rowTo = wrapRowEnd(view, pos, lineTo)
+    const sliceTo = Math.min(end, rowTo)
+    if (sliceTo > pos) pieces.push(...rangePieces(view, pos, sliceTo))
+    pos = rowTo > pos ? rowTo : pos + 1
+  }
+  return pieces
 }
 
 function emptyLineRect(view: EditorView, pos: number): SelRect | null {
@@ -77,14 +180,14 @@ function lineRects(view: EditorView, from: number, to: number): SelRect[] {
     const includesNewline = to > line.to
 
     if (start < end) {
-      const pieces = RectangleMarker.forRange(
-        view,
-        'cm-roundedSelection',
-        EditorSelection.range(start, end),
-      )
       const block = view.lineBlockAt(line.from)
       const lineTop = markerTop(view, block.top)
       const lineBottom = lineTop + block.height * view.scaleY
+      const rowHeight = view.defaultLineHeight * view.scaleY
+      const wrapped = lineBottom - lineTop > rowHeight * 1.4
+      const pieces = wrapped
+        ? wrappedRangePieces(view, start, end, line.to)
+        : rangePieces(view, start, end)
       const linePieces: SelRect[] = []
       for (const piece of pieces) {
         const mid = piece.top + piece.height / 2
@@ -95,7 +198,9 @@ function lineRects(view: EditorView, from: number, to: number): SelRect[] {
           width: piece.width ?? view.defaultCharacterWidth,
           height: piece.height,
         }
-        linePieces.push(pieces.length === 1 ? withLineHeight(view, start, rect) : rect)
+        linePieces.push(
+          wrapped ? snapToVisualRow(rect, lineTop, rowHeight) : withLineHeight(view, start, rect),
+        )
       }
       if (includesNewline) {
         const last = linePieces[linePieces.length - 1]
@@ -105,7 +210,7 @@ function lineRects(view: EditorView, from: number, to: number): SelRect[] {
           if (extra) linePieces.push(extra)
         }
       }
-      rects.push(...linePieces)
+      rects.push(...completeLineSelection(view, linePieces, line.from, start))
     } else if (line.from === line.to && includesNewline) {
       const empty = emptyLineRect(view, line.from)
       if (empty) rects.push(empty)

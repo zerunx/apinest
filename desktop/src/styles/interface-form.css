@@ -13,7 +13,7 @@
   --color-workspace-inset: #f6f6f6;
   --raw-editor-font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
   --raw-editor-bg: var(--color-workspace-content);
-  --raw-editor-gutter-bg: var(--color-workspace-inset);
+  --raw-editor-gutter-bg: var(--raw-editor-bg);
   --raw-editor-gutter-fg: #8a8a8a;
   --raw-editor-gutter-border: var(--color-interface-bar-border);
   --raw-editor-selection: rgba(0, 0, 0, 0.16);
@@ -48,7 +48,7 @@
   --color-workspace-inset: #0d0d0d;
   --raw-editor-font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
   --raw-editor-bg: var(--color-workspace-content);
-  --raw-editor-gutter-bg: #0d0d0d;
+  --raw-editor-gutter-bg: var(--raw-editor-bg);
   --raw-editor-gutter-fg: #777777;
   --raw-editor-gutter-border: var(--color-interface-bar-border);
   --raw-editor-selection: rgba(255, 255, 255, 0.22);
@@ -331,16 +331,25 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
+  cursor: text;
 }
 
 .interface-response-raw :deep(.interface-body-raw) {
   flex: 1;
   min-height: 0;
+  cursor: text;
 }
 
 .interface-response-raw :deep(.interface-body-raw__host) {
   min-height: 0;
   flex: 1;
+  cursor: text;
+}
+
+.interface-response-raw :deep(.cm-editor),
+.interface-response-raw :deep(.cm-scroller),
+.interface-response-raw :deep(.cm-content) {
+  cursor: text;
 }
 
 .interface-response-headers-table {
@@ -472,12 +481,24 @@
     opacity 0.18s ease;
 }
 
-.interface-url-actions__send {
-  min-width: 72px;
-}
-
+.interface-url-actions__send,
 .interface-url-actions__save {
   min-width: 88px;
+}
+
+.interface-url-actions .btn-primary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+}
+
+.interface-url-actions__save:hover:not(:disabled):not(.is-saved) {
+  background: color-mix(in srgb, var(--color-text) 18%, var(--color-surface));
+}
+
+.interface-url-actions__save.is-saved:hover:not(:disabled) {
+  background: color-mix(in srgb, #2ea043 16%, var(--color-surface));
+  border-color: color-mix(in srgb, #2ea043 50%, var(--color-border));
+  color: #2ea043;
 }
 
 .interface-url-actions .btn.is-busy:disabled {

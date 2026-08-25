@@ -38,6 +38,7 @@ function chromeTheme(dark: boolean): Extension {
     {
       '&': {
         height: '100%',
+        minHeight: '0',
         backgroundColor: 'var(--raw-editor-bg)',
         color: 'var(--raw-hl-plain)',
         colorScheme: dark ? 'dark' : 'light',
@@ -51,15 +52,11 @@ function chromeTheme(dark: boolean): Extension {
         fontFamily: 'var(--raw-editor-font-family)',
         fontSize: '13px',
         lineHeight: '20px',
-        minHeight: '100%',
-        height: '100%',
-        alignItems: 'stretch !important',
         cursor: 'text',
       },
       '.cm-content': {
         caretColor: 'transparent',
         minHeight: '100%',
-        flexGrow: '1',
         cursor: 'text',
       },
       '.cm-line::selection, .cm-line ::selection, .cm-content ::selection': {
@@ -100,7 +97,6 @@ function chromeTheme(dark: boolean): Extension {
         border: 'none',
         borderRight: '1px solid var(--raw-editor-gutter-border)',
         minHeight: '100%',
-        display: 'flex',
       },
       '.cm-lineNumbers .cm-gutterElement': {
         color: 'var(--raw-editor-gutter-fg)',

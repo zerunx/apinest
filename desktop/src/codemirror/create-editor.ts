@@ -15,12 +15,15 @@ import { selectedSpaceHighlighter } from './selected-space'
 import { roundedSelectionLayer } from './rounded-selection'
 import { lintExtension } from './json-lint'
 import { searchExtension } from './search-panel'
+import { wrappedLineIndent } from './wrap-indent'
 import { editorTheme } from './theme'
 
 const INDENT = '    '
 
 function editableExtension(readonly: boolean): Extension {
-  return [EditorView.editable.of(!readonly), EditorState.readOnly.of(readonly)]
+  // Keep editable so focus, caret, and shortcuts (e.g. Ctrl+A) still work;
+  // readOnly alone blocks content changes.
+  return [EditorView.editable.of(true), EditorState.readOnly.of(readonly)]
 }
 
 function foldMarker(open: boolean) {
@@ -89,6 +92,7 @@ export function createCodeMirror(options: CreateCodeMirrorOptions): CodeMirrorHa
         history(),
         drawSelection({ cursorBlinkRate: 1200 }),
         EditorView.lineWrapping,
+        wrappedLineIndent,
         indentUnit.of(INDENT),
         EditorState.tabSize.of(INDENT.length),
         indentOnInput(),

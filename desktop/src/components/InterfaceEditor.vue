@@ -457,7 +457,7 @@
               :class="{ 'interface-response-tabs__tab--active': responseTab === 'body' }"
               @click="responseTab = 'body'"
             >
-              {{ isGrpc ? t('request.response') : t('request.body') }}
+              {{ isGrpc ? t('request.response') : t('response.body') }}
             </button>
             <button
               type="button"
@@ -465,7 +465,7 @@
               :class="{ 'interface-response-tabs__tab--active': responseTab === 'headers' }"
               @click="responseTab = 'headers'"
             >
-              {{ isGrpc ? t('request.metadata') : t('request.headers') }}
+              {{ isGrpc ? t('request.metadata') : t('response.headers') }}
               <span v-if="response?.headers?.length" class="interface-response-tabs__badge">
                 {{ response.headers.length }}
               </span>
@@ -473,7 +473,7 @@
           </div>
           <div v-if="response && !sending" class="interface-response-bar__right">
             <div
-              v-if="responseTab === 'body'"
+              v-if="responseTab === 'body' && !isSendError"
               class="body-format-switch interface-response-type-switch"
             >
               <button
@@ -489,7 +489,7 @@
             </div>
             <div class="interface-response-meta">
               <span class="interface-response-meta__status" :class="responseStatusClass">
-                {{ response.status }} {{ response.status_text }}
+                {{ response.status ? `${response.status} ${response.status_text}` : response.status_text }}
               </span>
               <span class="interface-response-meta__sep" aria-hidden="true" />
               <span class="interface-response-meta__item">{{ response.duration_ms }} ms</span>
@@ -504,6 +504,7 @@
             <div class="interface-response-loading__spinner" aria-hidden="true" />
             <p class="interface-response-loading__text">{{ t('request.sending') }}</p>
           </div>
+          <ResponseErrorState v-else-if="isSendError" :message="response?.body ?? ''" />
           <template v-else-if="response">
             <RequestBodyRawEditor
               v-if="responseTab === 'body'"
@@ -562,6 +563,7 @@ import MethodPicker from './MethodPicker.vue'
 import ComboInput from './ComboInput.vue'
 import ParamTableColumnResizer from './ParamTableColumnResizer.vue'
 import RequestBodyRawEditor from './RequestBodyRawEditor.vue'
+import ResponseErrorState from './ResponseErrorState.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
 import GrpcMethodList from './GrpcMethodList.vue'
 import { formatJsonLenient } from '../utils/raw-json-utils'
@@ -597,6 +599,7 @@ type QueryParamRow = ParamRow & { enabled: boolean }
 type HeaderRow = ParamRow & { enabled: boolean }
 type BodyFormat = 'none' | 'form-data' | 'raw'
 type FormDataRow = ParamRow & { enabled: boolean }
+type RequestTabId = 'params' | 'authorization' | 'headers' | 'body' | 'message' | 'metadata'
 
 const props = defineProps<{
   mode: 'create' | 'edit'
@@ -610,6 +613,8 @@ const props = defineProps<{
     folder_id?: number
     status?: number
     detail?: Record<string, unknown> | null
+    lastResponse?: SendResponse | null
+    requestPaneTab?: RequestTabId
   } | null
 }>()
 
@@ -950,7 +955,18 @@ watch([environmentId, envVarsRevision], () => {
   void refreshEnvVars()
 })
 
-type RequestTabId = 'params' | 'authorization' | 'headers' | 'body' | 'message' | 'metadata'
+function requestTabForProtocol(tab: RequestTabId | undefined, proto: Protocol): RequestTabId {
+  const family = protocolFamily(proto)
+  const current = tab ?? (family === 'grpc' ? 'message' : 'body')
+  if (family === 'grpc') {
+    if (current === 'headers' || current === 'metadata') return 'metadata'
+    return 'message'
+  }
+  if (current === 'message') return 'body'
+  if (current === 'metadata') return 'headers'
+  if (family === 'ws' && current === 'authorization') return 'body'
+  return current
+}
 
 const allRequestTabs: { id: RequestTabId; labelKey: string }[] = [
   { id: 'params', labelKey: 'request.params' },
@@ -1086,6 +1102,9 @@ const urlBase = ref('')
 const name = ref('')
 const folderId = ref<string | number | null>(null)
 const requestTab = ref<RequestTabId>('body')
+watch(requestTab, () => {
+  if (editorReady.value && trackDirty.value) emit('state-change')
+})
 const bodyFormat = ref<BodyFormat>('none')
 const bodyRaw = ref('')
 const rawBodyEditorRef = ref<{ formatContent: () => boolean } | null>(null)
@@ -1181,12 +1200,40 @@ function detectResponseBodyType(body: string): ResponseBodyType {
   return 'Text'
 }
 
+const isSendError = computed(() => Boolean(response.value?.error) || response.value?.status === 0)
+
 const responseStatusClass = computed(() => {
   const s = response.value?.status ?? 0
+  if (response.value?.error || s === 0) return 'err'
   if (s >= 200 && s < 300) return 'ok'
-  if (s >= 400 || s === 0) return 'err'
+  if (s >= 400) return 'err'
   return 'warn'
 })
+
+function invokeErrorMessage(e: unknown): string {
+  if (typeof e === 'string' && e.trim()) return e.trim()
+  if (e instanceof Error && e.message.trim()) return e.message.trim()
+  if (e && typeof e === 'object' && 'message' in e) {
+    const msg = String((e as { message: unknown }).message ?? '').trim()
+    if (msg) return msg
+  }
+  const fallback = String(e ?? '').trim()
+  return fallback && fallback !== '[object Object]' ? fallback : 'request failed'
+}
+
+function applySendError(e: unknown, durationMs = 0) {
+  response.value = {
+    status: 0,
+    status_text: 'Error',
+    headers: [],
+    body: invokeErrorMessage(e),
+    duration_ms: durationMs,
+    history_id: 0,
+    error: true,
+  }
+  responseBodyType.value = 'Text'
+  responseTab.value = 'body'
+}
 
 function emptyRow(): ParamRow {
   return { name: '', type: 'string', required: false, description: '', example: '' }
@@ -1826,10 +1873,18 @@ function applyInitial(resetUi = false) {
     fromInitFolder ??
     (Number.isFinite(fromDetailFolder) ? fromDetailFolder : null) ??
     (props.mode === 'create' ? 0 : null)
-  response.value = null
+  const restored = init?.lastResponse ?? null
+  response.value = restored
+    ? {
+        ...restored,
+        headers: (restored.headers ?? []).map((h) => ({ ...h })),
+      }
+    : null
+  if (response.value) {
+    responseBodyType.value = detectResponseBodyType(response.value.body ?? '')
+  }
   if (resetUi) {
-    responseTab.value = 'body'
-    requestTab.value = protocolFamily(protocol.value) === 'grpc' ? 'message' : 'body'
+    requestTab.value = requestTabForProtocol(init?.requestPaneTab, protocol.value)
   }
 
   if (d) {
@@ -1996,6 +2051,7 @@ async function onSend() {
     sending.value = true
     response.value = null
     responseTab.value = 'body'
+    const grpcStarted = Date.now()
     try {
       const result = await invoke<SendResponse>('invoke_grpc', {
         args: {
@@ -2014,15 +2070,17 @@ async function onSend() {
       responseBodyType.value = detectResponseBodyType(result.body ?? '')
       responseTab.value = 'body'
     } catch (e) {
-      showValidation(String(e))
+      applySendError(e, Date.now() - grpcStarted)
     } finally {
       sending.value = false
+      emit('state-change')
     }
     return
   }
   sending.value = true
   response.value = null
   responseTab.value = 'body'
+  const started = Date.now()
   try {
     const result = await invoke<SendResponse>('send_http_request', {
       args: {
@@ -2038,9 +2096,10 @@ async function onSend() {
     responseBodyType.value = detectResponseBodyType(result.body ?? '')
     responseTab.value = 'body'
   } catch (e) {
-    showValidation(String(e))
+    applySendError(e, Date.now() - started)
   } finally {
     sending.value = false
+    emit('state-change')
   }
 }
 
@@ -2050,6 +2109,8 @@ function exportTabState() {
     method: method.value,
     url: displayUrl.value,
     folderId: folderId.value,
+    lastResponse: response.value,
+    requestPaneTab: requestTab.value,
     detail: {
       ...buildDetail(),
       folder_id: folderId.value,
@@ -2178,6 +2239,7 @@ onMounted(async () => {
   emit('editor-ready')
   await nextTick()
   if (!editorAlive) return
+  if (!baselineSnapshot.value) syncBaseline()
   trackDirty.value = true
   editorReady.value = true
 })
@@ -2209,6 +2271,7 @@ watch(
     emit('editor-ready')
     await nextTick()
     if (!editorAlive) return
+    if (!baselineSnapshot.value) syncBaseline()
     trackDirty.value = true
     editorReady.value = true
   },
@@ -2275,7 +2338,7 @@ watch(
   padding: 2px;
   gap: 2px;
   border: 1px solid var(--color-interface-bar-border);
-  border-radius: 7px;
+  border-radius: var(--radius);
   background: color-mix(in srgb, var(--color-interface-bar-border) 28%, transparent);
 }
 
@@ -2284,7 +2347,7 @@ watch(
   background: transparent;
   color: var(--color-text-secondary);
   padding: 4px 14px;
-  border-radius: 5px;
+  border-radius: calc(var(--radius) - 2px);
   font-size: 13px;
   line-height: 1.2;
   cursor: pointer;

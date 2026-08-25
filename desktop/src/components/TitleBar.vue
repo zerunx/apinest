@@ -296,7 +296,7 @@ async function close() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-left: 10px;
+  padding-left: 16px;
   background: var(--color-titlebar);
   border-bottom: 1px solid var(--color-border);
   user-select: none;
