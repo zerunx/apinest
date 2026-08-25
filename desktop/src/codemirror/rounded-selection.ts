@@ -125,7 +125,7 @@ function wrapRowEnd(view: EditorView, pos: number, lineTo: number): number {
  * background layer on the row below the caret.
  */
 function wrappedRangePieces(view: EditorView, start: number, end: number, lineTo: number) {
-  const pieces: ReturnType<typeof RectangleMarker.forRange> = []
+  const pieces: RectangleMarker[] = []
   let pos = start
   let guard = 0
   while (pos < end && guard < 10000) {

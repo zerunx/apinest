@@ -137,6 +137,29 @@ In the browser, complete the install wizard (admin account and PostgreSQL). If y
 - **Project sharing**: Share records so guests can view selected APIs without login
 - **System**: Install wizard, auth, admin console, Chinese and English UI
 
+## Build Desktop
+
+```bash
+cd desktop
+pnpm install
+pnpm run tauri:build
+```
+
+Artifacts are under `desktop/src-tauri/target/release/bundle/`:
+
+- Windows: `nsis/*.exe`, `msi/*.msi`
+- macOS: `macos/*.app`, `dmg/*.dmg`
+
+Build on the target OS (Windows for exe/msi, macOS for app/dmg).
+
+To bump the version, edit `version` in these files (lockfiles update on build/install):
+
+- `desktop/package.json`
+- `desktop/src-tauri/tauri.conf.json`
+- `desktop/src-tauri/Cargo.toml`
+- `desktop/src/components/SettingsDialog.vue` (About UI)
+- Optionally align Web: `web/package.json`
+
 ## Roadmap
 
 - [x] Desktop client integration

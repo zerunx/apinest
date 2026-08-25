@@ -137,6 +137,27 @@ docker compose up -d
 - **项目分享**：生成分享记录，访客无需登录即可查看勾选接口
 - **系统能力**：安装向导、用户鉴权、管理后台、中英双语
 
+## 打包 Desktop
+
+```bash
+cd desktop
+pnpm install
+pnpm run tauri:build
+```
+
+产物在 `desktop/src-tauri/target/release/bundle/`：
+
+- Windows：`nsis/*.exe`、`msi/*.msi`
+- macOS：`macos/*.app`、`dmg/*.dmg`
+
+升版本时改这些文件里的 `version` ：
+
+- `desktop/package.json`
+- `desktop/src-tauri/tauri.conf.json`
+- `desktop/src-tauri/Cargo.toml`
+- `desktop/src/components/SettingsDialog.vue`
+- `web/package.json`
+
 ## 路线图
 
 - [x] 桌面端对接

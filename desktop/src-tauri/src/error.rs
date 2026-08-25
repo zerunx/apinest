@@ -17,8 +17,6 @@ pub enum AppError {
     DbLock,
     #[error("not logged in")]
     NotLoggedIn,
-    #[error("server not configured")]
-    NoServer,
 }
 
 pub type AppResult<T> = Result<T, AppError>;
