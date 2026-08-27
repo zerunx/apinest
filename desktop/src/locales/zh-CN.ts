@@ -128,6 +128,8 @@ export default {
   'request.sending': '发送中…',
   'request.invalidUrl': '无效域名',
   'request.headers': 'Headers',
+  'request.hiddenHeaders': '{n} 个隐藏',
+  'request.hiddenHeaderHint': '此请求头由客户端自动生成。',
   'request.curlImported': '已从 cURL 导入请求',
   'request.body': 'Body',
   'request.response': 'Response',

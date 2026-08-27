@@ -129,6 +129,8 @@ export default {
   'request.sending': 'Sending…',
   'request.invalidUrl': 'Invalid domain',
   'request.headers': 'Headers',
+  'request.hiddenHeaders': '{n} hidden',
+  'request.hiddenHeaderHint': 'This header is generated automatically by the client.',
   'request.curlImported': 'Imported request from cURL',
   'request.body': 'Body',
   'request.response': 'Response',

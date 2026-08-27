@@ -158,6 +158,12 @@ export function buildCurlFromTabState(
 
   const body = detail.request_body
   const format = body?.format ?? 'none'
+  if (
+    format === 'raw' &&
+    !headers.some((h) => h.key.toLowerCase() === 'content-type')
+  ) {
+    headers.push({ key: 'Content-Type', value: 'application/json' })
+  }
   let raw: string | null = null
   let formData: CurlFormField[] | null = null
 

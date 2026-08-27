@@ -155,6 +155,12 @@
             @click="requestTab = tab.id"
           >
             {{ t(tab.labelKey) }}
+            <span
+              v-if="tab.id === 'headers' && headerTabCount"
+              class="interface-request-tabs__badge"
+            >
+              ({{ headerTabCount }})
+            </span>
           </button>
         </div>
 
@@ -255,13 +261,62 @@
 
           <div
             v-else-if="requestTab === 'headers' || requestTab === 'metadata'"
-            class="param-table param-table--resizable-wrap"
+            class="headers-pane"
           >
+            <button
+              v-if="requestTab === 'headers' && hiddenHeaders.length"
+              type="button"
+              class="hidden-headers-toggle"
+              :class="{ 'hidden-headers-toggle--open': showHiddenHeaders }"
+              :aria-expanded="showHiddenHeaders"
+              @click="showHiddenHeaders = !showHiddenHeaders"
+            >
+              <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+                <path
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M1.5 12s3.8-7.5 10.5-7.5S22.5 12 22.5 12 18.7 19.5 12 19.5 1.5 12 1.5 12z"
+                />
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="3.2"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                />
+              </svg>
+              {{ t('request.hiddenHeaders', { n: hiddenHeaders.length }) }}
+            </button>
+            <div class="param-table param-table--resizable-wrap">
             <ParamTableColumnResizer
               :columns="paramGridColumns"
               :handles="[false, 'key', false, false, false]"
               @resize="startTableColResize"
             />
+            <div
+              v-for="row in showHiddenHeaders ? hiddenHeaders : []"
+              :key="`auto-${row.key}`"
+              class="param-table__row param-table__row--auto"
+              :style="{ gridTemplateColumns: paramGridColumns }"
+            >
+              <label class="param-table__check">
+                <input type="checkbox" checked @click.prevent />
+              </label>
+              <div class="param-table__auto-key">
+                <span>{{ row.key }}</span>
+                <span
+                  class="param-table__auto-info"
+                  :title="t('request.hiddenHeaderHint')"
+                >i</span>
+              </div>
+              <div class="param-table__auto-value" :title="row.value">{{ row.value }}</div>
+              <div class="param-table__auto-desc" />
+              <div class="param-table__auto-spacer" />
+            </div>
             <div
               v-for="(row, idx) in requestHeaders"
               :key="idx"
@@ -299,6 +354,7 @@
               >
                 ×
               </button>
+            </div>
             </div>
           </div>
 
@@ -568,6 +624,7 @@ import ConfirmDialog from './ConfirmDialog.vue'
 import GrpcMethodList from './GrpcMethodList.vue'
 import { formatJsonLenient } from '../utils/raw-json-utils'
 import { looksLikeCurl, parseCurl, type ParsedCurl } from '../utils/parse-curl'
+import { buildAutoHeaders, sendableAutoHeaders } from '../utils/auto-headers'
 import {
   compactGrpcMetadata,
   fillGrpcMessageSamples,
@@ -1146,6 +1203,7 @@ const paramGridColumns = computed(
 )
 
 const requestHeaders = ref<HeaderRow[]>([defaultHeaderRow()])
+const showHiddenHeaders = ref(false)
 const queryParams = ref<QueryParamRow[]>([defaultQueryRow()])
 const responseHeaders = ref<ParamRow[]>([emptyRow()])
 const resultName = ref('')
@@ -1164,6 +1222,29 @@ const authTypeHint = computed(() => {
   if (authType.value === 'bearer') return t('request.authBearerHint')
   if (authType.value === 'basic') return t('request.authBasicHint')
   return t('request.authNoneHint')
+})
+
+function autoHeaderContext() {
+  return {
+    url: applyEnvVars(displayUrl.value.trim(), envVarMap.value),
+    bodyFormat: bodyFormat.value,
+    rawBody: bodyRaw.value,
+    authType: authType.value,
+    authBearerToken: authBearerToken.value,
+    authBasicUser: authBasicUser.value,
+    authBasicPassword: authBasicPassword.value,
+    userHeaders: requestHeaders.value.map((h) => ({
+      key: h.name,
+      enabled: h.enabled,
+    })),
+  }
+}
+
+const hiddenHeaders = computed(() => (isGrpc.value ? [] : buildAutoHeaders(autoHeaderContext())))
+
+const headerTabCount = computed(() => {
+  const userCount = requestHeaders.value.filter((r) => r.name.trim()).length
+  return userCount + hiddenHeaders.value.length
 })
 
 type ResponseBodyType = 'JSON' | 'Text'
@@ -1240,11 +1321,22 @@ function emptyRow(): ParamRow {
 }
 
 function defaultHeaderRow(): HeaderRow {
-  return { ...emptyRow(), name: 'Content-Type', example: 'application/json', enabled: true }
+  return emptyParamRow()
 }
 
 function emptyParamRow(): QueryParamRow {
   return { ...emptyRow(), enabled: true }
+}
+
+function isLegacyDefaultJsonContentType(rows: HeaderRow[]) {
+  const named = rows.filter((r) => r.name.trim())
+  if (named.length !== 1) return false
+  const row = named[0]
+  return (
+    row.name.trim().toLowerCase() === 'content-type' &&
+    row.example.trim().toLowerCase() === 'application/json' &&
+    !row.description.trim()
+  )
 }
 
 function defaultQueryRow(): QueryParamRow {
@@ -1842,10 +1934,19 @@ function buildSendHeaders() {
     })
   }
 
+  if (!isGrpc.value) {
+    for (const h of sendableAutoHeaders(autoHeaderContext())) {
+      if (!headers.some((x) => x.key.toLowerCase() === h.key.toLowerCase())) {
+        headers.push({ key: h.key, value: h.value, enabled: true })
+      }
+    }
+  }
+
   return headers
 }
 
 function applyInitial(resetUi = false) {
+  showHiddenHeaders.value = false
   const init = props.initial
   name.value = init?.name ?? ''
   const initUrl = init?.url ?? ''
@@ -1889,7 +1990,7 @@ function applyInitial(resetUi = false) {
 
   if (d) {
     if (Array.isArray(d.request_headers) && d.request_headers.length) {
-      requestHeaders.value = d.request_headers.map((x: any) => ({
+      const mapped = d.request_headers.map((x: any) => ({
         name: String(x.name ?? ''),
         type: String(x.type ?? 'string'),
         required: !!x.required,
@@ -1897,6 +1998,9 @@ function applyInitial(resetUi = false) {
         example: String(x.example ?? ''),
         enabled: x.enabled !== false,
       }))
+      requestHeaders.value = isLegacyDefaultJsonContentType(mapped)
+        ? [emptyParamRow()]
+        : mapped
     } else {
       requestHeaders.value = [defaultHeaderRow()]
     }
@@ -2381,6 +2485,98 @@ watch(
   margin: 14px 0 0 18px;
   font-size: 13px;
   line-height: 1.55;
+}
+
+.headers-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  min-width: 0;
+}
+
+.hidden-headers-toggle {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 2px;
+  border: 0;
+  background: color-mix(in srgb, var(--color-text-secondary) 12%, transparent);
+  color: var(--color-text-secondary);
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1.2;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.hidden-headers-toggle:hover {
+  color: var(--color-interface-field-text);
+  background: color-mix(in srgb, var(--color-interface-accent) 14%, transparent);
+}
+
+.hidden-headers-toggle--open {
+  color: var(--color-interface-accent);
+  background: color-mix(in srgb, var(--color-interface-accent) 16%, transparent);
+}
+
+.hidden-headers-toggle svg {
+  flex-shrink: 0;
+}
+
+.param-table__row--auto {
+  background: color-mix(in srgb, var(--color-text-secondary) 6%, var(--color-workspace-content));
+}
+
+.param-table__auto-key,
+.param-table__auto-value,
+.param-table__auto-desc,
+.param-table__auto-spacer {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  min-height: 36px;
+  padding: 0 10px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  border-right: 1px solid var(--color-interface-bar-border);
+}
+
+.param-table__auto-key {
+  gap: 6px;
+  color: var(--color-interface-field-text);
+}
+
+.param-table__auto-info {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-size: 10px;
+  font-style: italic;
+  font-family: Georgia, 'Times New Roman', serif;
+  line-height: 1;
+  opacity: 0.5;
+  cursor: help;
+}
+
+.param-table__auto-value {
+  color: var(--color-interface-field-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.param-table__auto-spacer {
+  border-right: 0;
 }
 
 .param-table {

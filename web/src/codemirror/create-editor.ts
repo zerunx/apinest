@@ -15,6 +15,7 @@ import { selectedSpaceHighlighter } from './selected-space'
 import { roundedSelectionLayer } from './rounded-selection'
 import { lintExtension } from './json-lint'
 import { editorTheme } from './theme'
+import { wrapSelectionQuotes } from './wrap-selection-quotes'
 
 const INDENT = '    '
 
@@ -154,7 +155,7 @@ export function createCodeMirror(options: CreateCodeMirrorOptions): CodeMirrorHa
         lint.of(lintExtension(currentLanguage)),
         editable.of(editableExtension(options.readonly ?? false)),
         gutters.of(gutterExtension(showLineNumbers, currentLanguage)),
-        keymap.of([...defaultKeymap, ...historyKeymap, ...foldKeymap, indentWithTab]),
+        keymap.of([wrapSelectionQuotes, ...defaultKeymap, ...historyKeymap, ...foldKeymap, indentWithTab]),
         clickAnywhereCursor(),
         EditorView.contentAttributes.of({ spellcheck: 'false' }),
         EditorView.updateListener.of((update) => {

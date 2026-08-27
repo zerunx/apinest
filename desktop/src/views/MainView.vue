@@ -415,7 +415,7 @@ let contextBootstrapped = false
 let restoringTabs = false
 
 function defaultHeaders(): HeaderPair[] {
-  return [{ key: 'Content-Type', value: 'application/json', enabled: true }]
+  return []
 }
 
 function editorSnapshot(): string {
