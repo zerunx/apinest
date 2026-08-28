@@ -1511,6 +1511,8 @@ async function onSelectApi(id: number, options?: { restore?: boolean }) {
   flex: 1;
   overflow: auto;
   padding: 0 6px 12px;
+  background: var(--color-sidebar);
+  scrollbar-gutter: stable;
 }
 
 .empty {

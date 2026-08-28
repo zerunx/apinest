@@ -610,7 +610,7 @@ export default {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: 13px;
   min-width: 0;
   flex: 1;
 }

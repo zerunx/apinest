@@ -45,7 +45,7 @@ pub fn export_apinest(db: State<'_, Db>, args: ExportApisArgs) -> AppResult<Valu
 }
 
 #[tauri::command]
-pub fn save_json_file(app: tauri::AppHandle, args: SaveJsonFileArgs) -> AppResult<bool> {
+pub async fn save_json_file(app: tauri::AppHandle, args: SaveJsonFileArgs) -> AppResult<bool> {
     let mut name = args.default_name.trim().to_string();
     if name.is_empty() {
         name = "apinest.json".into();
@@ -54,20 +54,29 @@ pub fn save_json_file(app: tauri::AppHandle, args: SaveJsonFileArgs) -> AppResul
         name.push_str(".json");
     }
 
-    let Some(file) = app
-        .dialog()
+    // Use the async dialog API instead of blocking_save_file().
+    // The blocking variant freezes the UI while the native save dialog is open.
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    app.dialog()
         .file()
         .set_file_name(&name)
         .add_filter("JSON", &["json"])
-        .blocking_save_file()
-    else {
+        .save_file(move |file| {
+            let _ = tx.send(file);
+        });
+
+    let Some(file) = rx.await.unwrap_or(None) else {
         return Ok(false);
     };
 
     let path = file
         .into_path()
         .map_err(|e| AppError::msg(format!("invalid path: {e}")))?;
-    std::fs::write(path, serde_json::to_vec_pretty(&args.document)?)?;
+    let content = serde_json::to_vec_pretty(&args.document)?;
+    tauri::async_runtime::spawn_blocking(move || std::fs::write(&path, content))
+        .await
+        .map_err(|e| AppError::msg(format!("write task failed: {e}")))?
+        .map_err(|e| AppError::msg(format!("failed to write file: {e}")))?;
     Ok(true)
 }
 

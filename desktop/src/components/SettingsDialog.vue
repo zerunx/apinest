@@ -8,7 +8,7 @@
     >
       <div class="dialog" role="dialog" aria-modal="true">
         <button type="button" class="close-btn" :title="t('common.close')" @click="closeSettings">
-          ×
+          <span>×</span>
         </button>
 
         <aside class="nav">
@@ -493,7 +493,7 @@ async function confirmClearCache() {
 
 .close-btn {
   position: absolute;
-  top: 10px;
+  top: 8px;
   right: 10px;
   z-index: 2;
   width: 28px;
@@ -503,12 +503,22 @@ async function confirmClearCache() {
   background: transparent;
   color: var(--color-text-secondary);
   font-size: 19px;
-  line-height: 1;
+  line-height: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
 }
 
 .close-btn:hover {
   background: var(--color-hover);
   color: var(--color-text);
+}
+
+.close-btn span {
+  display: block;
+  transform: translateY(-1px);
 }
 
 .nav {

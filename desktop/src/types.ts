@@ -54,6 +54,14 @@ export type SendResponse = {
   error?: boolean
 }
 
+export type FormDataSendField = {
+  name: string
+  value: string
+  type: 'string' | 'file'
+  file_name?: string
+  file_data?: string
+}
+
 export type SyncResult = {
   workspaces: number
   projects: number

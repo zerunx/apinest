@@ -155,9 +155,8 @@ const tabSupportsContextMenu = computed(() => activeModule.value === 'api')
 
 const deletingApiId = ref<number | null>(null)
 const tableWrapRef = ref<HTMLElement | null>(null)
-const tableWrapHeight = ref(400)
+const tableWrapHeight = ref(0)
 const TABLE_HEADER_HEIGHT = 40
-const TABLE_ROW_HEIGHT = 40
 let tableResizeObserver: ResizeObserver | null = null
 
 const apiRows = computed(() =>
@@ -179,54 +178,39 @@ function setupTableResizeObserver() {
   if (!tableWrapRef.value) return
 
   tableResizeObserver = new ResizeObserver(([entry]) => {
-    tableWrapHeight.value = Math.floor(entry.contentRect.height)
+    const next = Math.floor(entry.contentRect.height)
+    if (next > 0 && next !== tableWrapHeight.value) {
+      tableWrapHeight.value = next
+    }
   })
   tableResizeObserver.observe(tableWrapRef.value)
+  tableWrapHeight.value = Math.floor(tableWrapRef.value.clientHeight)
 }
 
-const tableContentHeight = computed(
-  () => TABLE_HEADER_HEIGHT + apiRows.value.length * TABLE_ROW_HEIGHT,
-)
-
-const tableNeedsScroll = computed(() => {
-  if (apiRows.value.length === 0) return false
-  const measured = tableWrapHeight.value
-  if (measured <= TABLE_HEADER_HEIGHT) return false
-  return tableContentHeight.value > measured
-})
-
+/** Always fill the wrap so el-table owns vertical scrolling for any row count. */
 const tableHeight = computed(() => {
-  const rowCount = apiRows.value.length
-  const contentHeight = tableContentHeight.value
   const measured = tableWrapHeight.value
-
-  if (rowCount === 0) {
-    return loadingInterfaces.value && measured > TABLE_HEADER_HEIGHT
-      ? measured
-      : TABLE_HEADER_HEIGHT
-  }
-
-  if (measured <= TABLE_HEADER_HEIGHT) {
-    return contentHeight
-  }
-
-  return tableNeedsScroll.value ? measured : contentHeight
+  return measured > TABLE_HEADER_HEIGHT ? measured : undefined
 })
 
 watch(showFolderView, async (visible) => {
   if (!visible) {
     tableResizeObserver?.disconnect()
+    tableWrapHeight.value = 0
     return
   }
   await nextTick()
   setupTableResizeObserver()
 })
 
-watch([tableNeedsScroll, () => apiRows.value.length], async () => {
-  if (!showFolderView.value) return
-  await nextTick()
-  setupTableResizeObserver()
-})
+watch(
+  () => apiRows.value.length,
+  async () => {
+    if (!showFolderView.value) return
+    await nextTick()
+    setupTableResizeObserver()
+  },
+)
 
 function tabLabel(tab: WorkspaceTab) {
   if (tab.kind === 'create-api') return t('workspace.newApi')
@@ -520,7 +504,6 @@ onBeforeUnmount(() => {
             <div
               ref="tableWrapRef"
               class="workspace-main__table-wrap"
-              :class="{ 'workspace-main__table-wrap--fill': tableNeedsScroll }"
             >
               <el-table
                 v-loading="loadingInterfaces"
@@ -591,7 +574,9 @@ onBeforeUnmount(() => {
                 <el-table-column
                   :label="t('workspace.columns.owner')"
                   prop="updatedByName"
-                  min-width="100"
+                  width="100"
+                  label-class-name="workspace-main__nowrap"
+                  class-name="workspace-main__nowrap"
                   show-overflow-tooltip
                 />
                 <el-table-column
@@ -612,7 +597,7 @@ onBeforeUnmount(() => {
                 />
                 <el-table-column
                   :label="t('member.columns.actions')"
-                  width="52"
+                  width="72"
                   fixed="right"
                   label-class-name="workspace-main__nowrap"
                   class-name="workspace-main__nowrap workspace-main__actions-col"
@@ -921,15 +906,11 @@ onBeforeUnmount(() => {
 }
 
 .workspace-main__table-wrap {
-  flex: 0 1 auto;
+  flex: 1;
+  min-height: 0;
   min-width: 0;
   width: 100%;
   overflow: hidden;
-}
-
-.workspace-main__table-wrap--fill {
-  flex: 1;
-  min-height: 0;
 }
 
 .workspace-main__table {
@@ -1054,6 +1035,13 @@ onBeforeUnmount(() => {
 
 .workspace-main__table :deep(.workspace-main__actions-col .cell) {
   overflow: visible;
+  padding-right: 16px;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.workspace-main__table :deep(th.workspace-main__actions-col .cell) {
+  padding-right: 16px;
 }
 
 .workspace-main__footer {

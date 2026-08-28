@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
+use base64::Engine;
 use reqwest::blocking::Client;
-use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
+use reqwest::blocking::multipart;
+use reqwest::header::{HeaderMap, HeaderName, HeaderValue, CONTENT_TYPE};
 use reqwest::Method;
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
@@ -16,11 +18,26 @@ pub(crate) const DEFAULT_TIMEOUT_SECS: u64 = 30;
 pub(crate) const CONNECT_TIMEOUT_SECS: u64 = 10;
 
 #[derive(Debug, Deserialize, Clone)]
+pub struct FormDataField {
+    pub name: String,
+    #[serde(default)]
+    pub value: String,
+    #[serde(rename = "type", default)]
+    pub field_type: String,
+    #[serde(default)]
+    pub file_name: Option<String>,
+    #[serde(default)]
+    pub file_data: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
 pub struct SendRequestArgs {
     pub method: String,
     pub url: String,
     pub headers: Vec<HeaderPair>,
     pub body: Option<String>,
+    #[serde(default)]
+    pub form_data: Option<Vec<FormDataField>>,
     pub interface_id: Option<i64>,
     pub variables: Option<HashMap<String, String>>,
 }
@@ -47,6 +64,7 @@ struct PreparedRequest {
     url: String,
     stored_headers: Vec<HeaderPair>,
     body: Option<String>,
+    multipart: Option<multipart::Form>,
     header_map: HeaderMap,
     timeout_secs: u64,
 }
@@ -75,12 +93,70 @@ fn validate_request_url(raw: &str) -> AppResult<()> {
     Ok(())
 }
 
+fn build_multipart_form(
+    fields: &[FormDataField],
+    vars: &HashMap<String, String>,
+) -> AppResult<multipart::Form> {
+    let mut form = multipart::Form::new();
+    let mut added = 0usize;
+
+    for field in fields {
+        let name = apply_vars(field.name.trim(), vars);
+        if name.is_empty() {
+            continue;
+        }
+
+        if field.field_type == "file" {
+            let encoded = field
+                .file_data
+                .as_ref()
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .ok_or_else(|| {
+                    AppError::msg(format!("missing file content for form field `{name}`"))
+                })?;
+            let bytes = base64::engine::general_purpose::STANDARD
+                .decode(encoded)
+                .map_err(|e| AppError::msg(format!("invalid file data for `{name}`: {e}")))?;
+            let file_name = field
+                .file_name
+                .as_deref()
+                .map(|s| apply_vars(s, vars))
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| "file".to_string());
+            let part = multipart::Part::bytes(bytes)
+                .file_name(file_name)
+                .mime_str("application/octet-stream")
+                .map_err(|e| AppError::msg(format!("invalid file part for `{name}`: {e}")))?;
+            form = form.part(name, part);
+        } else {
+            let value = apply_vars(&field.value, vars);
+            form = form.text(name, value);
+        }
+        added += 1;
+    }
+
+    if added == 0 {
+        return Err(AppError::msg("form-data request has no fields"));
+    }
+
+    Ok(form)
+}
+
 fn prepare_request(args: &SendRequestArgs, timeout_secs: u64) -> AppResult<PreparedRequest> {
     let vars = args.variables.clone().unwrap_or_default();
     let url = apply_vars(&args.url, &vars);
     validate_request_url(&url)?;
 
     let body = args.body.as_ref().map(|b| apply_vars(b, &vars));
+    let multipart_form = match args.form_data.as_ref() {
+        Some(fields) if !fields.is_empty() => Some(build_multipart_form(fields, &vars)?),
+        _ => None,
+    };
+    if multipart_form.is_some() && body.is_some() {
+        return Err(AppError::msg("request cannot include both body and form_data"));
+    }
+
     let method = Method::from_bytes(args.method.to_uppercase().as_bytes())
         .map_err(|_| AppError::msg(format!("invalid method: {}", args.method)))?;
 
@@ -92,6 +168,9 @@ fn prepare_request(args: &SendRequestArgs, timeout_secs: u64) -> AppResult<Prepa
         }
         let key = apply_vars(&h.key, &vars);
         let value = apply_vars(&h.value, &vars);
+        if multipart_form.is_some() && key.eq_ignore_ascii_case("content-type") {
+            continue;
+        }
         stored_headers.push(HeaderPair {
             key: key.clone(),
             value: value.clone(),
@@ -104,11 +183,16 @@ fn prepare_request(args: &SendRequestArgs, timeout_secs: u64) -> AppResult<Prepa
         header_map.insert(name, val);
     }
 
+    if multipart_form.is_some() {
+        header_map.remove(CONTENT_TYPE);
+    }
+
     Ok(PreparedRequest {
         method,
         url,
         stored_headers,
         body,
+        multipart: multipart_form,
         header_map,
         timeout_secs,
     })
@@ -124,7 +208,9 @@ fn execute_http_request(prepared: PreparedRequest) -> AppResult<(u16, String, Ve
     let mut req = client
         .request(prepared.method, &prepared.url)
         .headers(prepared.header_map);
-    if let Some(body) = &prepared.body {
+    if let Some(form) = prepared.multipart {
+        req = req.multipart(form);
+    } else if let Some(body) = &prepared.body {
         req = req.body(body.clone());
     }
 
@@ -159,6 +245,27 @@ fn execute_http_request(prepared: PreparedRequest) -> AppResult<(u16, String, Ve
     Ok((status_code, status_text, resp_headers, resp_body, duration_ms))
 }
 
+fn sanitize_form_data_for_history(fields: &[FormDataField]) -> Vec<serde_json::Value> {
+    fields
+        .iter()
+        .map(|field| {
+            if field.field_type == "file" {
+                serde_json::json!({
+                    "name": field.name,
+                    "type": "file",
+                    "file_name": field.file_name,
+                })
+            } else {
+                serde_json::json!({
+                    "name": field.name,
+                    "type": "string",
+                    "value": field.value,
+                })
+            }
+        })
+        .collect()
+}
+
 #[tauri::command]
 pub async fn send_http_request(db: State<'_, Db>, args: SendRequestArgs) -> AppResult<SendResponse> {
     let timeout_secs = db.with_conn(|conn| {
@@ -175,6 +282,7 @@ pub async fn send_http_request(db: State<'_, Db>, args: SendRequestArgs) -> AppR
     let url = prepared.url.clone();
     let stored_headers = prepared.stored_headers.clone();
     let request_body = prepared.body.clone();
+    let form_data = args.form_data.clone();
 
     let (status_code, status_text, resp_headers, resp_body, duration_ms) =
         tauri::async_runtime::spawn_blocking(move || execute_http_request(prepared))
@@ -182,12 +290,21 @@ pub async fn send_http_request(db: State<'_, Db>, args: SendRequestArgs) -> AppR
             .map_err(|e| AppError::msg(format!("request task failed: {e}")))??
             ;
 
-    let request_json = serde_json::to_string(&serde_json::json!({
-        "method": method,
-        "url": url,
-        "headers": stored_headers,
-        "body": request_body,
-    }))?;
+    let request_json = if let Some(ref fields) = form_data {
+        serde_json::to_string(&serde_json::json!({
+            "method": method,
+            "url": url,
+            "headers": stored_headers,
+            "form_data": sanitize_form_data_for_history(fields),
+        }))?
+    } else {
+        serde_json::to_string(&serde_json::json!({
+            "method": method,
+            "url": url,
+            "headers": stored_headers,
+            "body": request_body,
+        }))?
+    };
     let response_json = serde_json::to_string(&serde_json::json!({
         "status": status_code,
         "headers": resp_headers,

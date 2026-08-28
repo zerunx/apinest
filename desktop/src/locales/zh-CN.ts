@@ -142,6 +142,7 @@ export default {
   'request.formDataText': 'Text',
   'request.formDataFile': 'File',
   'request.formDataSelectFile': '选择文件',
+  'request.formDataFileMissing': '文件字段「{name}」未选择文件',
   'request.rawFormat': 'Beautify',
   'editor.find': '查找',
   'editor.findNext': '下一个',

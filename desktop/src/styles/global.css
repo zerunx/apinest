@@ -89,6 +89,9 @@
 * {
   box-sizing: border-box;
   scrollbar-width: thin;
+}
+
+*:not(.tree-wrap) {
   scrollbar-color: var(--color-scrollbar-thumb) transparent;
 }
 
@@ -114,6 +117,43 @@
 
 *::-webkit-scrollbar-corner {
   background: transparent;
+}
+
+/* Left API list (.tree-wrap). Overlay scrollbars on Win11 ignore ::-webkit-scrollbar;
+   use scrollbar-width / scrollbar-color (WebView2 honors these) plus webkit fallback. */
+.tree-wrap {
+  color-scheme: light;
+  scrollbar-width: thin;
+  --tree-scrollbar-thumb: rgba(0, 0, 0, 0.08);
+  --tree-scrollbar-thumb-hover: rgba(0, 0, 0, 0.1);
+}
+
+html[data-theme='dark'] .tree-wrap {
+  color-scheme: dark;
+  --tree-scrollbar-thumb: rgba(255, 255, 255, 0.08);
+  --tree-scrollbar-thumb-hover: rgba(255, 255, 255, 0.01);
+}
+
+html .tree-wrap::-webkit-scrollbar {
+  width: 6px !important;
+  height: 6px !important;
+  background-color: var(--color-sidebar);
+}
+
+html .tree-wrap::-webkit-scrollbar-track,
+html .tree-wrap::-webkit-scrollbar-corner {
+  background-color: var(--color-sidebar);
+}
+
+html .tree-wrap::-webkit-scrollbar-thumb {
+  background-color: var(--tree-scrollbar-thumb) !important;
+  border: 0 !important;
+  border-radius: 999px;
+  background-clip: border-box !important;
+}
+
+html .tree-wrap::-webkit-scrollbar-thumb:hover {
+  background-color: var(--tree-scrollbar-thumb-hover) !important;
 }
 
 html,

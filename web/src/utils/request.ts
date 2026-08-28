@@ -18,11 +18,38 @@ http.interceptors.request.use((config) => {
   return config
 })
 
+const AUTH_PUBLIC_PREFIXES = ['/login', '/register', '/install', '/share', '/invite']
+
+let redirectingToLogin = false
+
+function redirectToLogin() {
+  if (typeof window === 'undefined') return
+  const { pathname, search, hash } = window.location
+  if (AUTH_PUBLIC_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) {
+    return
+  }
+  if (redirectingToLogin) return
+  redirectingToLogin = true
+
+  const redirect = `${pathname}${search}${hash}`
+  const loginUrl =
+    redirect && redirect !== '/'
+      ? `/login?redirect=${encodeURIComponent(redirect)}`
+      : '/login'
+
+  // Full navigation resets in-memory auth state and avoids circular imports with the router.
+  window.location.assign(loginUrl)
+}
+
 http.interceptors.response.use(
   (response: AxiosResponse<ApiResponse>) => {
     const payload = response.data
 
     if (payload.code !== 0) {
+      if (payload.code === 401) {
+        clearAuth()
+        redirectToLogin()
+      }
       return Promise.reject(new Error(payload.message || '请求失败'))
     }
 
@@ -31,6 +58,7 @@ http.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       clearAuth()
+      redirectToLogin()
     }
 
     const message =

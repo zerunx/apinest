@@ -16,6 +16,17 @@ export type AutoHeaderContext = {
   authBasicUser?: string
   authBasicPassword?: string
   userHeaders: Array<{ key: string; enabled?: boolean }>
+  /** Lowercase header names the user has unchecked in the hidden-headers UI. */
+  disabledAutoHeaders?: Iterable<string>
+}
+
+function disabledAutoHeaderKeys(ctx: AutoHeaderContext): Set<string> {
+  const keys = new Set<string>()
+  for (const key of ctx.disabledAutoHeaders ?? []) {
+    const normalized = key.trim().toLowerCase()
+    if (normalized) keys.add(normalized)
+  }
+  return keys
 }
 
 function takenKeys(headers: Array<{ key: string; enabled?: boolean }>): Set<string> {
@@ -83,7 +94,12 @@ export function buildAutoHeaders(ctx: AutoHeaderContext): AutoHeader[] {
 }
 
 export function sendableAutoHeaders(ctx: AutoHeaderContext): Array<{ key: string; value: string }> {
+  const disabled = disabledAutoHeaderKeys(ctx)
   return buildAutoHeaders(ctx)
-    .filter((h) => h.send)
+    .filter((h) => h.send && !disabled.has(h.key.toLowerCase()))
     .map((h) => ({ key: h.key, value: h.value }))
+}
+
+export function isAutoHeaderEnabled(ctx: AutoHeaderContext, key: string): boolean {
+  return !disabledAutoHeaderKeys(ctx).has(key.trim().toLowerCase())
 }

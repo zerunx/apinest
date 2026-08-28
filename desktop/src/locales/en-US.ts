@@ -143,6 +143,7 @@ export default {
   'request.formDataText': 'Text',
   'request.formDataFile': 'File',
   'request.formDataSelectFile': 'Select file',
+  'request.formDataFileMissing': 'No file selected for field "{name}"',
   'request.rawFormat': 'Beautify',
   'editor.find': 'Find',
   'editor.findNext': 'Next',

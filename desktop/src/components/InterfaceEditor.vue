@@ -301,10 +301,15 @@
               v-for="row in showHiddenHeaders ? hiddenHeaders : []"
               :key="`auto-${row.key}`"
               class="param-table__row param-table__row--auto"
+              :class="{ 'param-table__row--off': !autoHeaderEnabled(row.key) }"
               :style="{ gridTemplateColumns: paramGridColumns }"
             >
               <label class="param-table__check">
-                <input type="checkbox" checked @click.prevent />
+                <input
+                  type="checkbox"
+                  :checked="autoHeaderEnabled(row.key)"
+                  @change="setAutoHeaderEnabled(row.key, ($event.target as HTMLInputElement).checked)"
+                />
               </label>
               <div class="param-table__auto-key">
                 <span>{{ row.key }}</span>
@@ -624,7 +629,7 @@ import ConfirmDialog from './ConfirmDialog.vue'
 import GrpcMethodList from './GrpcMethodList.vue'
 import { formatJsonLenient } from '../utils/raw-json-utils'
 import { looksLikeCurl, parseCurl, type ParsedCurl } from '../utils/parse-curl'
-import { buildAutoHeaders, sendableAutoHeaders } from '../utils/auto-headers'
+import { buildAutoHeaders, isAutoHeaderEnabled, sendableAutoHeaders } from '../utils/auto-headers'
 import {
   compactGrpcMetadata,
   fillGrpcMessageSamples,
@@ -648,14 +653,14 @@ import {
 import { useToast } from '../composables/useToast'
 import { useWorkspaceContext } from '../composables/useWorkspaceContext'
 import { createTextUndo, matchUndoRedoKey } from '../composables/useTextUndo'
-import type { SendResponse } from '../types'
+import type { FormDataSendField, SendResponse } from '../types'
 
 export type FolderOption = { id: number; name: string; parent_id: number; label: string }
 
 type QueryParamRow = ParamRow & { enabled: boolean }
 type HeaderRow = ParamRow & { enabled: boolean }
 type BodyFormat = 'none' | 'form-data' | 'raw'
-type FormDataRow = ParamRow & { enabled: boolean }
+type FormDataRow = ParamRow & { enabled: boolean; fileData?: string; fileName?: string }
 type RequestTabId = 'params' | 'authorization' | 'headers' | 'body' | 'message' | 'metadata'
 
 const props = defineProps<{
@@ -1204,6 +1209,7 @@ const paramGridColumns = computed(
 
 const requestHeaders = ref<HeaderRow[]>([defaultHeaderRow()])
 const showHiddenHeaders = ref(false)
+const disabledAutoHeaders = ref<Set<string>>(new Set())
 const queryParams = ref<QueryParamRow[]>([defaultQueryRow()])
 const responseHeaders = ref<ParamRow[]>([emptyRow()])
 const resultName = ref('')
@@ -1237,14 +1243,29 @@ function autoHeaderContext() {
       key: h.name,
       enabled: h.enabled,
     })),
+    disabledAutoHeaders: disabledAutoHeaders.value,
   }
+}
+
+function autoHeaderEnabled(key: string) {
+  return isAutoHeaderEnabled(autoHeaderContext(), key)
+}
+
+function setAutoHeaderEnabled(key: string, enabled: boolean) {
+  const normalized = key.trim().toLowerCase()
+  if (!normalized) return
+  const next = new Set(disabledAutoHeaders.value)
+  if (enabled) next.delete(normalized)
+  else next.add(normalized)
+  disabledAutoHeaders.value = next
 }
 
 const hiddenHeaders = computed(() => (isGrpc.value ? [] : buildAutoHeaders(autoHeaderContext())))
 
 const headerTabCount = computed(() => {
-  const userCount = requestHeaders.value.filter((r) => r.name.trim()).length
-  return userCount + hiddenHeaders.value.length
+  const userCount = requestHeaders.value.filter((r) => r.name.trim() && r.enabled !== false).length
+  const autoCount = hiddenHeaders.value.filter((h) => autoHeaderEnabled(h.key)).length
+  return userCount + autoCount
 })
 
 type ResponseBodyType = 'JSON' | 'Text'
@@ -1397,14 +1418,51 @@ function onFormDataChange(idx: number) {
 
 function onFormDataTypeChange(idx: number) {
   const row = formDataFields.value[idx]
-  if (row.type === 'file') row.example = ''
+  if (row.type === 'file') {
+    row.example = ''
+    row.fileData = undefined
+    row.fileName = undefined
+  } else {
+    row.fileData = undefined
+    row.fileName = undefined
+  }
   onFormDataChange(idx)
 }
 
-function onFormDataFileChange(idx: number, event: Event) {
+function readFileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = String(reader.result ?? '')
+      const comma = result.indexOf(',')
+      resolve(comma >= 0 ? result.slice(comma + 1) : result)
+    }
+    reader.onerror = () => reject(reader.error ?? new Error('failed to read file'))
+    reader.readAsDataURL(file)
+  })
+}
+
+async function onFormDataFileChange(idx: number, event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
-  formDataFields.value[idx].example = file?.name ?? ''
+  const row = formDataFields.value[idx]
+  if (!file) {
+    row.example = ''
+    row.fileName = undefined
+    row.fileData = undefined
+    onFormDataChange(idx)
+    return
+  }
+  try {
+    row.example = file.name
+    row.fileName = file.name
+    row.fileData = await readFileAsBase64(file)
+  } catch {
+    row.example = ''
+    row.fileName = undefined
+    row.fileData = undefined
+    showToast(t('request.formDataFileMissing', { name: row.name.trim() || t('common.key') }), 1800, 'warning')
+  }
   onFormDataChange(idx)
 }
 
@@ -1445,13 +1503,37 @@ function autoGenerateGrpcMessage() {
 function buildRequestBodyForSend(): string | null {
   if (bodyFormat.value === 'none') return null
   if (bodyFormat.value === 'raw') return bodyRaw.value || null
+  return null
+}
+
+function buildFormDataForSend(): FormDataSendField[] | null {
+  if (bodyFormat.value !== 'form-data') return null
   const fields = formDataFields.value.filter((r) => r.enabled !== false && r.name.trim())
   if (!fields.length) return null
-  const params = new URLSearchParams()
+
+  const result: FormDataSendField[] = []
   for (const row of fields) {
-    params.append(row.name.trim(), row.example)
+    const name = applyEnvVars(row.name.trim(), envVarMap.value)
+    if (row.type === 'file') {
+      if (!row.fileData) {
+        throw new Error(t('request.formDataFileMissing', { name }))
+      }
+      result.push({
+        name,
+        value: '',
+        type: 'file',
+        file_name: row.fileName || row.example || 'file',
+        file_data: row.fileData,
+      })
+    } else {
+      result.push({
+        name,
+        value: applyEnvVars(row.example, envVarMap.value),
+        type: 'string',
+      })
+    }
   }
-  return params.toString()
+  return result.length ? result : null
 }
 
 function onQueryParamChange(idx: number) {
@@ -1911,7 +1993,7 @@ function buildDetail() {
 }
 
 function buildSendHeaders() {
-  const headers = requestHeaders.value
+  let headers = requestHeaders.value
     .filter((h) => h.enabled !== false && h.name.trim())
     .map((h) => ({
       key: h.name.trim(),
@@ -1919,13 +2001,25 @@ function buildSendHeaders() {
       enabled: true,
     }))
 
-  if (authType.value === 'bearer' && authBearerToken.value.trim()) {
+  if (bodyFormat.value === 'form-data') {
+    headers = headers.filter((h) => h.key.toLowerCase() !== 'content-type')
+  }
+
+  if (
+    autoHeaderEnabled('Authorization') &&
+    authType.value === 'bearer' &&
+    authBearerToken.value.trim()
+  ) {
     headers.push({
       key: 'Authorization',
       value: `Bearer ${authBearerToken.value.trim()}`,
       enabled: true,
     })
-  } else if (authType.value === 'basic' && (authBasicUser.value || authBasicPassword.value)) {
+  } else if (
+    autoHeaderEnabled('Authorization') &&
+    authType.value === 'basic' &&
+    (authBasicUser.value || authBasicPassword.value)
+  ) {
     const token = btoa(`${authBasicUser.value}:${authBasicPassword.value}`)
     headers.push({
       key: 'Authorization',
@@ -1947,6 +2041,7 @@ function buildSendHeaders() {
 
 function applyInitial(resetUi = false) {
   showHiddenHeaders.value = false
+  disabledAutoHeaders.value = new Set()
   const init = props.initial
   name.value = init?.name ?? ''
   const initUrl = init?.url ?? ''
@@ -2181,6 +2276,15 @@ async function onSend() {
     }
     return
   }
+  let formData: FormDataSendField[] | null = null
+  if (bodyFormat.value === 'form-data') {
+    try {
+      formData = buildFormDataForSend()
+    } catch (e) {
+      showToast(invokeErrorMessage(e), 1800, 'warning')
+      return
+    }
+  }
   sending.value = true
   response.value = null
   responseTab.value = 'body'
@@ -2192,6 +2296,7 @@ async function onSend() {
         url,
         headers: buildSendHeaders(),
         body: buildRequestBodyForSend(),
+        form_data: formData,
         interface_id: props.interfaceId ?? null,
         variables: Object.keys(envVarMap.value).length ? envVarMap.value : null,
       },
@@ -2551,6 +2656,13 @@ watch(
   color: var(--color-interface-field-text);
 }
 
+.param-table__auto-key > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .param-table__auto-info {
   display: inline-flex;
   align-items: center;
@@ -2558,6 +2670,7 @@ watch(
   width: 14px;
   height: 14px;
   flex-shrink: 0;
+  margin-left: auto;
   border: 1px solid currentColor;
   border-radius: 50%;
   font-size: 10px;

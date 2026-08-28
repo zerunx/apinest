@@ -17,7 +17,8 @@
         "height": 920,
         "minWidth": 1100,
         "minHeight": 720,
-        "decorations": false
+        "decorations": false,
+        "additionalBrowserArgs": "--disable-features=OverlayScrollbar,FluentOverlayScrollbar"
       }
     ],
     "security": {

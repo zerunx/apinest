@@ -809,6 +809,10 @@
   padding: 0 12px 12px;
 }
 
+.interface-body-raw--readonly {
+  padding-top: 10px;
+}
+
 .interface-body-raw__toolbar {
   display: flex;
   align-items: center;
@@ -816,6 +820,11 @@
   flex-wrap: wrap;
   padding: 0 0 10px;
   border-bottom: 1px solid var(--color-border);
+}
+
+.interface-body-raw--readonly .interface-body-raw__toolbar {
+  padding-top: 2px;
+  padding-bottom: 12px;
 }
 
 .interface-body-raw__toolbar-label {
