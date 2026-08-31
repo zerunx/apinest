@@ -88,10 +88,10 @@
 
 * {
   box-sizing: border-box;
-  scrollbar-width: thin;
 }
 
 *:not(.tree-wrap) {
+  scrollbar-width: thin;
   scrollbar-color: var(--color-scrollbar-thumb) transparent;
 }
 
@@ -119,19 +119,21 @@
   background: transparent;
 }
 
-/* Left API list (.tree-wrap). Overlay scrollbars on Win11 ignore ::-webkit-scrollbar;
-   use scrollbar-width / scrollbar-color (WebView2 honors these) plus webkit fallback. */
+/* Left API list (.tree-wrap).
+   scrollbar-width / scrollbar-color MUST stay auto, or Chromium ignores
+   ::-webkit-scrollbar-* (including :hover) and uses the system white overlay. */
 .tree-wrap {
   color-scheme: light;
-  scrollbar-width: thin;
+  scrollbar-width: auto;
+  scrollbar-color: auto;
   --tree-scrollbar-thumb: rgba(0, 0, 0, 0.08);
-  --tree-scrollbar-thumb-hover: rgba(0, 0, 0, 0.1);
+  --tree-scrollbar-thumb-hover: rgba(0, 0, 0, 0.3);
 }
 
 html[data-theme='dark'] .tree-wrap {
   color-scheme: dark;
   --tree-scrollbar-thumb: rgba(255, 255, 255, 0.08);
-  --tree-scrollbar-thumb-hover: rgba(255, 255, 255, 0.01);
+  --tree-scrollbar-thumb-hover: rgba(255, 255, 255, 0.3);
 }
 
 html .tree-wrap::-webkit-scrollbar {

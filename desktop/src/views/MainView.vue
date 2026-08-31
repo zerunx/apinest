@@ -524,7 +524,9 @@ function applyTabToForm(tab: RequestTab, options?: { remount?: boolean }) {
     lastResponse: cloneSendResponse(tab.lastResponse),
     requestPaneTab: tab.requestPaneTab ?? 'body',
   }
-  if (options?.remount !== false) {
+  // Remount only when explicitly requested. Default keep-alive avoids flashing
+  // method/url/name/folder/body while the editor tears down and remounts.
+  if (options?.remount === true) {
     editorKey.value += 1
   }
 }

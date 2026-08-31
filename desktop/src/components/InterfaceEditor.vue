@@ -2468,13 +2468,19 @@ onUnmounted(() => {
 
 watch(
   () => [props.workspaceId, props.projectId, props.initial],
-  async () => {
-    editorReady.value = false
+  async (next, prev) => {
+    if (!editorAlive) return
     trackDirty.value = false
     baselineSnapshot.value = ''
-    await loadFolders()
-    if (!editorAlive) return
-    applyInitial(false)
+    const projectChanged =
+      Array.isArray(prev) && (next[0] !== prev[0] || next[1] !== prev[1])
+    // Project switch: wait for folders so the folder select stays consistent.
+    // Same-project tab switch: apply immediately to avoid field flash.
+    if (projectChanged) {
+      await loadFolders()
+      if (!editorAlive) return
+    }
+    applyInitial(true)
     await nextTick()
     if (!editorAlive) return
     emit('editor-ready')
