@@ -170,9 +170,10 @@ To bump the version, edit `version` in these files (lockfiles update on build/in
 - [x] Import proto files and auto-generate mock parameters
 - [x] ApiNest import / export
 - [ ] Import from Postman, Apifox, Eolink, YApi, and similar formats
-- [ ] Web API-doc view styling
+- [x] Web API-doc view styling
 - [ ] Liquid-glass theme and finer borders
 - [ ] Built-in / multi-database support (PostgreSQL only for now)
+- [ ] Dictionary library
 
 ## License
 

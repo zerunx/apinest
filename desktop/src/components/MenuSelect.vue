@@ -1,5 +1,5 @@
 <template>
-  <div class="menu-select" :class="{ open, compact, dense, stretch }" ref="rootRef">
+  <div class="menu-select" :class="{ open, compact, dense, stretch, plain }" ref="rootRef">
     <button type="button" class="menu-select__trigger" @click.stop="toggle">
       <span class="menu-select__label">{{ currentLabel }}</span>
       <span class="menu-select__chevron" :class="{ open }" aria-hidden="true">
@@ -55,6 +55,7 @@ const props = withDefaults(
     fitMenu?: boolean
     dense?: boolean
     stretch?: boolean
+    plain?: boolean
     menuMinWidth?: number
     menuWidth?: number
     menuAlign?: 'left' | 'right'
@@ -65,6 +66,7 @@ const props = withDefaults(
     fitMenu: false,
     dense: false,
     stretch: false,
+    plain: false,
     menuMinWidth: 0,
     menuWidth: 0,
     menuAlign: 'left',
@@ -109,6 +111,8 @@ function placeMenu() {
     menuStyle.width = `${width}px`
     menuStyle.left =
       props.menuAlign === 'right' ? `${rect.right - width}px` : `${rect.left}px`
+    // Keep dense menus visually attached under the trigger.
+    menuStyle.top = props.dense ? `${rect.bottom + 2}px` : `${rect.bottom + 4}px`
   } else {
     menuStyle.minWidth = `${Math.max(rect.width, 180)}px`
     menuStyle.width = ''
@@ -206,6 +210,21 @@ onUnmounted(() => {
   max-height: none;
 }
 
+.menu-select.compact.plain {
+  height: 100%;
+  min-height: 0;
+}
+
+.menu-select.compact.plain .menu-select__trigger {
+  height: 100%;
+  min-height: 0;
+  max-height: none;
+  border: 0;
+  border-radius: var(--raw-editor-selection-radius, 4px);
+  background: transparent;
+  box-shadow: none;
+}
+
 .menu-select__label {
   flex: 1;
   min-width: 0;
@@ -256,12 +275,14 @@ onUnmounted(() => {
 }
 
 .menu-select.dense .menu-select__menu {
-  padding: 5px;
+  padding: 4px;
+  border-radius: 6px;
+  overflow: hidden;
 }
 
 .menu-select.dense .menu-select__item {
-  padding: 7px 10px;
+  padding: 6px 10px;
   font-size: 12px;
-  border-radius: 5px;
+  border-radius: 4px;
 }
 </style>

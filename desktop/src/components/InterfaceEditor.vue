@@ -171,9 +171,16 @@
           <div v-if="requestTab === 'params'" class="param-table param-table--resizable-wrap">
             <ParamTableColumnResizer
               :columns="paramGridColumns"
-              :handles="[false, 'key', false, false, false]"
+              :handles="[false, 'key', 'value', false, false]"
               @resize="startTableColResize"
             />
+            <div class="param-table__row param-table__row--head" :style="{ gridTemplateColumns: paramGridColumns }">
+              <span class="param-table__check param-table__check--head" />
+              <span class="param-table__head-cell">{{ t('create.param.name') }}</span>
+              <span class="param-table__head-cell">{{ t('common.value') }}</span>
+              <span class="param-table__head-cell">{{ t('create.param.desc') }}</span>
+              <span class="param-table__head-action" />
+            </div>
             <div
               v-for="(row, idx) in queryParams"
               :key="idx"
@@ -294,9 +301,16 @@
             <div class="param-table param-table--resizable-wrap">
             <ParamTableColumnResizer
               :columns="paramGridColumns"
-              :handles="[false, 'key', false, false, false]"
+              :handles="[false, 'key', 'value', false, false]"
               @resize="startTableColResize"
             />
+            <div class="param-table__row param-table__row--head" :style="{ gridTemplateColumns: paramGridColumns }">
+              <span class="param-table__check param-table__check--head" />
+              <span class="param-table__head-cell">{{ t('create.param.name') }}</span>
+              <span class="param-table__head-cell">{{ t('common.value') }}</span>
+              <span class="param-table__head-cell">{{ t('create.param.desc') }}</span>
+              <span class="param-table__head-action" />
+            </div>
             <div
               v-for="row in showHiddenHeaders ? hiddenHeaders : []"
               :key="`auto-${row.key}`"
@@ -399,39 +413,51 @@
 
             <div v-else-if="bodyFormat === 'form-data'" class="param-table param-table--resizable-wrap">
               <ParamTableColumnResizer
-                :columns="paramGridColumns"
-                :handles="[false, 'key', false, false, false]"
+                :columns="formDataGridColumns"
+                :handles="[false, 'key', 'type', 'value', false, false]"
                 @resize="startTableColResize"
               />
+              <div
+                class="param-table__row param-table__row--head"
+                :style="{ gridTemplateColumns: formDataGridColumns }"
+              >
+                <span class="param-table__check param-table__check--head" />
+                <span class="param-table__head-cell">{{ t('create.param.name') }}</span>
+                <span class="param-table__head-cell">{{ t('create.param.type') }}</span>
+                <span class="param-table__head-cell">{{ t('common.value') }}</span>
+                <span class="param-table__head-cell">{{ t('create.param.desc') }}</span>
+                <span class="param-table__head-action" />
+              </div>
               <div
                 v-for="(row, idx) in formDataFields"
                 :key="idx"
                 class="param-table__row"
                 :class="{ 'param-table__row--off': row.enabled === false }"
-                :style="{ gridTemplateColumns: paramGridColumns }"
+                :style="{ gridTemplateColumns: formDataGridColumns }"
               >
                 <label class="param-table__check">
                   <input v-model="row.enabled" type="checkbox" />
                 </label>
-                <div class="param-table__key-cell">
-                  <input
-                    v-model="row.name"
-                    class="param-table__cell param-table__cell--inner param-table__cell--key"
-                    :placeholder="t('common.key')"
-                    @input="onFormDataChange(idx)"
-                  />
-                  <MenuSelect
-                    v-model="row.type"
-                    compact
-                    stretch
-                    fit-menu
-                    dense
-                    menu-align="right"
-                    :menu-min-width="88"
-                    class="param-table__key-type"
-                    :options="formDataTypeOptions"
-                    @update:model-value="onFormDataTypeChange(idx)"
-                  />
+                <input
+                  v-model="row.name"
+                  class="param-table__cell"
+                  :placeholder="t('common.key')"
+                  @input="onFormDataChange(idx)"
+                />
+                <div class="param-table__type">
+                  <div class="param-table__type-select">
+                    <MenuSelect
+                      v-model="row.type"
+                      compact
+                      plain
+                      fit-menu
+                      dense
+                      menu-align="left"
+                      :menu-min-width="76"
+                      :options="formDataTypeOptions"
+                      @update:model-value="onFormDataTypeChange(idx)"
+                    />
+                  </div>
                 </div>
                 <div class="param-table__value">
                   <input
@@ -1080,8 +1106,8 @@ const bodyFormats = computed(() => [
 ])
 
 const formDataTypeOptions = computed(() => [
-  { value: 'string', label: t('request.formDataText') },
-  { value: 'file', label: t('request.formDataFile') },
+  { value: 'string', label: '[string]' },
+  { value: 'file', label: '[file]' },
 ])
 
 const splitContainerRef = ref<HTMLElement | null>(null)
@@ -1198,13 +1224,18 @@ const {
   widths: tableColWidths,
   start: startTableColResize,
 } = useColumnResize(
-  'request_table_col_widths_v4',
-  { key: 280 },
-  { key: 160 },
+  'request_table_col_widths_v6',
+  { key: 180, type: 86, value: 350, desc: 160 },
+  { key: 100, type: 80, value: 200, desc: 80 },
 )
 
 const paramGridColumns = computed(
-  () => `40px ${tableColWidths.value.key}px minmax(160px, 1fr) minmax(160px, 1fr) 36px`,
+  () =>
+    `40px ${tableColWidths.value.key}px ${tableColWidths.value.value}px minmax(0, 1fr) 40px`,
+)
+const formDataGridColumns = computed(
+  () =>
+    `40px ${tableColWidths.value.key}px ${tableColWidths.value.type}px ${tableColWidths.value.value}px minmax(0, 1fr) 40px`,
 )
 
 const requestHeaders = ref<HeaderRow[]>([defaultHeaderRow()])
@@ -2517,6 +2548,7 @@ watch(
   align-items: center;
   gap: 12px;
   flex-shrink: 0;
+  min-height: 28px;
   position: relative;
   z-index: 2;
 }
@@ -2535,9 +2567,10 @@ watch(
   background: transparent;
   appearance: none;
   color: var(--color-text-secondary);
-  padding: 3px 0;
+  padding: 0;
+  height: 24px;
   font-size: 13px;
-  line-height: 1.2;
+  line-height: 1;
   cursor: pointer;
   transition: color 0.15s ease;
 }
@@ -2548,23 +2581,29 @@ watch(
 
 .body-format-switch {
   display: inline-flex;
-  align-self: flex-start;
+  align-items: center;
   flex-shrink: 0;
+  height: 28px;
   padding: 2px;
   gap: 2px;
+  box-sizing: border-box;
   border: 1px solid var(--color-interface-bar-border);
-  border-radius: var(--radius);
+  border-radius: 4px;
   background: color-mix(in srgb, var(--color-interface-bar-border) 28%, transparent);
 }
 
 .body-format-switch__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 0;
   background: transparent;
   color: var(--color-text-secondary);
-  padding: 4px 14px;
-  border-radius: calc(var(--radius) - 2px);
+  padding: 0 14px 1px;
+  height: 100%;
+  border-radius: 2px;
   font-size: 13px;
-  line-height: 1.2;
+  line-height: 1;
   cursor: pointer;
   transition:
     background-color 0.15s ease,
@@ -2585,17 +2624,20 @@ watch(
 
 .interface-response-type-switch {
   flex-shrink: 0;
+  height: auto;
 }
 
 .interface-response-type-switch .body-format-switch__btn {
   padding: 3px 10px;
+  height: auto;
   font-size: 12px;
+  line-height: 1.2;
 }
 
 .body-none-hint {
-  margin: 14px 0 0 18px;
+  margin: 0 0 0 18px;
   font-size: 13px;
-  line-height: 1.55;
+  line-height: 1.85;
 }
 
 .headers-pane {
@@ -2640,7 +2682,7 @@ watch(
 }
 
 .param-table__row--auto {
-  background: color-mix(in srgb, var(--color-text-secondary) 6%, var(--color-workspace-content));
+  background: transparent;
 }
 
 .param-table__auto-key,
@@ -2650,11 +2692,13 @@ watch(
   display: flex;
   align-items: center;
   min-width: 0;
-  min-height: 36px;
-  padding: 0 10px;
+  min-height: 34px;
+  margin: 3px 6px;
+  padding: 0 8px;
   font-size: 13px;
   color: var(--color-text-secondary);
-  border-right: 1px solid var(--color-interface-bar-border);
+  border-radius: 4px;
+  box-sizing: border-box;
 }
 
 .param-table__auto-key {
@@ -2695,25 +2739,29 @@ watch(
 }
 
 .param-table__auto-spacer {
-  border-right: 0;
+  margin: 4px 0;
+  padding: 0;
 }
 
 .param-table {
+  --param-table-head-height: 34px;
   border: 1px solid var(--color-interface-bar-border);
-  border-radius: 4px;
+  border-radius: var(--raw-editor-selection-radius);
   overflow: hidden;
   min-height: 0;
   max-width: 100%;
   min-width: 0;
+  background: var(--color-workspace-content);
 }
 
 .param-table__row {
   display: grid;
-  grid-template-columns: 40px 1fr 1fr 1.2fr 36px;
-  align-items: stretch;
-  min-height: 36px;
+  grid-template-columns: 40px 1fr 1fr 1.2fr 40px;
+  align-items: center;
+  min-height: 42px;
   border-bottom: 1px solid var(--color-interface-bar-border);
   background: var(--color-workspace-content);
+  transition: background-color 0.12s ease;
 }
 
 .param-table--resizable-wrap {
@@ -2731,6 +2779,36 @@ watch(
   border-bottom: 0;
 }
 
+.param-table__row:not(.param-table__row--head):hover {
+  background: color-mix(in srgb, var(--color-text-secondary) 28%, var(--color-workspace-content));
+}
+
+.param-table__row--head {
+  --param-table-head-height: 34px;
+  min-height: var(--param-table-head-height);
+  background: var(--color-workspace-content);
+  pointer-events: none;
+  user-select: none;
+}
+
+.param-table__head-cell,
+.param-table__head-action {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  padding: 0 14px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--color-text-secondary);
+  background: transparent;
+  position: relative;
+}
+
+.param-table__head-action {
+  padding: 0;
+}
+
 .param-table__row--off {
   opacity: 0.55;
 }
@@ -2739,32 +2817,95 @@ watch(
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 0;
-  border-right: 1px solid var(--color-interface-bar-border);
+  align-self: center;
+  height: 34px;
+  margin: 3px 0;
   background: transparent;
   cursor: pointer;
 }
 
+.param-table__check--head {
+  height: auto;
+  margin: 0;
+  cursor: default;
+}
+
 .param-table__check input {
-  width: 14px;
-  height: 14px;
+  appearance: none;
+  -webkit-appearance: none;
+  width: 15px;
+  height: 15px;
   margin: 0;
   cursor: pointer;
-  accent-color: var(--color-interface-accent);
+  border: 1px solid color-mix(in srgb, var(--color-text-secondary) 65%, transparent);
+  border-radius: var(--raw-editor-selection-radius);
+  background-color: transparent;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 11px 11px;
+  box-sizing: border-box;
+  transition:
+    background-color 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.param-table__check input:checked {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='M3.2 8.2L6.4 11.4L12.8 4.4' stroke='%23fff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+.param-table__check input:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-primary) 40%, transparent);
+  outline-offset: 1px;
 }
 
 .param-table__combo {
   min-width: 0;
-  border-right: 1px solid var(--color-interface-bar-border);
+  height: 34px;
+  margin: 3px 6px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  overflow: hidden;
+  box-sizing: border-box;
+  transition:
+    background-color 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.param-table__row:not(.param-table__row--head):hover .param-table__combo {
+  background: var(--color-workspace-inset);
+}
+
+.param-table__combo:focus-within {
+  background: var(--color-workspace-inset);
+  border-color: var(--color-primary);
+}
+
+.param-table__combo :deep(.combo-input),
+.param-table__combo :deep(.combo-input__field) {
+  height: 100%;
+  min-height: 0;
+  border-radius: 4px;
+}
+
+.param-table__combo :deep(.combo-input__field) {
+  padding: 0 28px 0 10px;
+  background: transparent;
+}
+
+.param-table__combo :deep(.combo-input__field:focus) {
+  background: transparent;
 }
 
 .param-table__cell {
   min-width: 0;
-  height: 100%;
-  min-height: 36px;
-  border: 0;
-  border-right: 1px solid var(--color-interface-bar-border);
-  border-radius: 0;
+  width: calc(100% - 12px);
+  height: 34px;
+  min-height: 34px;
+  margin: 3px 6px;
+  border: 1px solid transparent;
+  border-radius: 4px;
   background: transparent;
   color: var(--color-interface-field-text);
   padding: 0 10px;
@@ -2772,97 +2913,119 @@ watch(
   font-size: 13px;
   outline: none;
   box-sizing: border-box;
+  transition:
+    background-color 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.param-table__row:not(.param-table__row--head):hover .param-table__cell {
+  background: var(--color-workspace-inset);
+}
+
+.param-table__cell:focus {
+  background: var(--color-workspace-inset);
+  border-color: var(--color-primary);
 }
 
 .param-table__value {
   min-width: 0;
   height: 100%;
-  min-height: 36px;
-  border-right: 1px solid var(--color-interface-bar-border);
+  min-height: 42px;
   display: flex;
-  align-items: stretch;
+  align-items: center;
 }
 
 .param-table__cell--inner {
   flex: 1;
   min-width: 0;
-  border-right: 0;
+  width: calc(100% - 12px);
 }
 
-.param-table__key-cell {
+.param-table__type {
   display: flex;
-  align-items: stretch;
+  align-items: center;
   min-width: 0;
   height: 100%;
-  min-height: 36px;
-  border-right: 1px solid var(--color-interface-bar-border);
-  background: transparent;
-  transition: background-color 0.12s ease;
+  min-height: 42px;
+  padding: 0;
+  box-sizing: border-box;
 }
 
-.param-table__key-cell:focus-within {
-  background: color-mix(in srgb, var(--color-interface-accent) 6%, transparent);
-}
-
-.param-table__key-cell .param-table__cell--key {
+.param-table__type-select {
   flex: 1;
   min-width: 0;
-  border-right: 0;
-  padding-right: 6px;
-}
-
-.param-table__key-cell .param-table__cell--key:focus {
-  background: transparent;
-}
-
-.param-table__key-type {
-  flex-shrink: 0;
   display: flex;
-  align-self: stretch;
-  width: 70px;
-  min-width: 70px;
-  height: 100%;
-}
-
-.param-table__key-type :deep(.menu-select.compact) {
-  flex: 1;
-  min-width: 70px;
-}
-
-.param-table__key-type :deep(.menu-select.compact .menu-select__trigger) {
-  border: 0;
-  border-left: 1px solid var(--color-interface-bar-border);
-  border-radius: 0;
+  width: calc(100% - 12px);
+  height: 34px;
+  margin: 3px 6px;
+  border: 1px solid transparent;
+  outline: none;
+  border-radius: 4px;
+  overflow: hidden;
   background: transparent;
-  padding: 0 6px 0 8px;
-  gap: 3px;
-  color: var(--color-text-secondary);
+  box-sizing: border-box;
   transition:
-    color 0.12s ease,
-    background-color 0.12s ease;
+    background-color 0.12s ease,
+    border-color 0.12s ease;
 }
 
-.param-table__key-type :deep(.menu-select.compact .menu-select__trigger:hover),
-.param-table__key-type :deep(.menu-select.open .menu-select__trigger) {
+.param-table__row:not(.param-table__row--head):hover .param-table__type-select {
+  background: var(--color-workspace-inset);
+}
+
+.param-table__type-select:focus-within {
+  background: var(--color-workspace-inset);
+  border-color: var(--color-primary);
+}
+
+.param-table__type-select :deep(.menu-select.compact.plain) {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.param-table__type-select :deep(.menu-select.compact.plain .menu-select__trigger) {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  max-height: none;
+  border: none !important;
+  outline: none;
+  border-radius: 4px;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 4px 0 8px;
+  gap: 2px;
   color: var(--color-interface-field-text);
-  background: color-mix(in srgb, var(--color-interface-accent) 8%, transparent);
 }
 
-.param-table__key-type :deep(.menu-select__label) {
+.param-table__type-select :deep(.menu-select.compact.plain .menu-select__trigger:hover),
+.param-table__type-select :deep(.menu-select.compact.plain.open .menu-select__trigger) {
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.param-table__type-select :deep(.menu-select__label) {
   flex: 1 1 auto;
   min-width: 0;
-  overflow: visible;
-  text-overflow: clip;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 12px;
   font-weight: 500;
 }
 
-.param-table__key-type :deep(.menu-select__chevron) {
+.param-table__type-select :deep(.menu-select__chevron) {
   flex-shrink: 0;
   margin-left: 0;
 }
 
-.param-table__key-type :deep(.menu-select__chevron svg) {
+.param-table__type-select :deep(.menu-select__chevron svg) {
   width: 12px;
   height: 12px;
 }
@@ -2872,9 +3035,27 @@ watch(
   display: flex;
   align-items: center;
   min-width: 0;
+  width: calc(100% - 12px);
+  height: 34px;
+  margin: 3px 6px;
   padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 4px;
   cursor: pointer;
   overflow: hidden;
+  box-sizing: border-box;
+  transition:
+    background-color 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.param-table__row:not(.param-table__row--head):hover .param-table__file {
+  background: var(--color-workspace-inset);
+}
+
+.param-table__file:focus-within {
+  background: var(--color-workspace-inset);
+  border-color: var(--color-primary);
 }
 
 .param-table__file-input {
@@ -2898,27 +3079,52 @@ watch(
   opacity: 1;
 }
 
-.param-table__cell:focus {
-  background: color-mix(in srgb, var(--color-interface-accent) 6%, transparent);
-}
-
 .param-table__del {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  width: 28px;
+  height: 28px;
+  margin: 0 auto;
+  padding: 0;
   border: 0;
   background: transparent;
   color: var(--color-text-secondary);
   font-size: 18px;
   line-height: 1;
   cursor: pointer;
+  border-radius: var(--raw-editor-selection-radius);
+  opacity: 0;
+  pointer-events: none;
+  position: relative;
+  z-index: 2;
+  /* Optical center: × glyph sits slightly low in most fonts */
+  padding-bottom: 1px;
+  transition:
+    opacity 0.12s ease,
+    color 0.12s ease,
+    background-color 0.12s ease;
+}
+
+.param-table__row:not(.param-table__row--head):hover .param-table__del {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .param-table__del:hover:not(:disabled) {
-  color: var(--color-text);
-  background: var(--color-hover);
+  color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 16%, transparent);
 }
 
 .param-table__del:disabled {
-  opacity: 0.25;
+  opacity: 0;
   cursor: not-allowed;
+}
+
+.param-table__row:not(.param-table__row--head):hover .param-table__del:disabled {
+  opacity: 0.35;
+  pointer-events: none;
 }
 
 .auth-pane {

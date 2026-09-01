@@ -1465,10 +1465,11 @@ async function onSelectApi(id: number, options?: { restore?: boolean }) {
 
 .sidebar-resizer {
   flex-shrink: 0;
-  width: 5px;
+  width: 2px;
   cursor: col-resize;
   position: relative;
   background: transparent;
+  z-index: 2;
 }
 
 .sidebar-resizer::before {
@@ -1476,10 +1477,15 @@ async function onSelectApi(id: number, options?: { restore?: boolean }) {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: 50%;
+  left: 0;
   width: 1px;
-  transform: translateX(-50%);
   background: var(--color-border);
+}
+
+:root:not([data-theme='dark']) .sidebar-resizer::before,
+:root[data-theme='light'] .sidebar-resizer::before {
+  /* Flat hairline — avoid a recessed/groove look in light theme */
+  background: color-mix(in srgb, var(--color-border) 55%, #fff);
 }
 
 .sidebar-resizer:hover::before,
@@ -1535,8 +1541,7 @@ async function onSelectApi(id: number, options?: { restore?: boolean }) {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 42px;
-  padding: 6px 10px 6px 8px;
+  padding: 6px 8px 6px 10px;
   border-bottom: 1px solid var(--color-border);
   background: var(--color-sidebar);
 }
@@ -1558,18 +1563,24 @@ async function onSelectApi(id: number, options?: { restore?: boolean }) {
 .req-tab {
   position: relative;
   max-width: 200px;
-  height: 26px;
+  height: 30px;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   border: 0;
   border-radius: var(--radius);
   background: transparent;
   color: var(--color-text-secondary);
-  padding: 0 6px 0 10px;
+  padding: 0 6px 0 8px;
   font-size: 13px;
   white-space: nowrap;
   flex-shrink: 0;
+}
+
+.req-tab .method {
+  min-width: 36px;
+  flex-shrink: 0;
+  line-height: 1;
 }
 
 .req-tab:hover:not(.active) {
@@ -1585,6 +1596,7 @@ async function onSelectApi(id: number, options?: { restore?: boolean }) {
 .req-tab-name {
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 1.2;
 }
 
 .req-tab-close {
@@ -1631,8 +1643,8 @@ async function onSelectApi(id: number, options?: { restore?: boolean }) {
 }
 
 .tab-add {
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border: 0;
   border-radius: var(--radius);
   background: transparent;

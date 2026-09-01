@@ -216,7 +216,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
-const open = ref(true)
+const open = ref(false)
 const menuOpen = ref(false)
 const menuRef = ref<HTMLElement | null>(null)
 const menuBtnRef = ref<HTMLButtonElement | null>(null)

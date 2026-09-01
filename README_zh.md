@@ -168,9 +168,10 @@ pnpm run tauri:build
 - [x] proto 文件导入参数，自动生成模拟参数
 - [x] apinest 导入，导出
 - [ ] postman apifox eolink yapi 等接口格式导入
-- [ ] Web端接口查看的样式
+- [x] Web端接口查看的样式
 - [ ] 液态玻璃主题与边框细化
 - [ ] 内置 / 多数据库支持（当前仅外部 PostgreSQL）
+- [ ] 字典库
 
 ## License
 

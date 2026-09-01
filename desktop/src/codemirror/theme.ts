@@ -50,6 +50,9 @@ function chromeTheme(dark: boolean): Extension {
         fontFamily: 'var(--raw-editor-font-family)',
         fontSize: '13px',
         lineHeight: '20px',
+        // Stable CJK/Latin mixed metrics while selection overlays update.
+        fontKerning: 'none',
+        fontVariantLigatures: 'none',
       },
       // Prefer filling the first visual row (key + value) instead of wrapping
       // at the space after `: `, which parked the string on the next line.
@@ -60,6 +63,8 @@ function chromeTheme(dark: boolean): Extension {
       '.cm-content': {
         caretColor: 'transparent',
         lineHeight: '20px',
+        fontKerning: 'none',
+        fontVariantLigatures: 'none',
       },
       '.cm-line': {
         lineHeight: '20px',
@@ -80,19 +85,13 @@ function chromeTheme(dark: boolean): Extension {
       '.cm-roundedSelectionLayer': {
         pointerEvents: 'none',
       },
-      '.cm-selected-space': {
-        position: 'relative',
+      '.cm-selectedSpaceLayer': {
+        pointerEvents: 'none',
       },
-      '.cm-selected-space::after': {
-        content: '""',
+      '.cm-selectedSpaceDot': {
         position: 'absolute',
-        left: '50%',
-        top: '50%',
-        width: '2px',
-        height: '2px',
         borderRadius: '50%',
         backgroundColor: 'var(--raw-hl-space-dot)',
-        transform: 'translate(-50%, -50%)',
         pointerEvents: 'none',
       },
       '.cm-cursor, .cm-dropCursor': {
