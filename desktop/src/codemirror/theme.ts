@@ -24,12 +24,12 @@ const highlightStyle = HighlightStyle.define([
   { tag: t.invalid, color: 'var(--raw-hl-error)' },
 ])
 
-/** Soft repeating squiggle (VS Code–like). Period must match SVG width. */
+/** Clear editor-style squiggle under errors (no tint bar). */
 function lintWave(color: string): string {
   const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="3" viewBox="0 0 10 3" fill="none">` +
-    `<path d="M0 2.1C1.25 2.1 1.25.9 2.5.9S3.75 2.1 5 2.1 6.25.9 7.5.9 8.75 2.1 10 2.1" ` +
-    `stroke="${color}" stroke-width="1.05" stroke-linecap="round" stroke-linejoin="round"/>` +
+    `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="4" viewBox="0 0 12 4" fill="none">` +
+    `<path d="M0 3.2 L3 0.8 L6 3.2 L9 0.8 L12 3.2" stroke="${color}" stroke-width="1.3" ` +
+    `stroke-linecap="round" stroke-linejoin="round"/>` +
     `</svg>`
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`
 }
@@ -167,18 +167,16 @@ function chromeTheme(dark: boolean): Extension {
         color: 'var(--raw-hl-error)',
       },
       '.cm-lintRange': {
-        backgroundImage: 'none',
         backgroundPosition: 'left bottom',
         backgroundRepeat: 'repeat-x',
-        paddingBottom: '1px',
+        paddingBottom: '2px',
       },
       '.cm-lintRange-error': {
-        backgroundColor: dark ? 'rgba(241, 76, 76, 0.12)' : 'rgba(209, 52, 56, 0.1)',
-        backgroundImage: lintWave(dark ? 'rgba(241, 76, 76, 0.95)' : 'rgba(209, 52, 56, 0.9)'),
-        backgroundSize: '10px 3px',
+        backgroundColor: 'transparent',
+        backgroundImage: lintWave(dark ? '#f14c4c' : '#d13438'),
+        backgroundSize: '12px 4px',
         backgroundPosition: 'left bottom',
         backgroundRepeat: 'repeat-x',
-        borderRadius: '2px',
       },
       '.cm-searchMatch': {
         backgroundColor: 'var(--raw-find-match)',

@@ -680,7 +680,7 @@ import RequestBodyRawEditor from './RequestBodyRawEditor.vue'
 import ResponseErrorState from './ResponseErrorState.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
 import GrpcMethodList from './GrpcMethodList.vue'
-import { formatJsonLenient } from '../utils/raw-json-utils'
+import { formatJsonLenient, stripJsonComments } from '../utils/raw-json-utils'
 import { looksLikeCurl, parseCurl, type ParsedCurl } from '../utils/parse-curl'
 import { buildAutoHeaders, isAutoHeaderEnabled, sendableAutoHeaders } from '../utils/auto-headers'
 import {
@@ -1252,9 +1252,9 @@ const {
   start: startTableColResize,
 } = useColumnResize(
   'request_table_col_widths',
-  { key: 200, type: 90, value: 380, desc: 160 }, // 默认
-  { key: 140, type: 90, value: 200, desc: 80 },  // 最小
-  { key: 360, type: 140, value: 520, desc: 320 }, // 最大
+  { key: 300, type: 90, value: 400, desc: 400 }, // 默认
+  { key: 150, type: 90, value: 200, desc: 80 },  // 最小
+  { key: 400, type: 140, value: 500, desc: 500 }, // 最大
 )
 
 const paramGridColumns = computed(
@@ -1314,7 +1314,7 @@ function autoHeaderContext() {
   return {
     url: applyEnvVars(displayUrl.value.trim(), envVarMap.value),
     bodyFormat: bodyFormat.value,
-    rawBody: bodyRaw.value,
+    rawBody: bodyFormat.value === 'raw' ? stripJsonComments(bodyRaw.value) : bodyRaw.value,
     authType: authType.value,
     authBearerToken: authBearerToken.value,
     authBasicUser: authBasicUser.value,
@@ -1582,7 +1582,11 @@ function autoGenerateGrpcMessage() {
 
 function buildRequestBodyForSend(): string | null {
   if (bodyFormat.value === 'none') return null
-  if (bodyFormat.value === 'raw') return bodyRaw.value || null
+  if (bodyFormat.value === 'raw') {
+    const raw = bodyRaw.value
+    if (!raw) return null
+    return stripJsonComments(raw)
+  }
   return null
 }
 
@@ -2339,7 +2343,7 @@ async function onSend() {
           rpc_path: grpcSelectedRpc.value,
           proto_source: grpcProtoSource.value,
           proto_name: grpcProtoName.value || null,
-          message_json: bodyRaw.value,
+          message_json: stripJsonComments(bodyRaw.value),
           metadata: buildSendHeaders(),
           tls: false,
           interface_id: props.interfaceId ?? null,

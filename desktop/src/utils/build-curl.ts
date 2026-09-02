@@ -1,3 +1,5 @@
+import { stripJsonComments } from './raw-json-utils'
+
 export type CurlHeader = {
   key: string
   value: string
@@ -168,7 +170,7 @@ export function buildCurlFromTabState(
   let formData: CurlFormField[] | null = null
 
   if (format === 'raw' && body?.raw != null && String(body.raw) !== '') {
-    raw = applyEnvVars(String(body.raw), vars)
+    raw = stripJsonComments(applyEnvVars(String(body.raw), vars))
   } else if (format === 'form-data' && Array.isArray(body?.fields)) {
     formData = body!.fields!
       .filter((f) => f.enabled !== false && String(f.name ?? '').trim())

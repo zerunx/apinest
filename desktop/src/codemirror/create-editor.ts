@@ -1,6 +1,6 @@
 import { Compartment, EditorState, type Extension } from '@codemirror/state'
 import { EditorView, keymap, lineNumbers, placeholder as placeholderExt, drawSelection } from '@codemirror/view'
-import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
+import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import {
   bracketMatching,
   codeFolding,
@@ -18,6 +18,7 @@ import { searchExtension } from './search-panel'
 import { wrappedLineIndent } from './wrap-indent'
 import { editorTheme } from './theme'
 import { wrapSelectionQuotes } from './wrap-selection-quotes'
+import { indentWithTabStop } from './indent-tab'
 
 const INDENT = '    '
 
@@ -103,7 +104,8 @@ export function createCodeMirror(options: CreateCodeMirrorOptions): CodeMirrorHa
         lint.of(lintExtension(currentLanguage)),
         editable.of(editableExtension(options.readonly ?? false)),
         gutters.of(gutterExtension(showLineNumbers, currentLanguage)),
-        keymap.of([wrapSelectionQuotes, ...defaultKeymap, ...historyKeymap, ...foldKeymap, indentWithTab]),
+        wrapSelectionQuotes,
+        keymap.of([...defaultKeymap, ...historyKeymap, ...foldKeymap, indentWithTabStop]),
         searchExtension(),
         EditorView.contentAttributes.of({ spellcheck: 'false' }),
         EditorView.updateListener.of((update) => {

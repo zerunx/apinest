@@ -12,6 +12,44 @@ export function readJsonStringEnd(text: string, start: number): number {
   return text.length
 }
 
+/**
+ * Strip `//` and `/* *\/` comments outside JSON strings.
+ * When `preserveLength` is true, comment chars (except newlines) become spaces
+ * so error indices still map to the original document.
+ */
+export function stripJsonComments(text: string, preserveLength = false): string {
+  let out = ''
+  let i = 0
+  while (i < text.length) {
+    const char = text[i]
+    if (char === '"') {
+      const end = readJsonStringEnd(text, i)
+      out += text.slice(i, end)
+      i = end
+      continue
+    }
+    if (char === '/' && text[i + 1] === '/') {
+      const start = i
+      i += 2
+      while (i < text.length && text[i] !== '\n' && text[i] !== '\r') i += 1
+      if (preserveLength) out += text.slice(start, i).replace(/[^\n\r]/g, ' ')
+      continue
+    }
+    if (char === '/' && text[i + 1] === '*') {
+      const start = i
+      i += 2
+      while (i + 1 < text.length && !(text[i] === '*' && text[i + 1] === '/')) i += 1
+      if (i + 1 < text.length) i += 2
+      else i = text.length
+      if (preserveLength) out += text.slice(start, i).replace(/[^\n\r]/g, ' ')
+      continue
+    }
+    out += char
+    i += 1
+  }
+  return out
+}
+
 export type JsonToken = {
   kind: 'string' | 'number' | 'literal' | 'punct'
   text: string
@@ -152,7 +190,7 @@ export function formatJsonLenient(text: string): string | null {
   const trimmed = text.trim()
   if (!trimmed) return null
 
-  const normalized = removeTrailingCommas(trimmed)
+  const normalized = removeTrailingCommas(stripJsonComments(trimmed))
   const tokens = tokenizeJson(normalized)
   if (!tokens.length) return null
 
@@ -438,7 +476,7 @@ function locateJsonSyntaxErrorIndex(text: string): number | null {
 
 export function findJsonSyntaxError(text: string): JsonSyntaxError | null {
   if (!text.trim()) return null
-  const index = locateJsonSyntaxErrorIndex(text)
+  const index = locateJsonSyntaxErrorIndex(stripJsonComments(text, true))
   if (index == null) return null
   const { line, column } = indexToLineColumn(text, index)
   return { index, line, column }
@@ -451,6 +489,17 @@ export function isInsideJsonString(text: string, index: number): boolean {
       const end = readJsonStringEnd(text, i)
       if (index < end) return index > i
       i = end
+      continue
+    }
+    if (text[i] === '/' && text[i + 1] === '/') {
+      while (i < text.length && text[i] !== '\n' && text[i] !== '\r') i += 1
+      continue
+    }
+    if (text[i] === '/' && text[i + 1] === '*') {
+      i += 2
+      while (i + 1 < text.length && !(text[i] === '*' && text[i + 1] === '/')) i += 1
+      if (i + 1 < text.length) i += 2
+      else i = text.length
       continue
     }
     i += 1

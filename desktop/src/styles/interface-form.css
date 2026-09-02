@@ -908,3 +908,12 @@
   position: relative;
   overflow: hidden;
 }
+
+/* JSON // comments: override token colors from syntax highlighting */
+.interface-body-raw__host .cm-jsonComment,
+.interface-body-raw__host .cm-jsonComment span,
+.interface-body-raw__host .cm-line.cm-jsonCommentLine,
+.interface-body-raw__host .cm-line.cm-jsonCommentLine span {
+  color: var(--raw-hl-comment) !important;
+  font-style: italic;
+}
