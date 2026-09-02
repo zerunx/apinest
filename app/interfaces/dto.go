@@ -23,6 +23,7 @@ type ParamItem struct {
 	Name        string `json:"name"`
 	Type        string `json:"type"`
 	Required    bool   `json:"required"`
+	Enabled     *bool  `json:"enabled,omitempty"`
 	Description string `json:"description"`
 	Example     string `json:"example"`
 }
@@ -33,6 +34,7 @@ type BodyFieldItem struct {
 	Name        string          `json:"name"`
 	Type        string          `json:"type"`
 	Required    bool            `json:"required"`
+	Enabled     *bool           `json:"enabled,omitempty"`
 	Description string          `json:"description"`
 	Example     string          `json:"example"`
 	Children    []BodyFieldItem `json:"children,omitempty"`
@@ -150,4 +152,15 @@ type ReorderRequest struct {
 	ProjectID    int64   `json:"project_id" binding:"required,min=1"`
 	FolderID     int64   `json:"folder_id" binding:"required,min=1"`
 	InterfaceIDs []int64 `json:"interface_ids" binding:"required,min=1,dive,min=1"`
+}
+
+func resolveEnabled(v *bool) bool {
+	if v == nil {
+		return true
+	}
+	return *v
+}
+
+func enabledPtr(v bool) *bool {
+	return &v
 }

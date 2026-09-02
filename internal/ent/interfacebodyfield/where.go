@@ -80,6 +80,11 @@ func Required(v bool) predicate.InterfaceBodyField {
 	return predicate.InterfaceBodyField(sql.FieldEQ(FieldRequired, v))
 }
 
+// Enabled applies equality check predicate on the "enabled" field. It's identical to EnabledEQ.
+func Enabled(v bool) predicate.InterfaceBodyField {
+	return predicate.InterfaceBodyField(sql.FieldEQ(FieldEnabled, v))
+}
+
 // Description applies equality check predicate on the "description" field. It's identical to DescriptionEQ.
 func Description(v string) predicate.InterfaceBodyField {
 	return predicate.InterfaceBodyField(sql.FieldEQ(FieldDescription, v))
@@ -308,6 +313,16 @@ func RequiredEQ(v bool) predicate.InterfaceBodyField {
 // RequiredNEQ applies the NEQ predicate on the "required" field.
 func RequiredNEQ(v bool) predicate.InterfaceBodyField {
 	return predicate.InterfaceBodyField(sql.FieldNEQ(FieldRequired, v))
+}
+
+// EnabledEQ applies the EQ predicate on the "enabled" field.
+func EnabledEQ(v bool) predicate.InterfaceBodyField {
+	return predicate.InterfaceBodyField(sql.FieldEQ(FieldEnabled, v))
+}
+
+// EnabledNEQ applies the NEQ predicate on the "enabled" field.
+func EnabledNEQ(v bool) predicate.InterfaceBodyField {
+	return predicate.InterfaceBodyField(sql.FieldNEQ(FieldEnabled, v))
 }
 
 // DescriptionEQ applies the EQ predicate on the "description" field.

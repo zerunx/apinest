@@ -77,6 +77,7 @@ export default {
   'common.key': 'Key',
   'common.value': 'Value',
   'common.enabled': 'Enabled',
+  'common.selectAll': 'Select all',
   'create.workspace': 'New workspace',
   'create.project': 'New project',
   'create.folder': 'New folder',

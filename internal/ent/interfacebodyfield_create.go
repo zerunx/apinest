@@ -91,6 +91,20 @@ func (_c *InterfaceBodyFieldCreate) SetNillableRequired(v *bool) *InterfaceBodyF
 	return _c
 }
 
+// SetEnabled sets the "enabled" field.
+func (_c *InterfaceBodyFieldCreate) SetEnabled(v bool) *InterfaceBodyFieldCreate {
+	_c.mutation.SetEnabled(v)
+	return _c
+}
+
+// SetNillableEnabled sets the "enabled" field if the given value is not nil.
+func (_c *InterfaceBodyFieldCreate) SetNillableEnabled(v *bool) *InterfaceBodyFieldCreate {
+	if v != nil {
+		_c.SetEnabled(*v)
+	}
+	return _c
+}
+
 // SetDescription sets the "description" field.
 func (_c *InterfaceBodyFieldCreate) SetDescription(v string) *InterfaceBodyFieldCreate {
 	_c.mutation.SetDescription(v)
@@ -243,6 +257,10 @@ func (_c *InterfaceBodyFieldCreate) defaults() error {
 		v := interfacebodyfield.DefaultRequired
 		_c.mutation.SetRequired(v)
 	}
+	if _, ok := _c.mutation.Enabled(); !ok {
+		v := interfacebodyfield.DefaultEnabled
+		_c.mutation.SetEnabled(v)
+	}
 	if _, ok := _c.mutation.Description(); !ok {
 		v := interfacebodyfield.DefaultDescription
 		_c.mutation.SetDescription(v)
@@ -298,6 +316,9 @@ func (_c *InterfaceBodyFieldCreate) check() error {
 	}
 	if _, ok := _c.mutation.Required(); !ok {
 		return &ValidationError{Name: "required", err: errors.New(`ent: missing required field "InterfaceBodyField.required"`)}
+	}
+	if _, ok := _c.mutation.Enabled(); !ok {
+		return &ValidationError{Name: "enabled", err: errors.New(`ent: missing required field "InterfaceBodyField.enabled"`)}
 	}
 	if _, ok := _c.mutation.Description(); !ok {
 		return &ValidationError{Name: "description", err: errors.New(`ent: missing required field "InterfaceBodyField.description"`)}
@@ -379,6 +400,10 @@ func (_c *InterfaceBodyFieldCreate) createSpec() (*InterfaceBodyField, *sqlgraph
 	if value, ok := _c.mutation.Required(); ok {
 		_spec.SetField(interfacebodyfield.FieldRequired, field.TypeBool, value)
 		_node.Required = value
+	}
+	if value, ok := _c.mutation.Enabled(); ok {
+		_spec.SetField(interfacebodyfield.FieldEnabled, field.TypeBool, value)
+		_node.Enabled = value
 	}
 	if value, ok := _c.mutation.Description(); ok {
 		_spec.SetField(interfacebodyfield.FieldDescription, field.TypeString, value)

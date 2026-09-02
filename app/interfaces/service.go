@@ -393,6 +393,7 @@ func buildParamItems(rows []*ent.InterfaceRequestHeader) []ParamItem {
 			Name:        row.Name,
 			Type:        row.Type,
 			Required:    row.Required,
+			Enabled:     enabledPtr(row.Enabled),
 			Description: row.Description,
 			Example:     row.Example,
 		})
@@ -408,6 +409,7 @@ func buildQueryParamItems(rows []*ent.InterfaceQueryParam) []ParamItem {
 			Name:        row.Name,
 			Type:        row.Type,
 			Required:    row.Required,
+			Enabled:     enabledPtr(row.Enabled),
 			Description: row.Description,
 			Example:     row.Example,
 		})
@@ -436,6 +438,7 @@ func buildBodyFieldTree(rows []*ent.InterfaceBodyField) []BodyFieldItem {
 				Name:        row.Name,
 				Type:        row.Type,
 				Required:    row.Required,
+				Enabled:     enabledPtr(row.Enabled),
 				Description: row.Description,
 				Example:     row.Example,
 				Children:    build(row.ID),

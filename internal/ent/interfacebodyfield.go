@@ -29,6 +29,8 @@ type InterfaceBodyField struct {
 	Type string `json:"type,omitempty"`
 	// 是否必填
 	Required bool `json:"required,omitempty"`
+	// 是否启用
+	Enabled bool `json:"enabled,omitempty"`
 	// 说明
 	Description string `json:"description,omitempty"`
 	// 参数示例
@@ -74,7 +76,7 @@ func (*InterfaceBodyField) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case interfacebodyfield.FieldDeletedAt:
 			values[i] = &sql.NullScanner{S: new(utils.DateTime)}
-		case interfacebodyfield.FieldRequired:
+		case interfacebodyfield.FieldRequired, interfacebodyfield.FieldEnabled:
 			values[i] = new(sql.NullBool)
 		case interfacebodyfield.FieldID, interfacebodyfield.FieldInterfaceID, interfacebodyfield.FieldParentID, interfacebodyfield.FieldSortOrder:
 			values[i] = new(sql.NullInt64)
@@ -132,6 +134,12 @@ func (_m *InterfaceBodyField) assignValues(columns []string, values []any) error
 				return fmt.Errorf("unexpected type %T for field required", values[i])
 			} else if value.Valid {
 				_m.Required = value.Bool
+			}
+		case interfacebodyfield.FieldEnabled:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field enabled", values[i])
+			} else if value.Valid {
+				_m.Enabled = value.Bool
 			}
 		case interfacebodyfield.FieldDescription:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -225,6 +233,9 @@ func (_m *InterfaceBodyField) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("required=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Required))
+	builder.WriteString(", ")
+	builder.WriteString("enabled=")
+	builder.WriteString(fmt.Sprintf("%v", _m.Enabled))
 	builder.WriteString(", ")
 	builder.WriteString("description=")
 	builder.WriteString(_m.Description)

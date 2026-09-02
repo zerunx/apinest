@@ -110,12 +110,20 @@ const { beginSuppress, captureBaseline } = useInterfaceEditorDirty({
 })
 
 function toParamRows(
-  items: { name: string; type: string; required: boolean; description: string; example: string }[],
+  items: {
+    name: string
+    type: string
+    required: boolean
+    enabled?: boolean
+    description: string
+    example: string
+  }[],
 ): ParamRow[] {
   const rows = items.map((item) => ({
     name: item.name,
     type: item.type || 'string',
     required: item.required,
+    enabled: item.enabled !== false,
     description: item.description,
     example: item.example,
   }))

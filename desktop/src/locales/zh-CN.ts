@@ -76,6 +76,7 @@ export default {
   'common.key': 'Key',
   'common.value': 'Value',
   'common.enabled': '启用',
+  'common.selectAll': '全选',
   'create.workspace': '新建工作空间',
   'create.project': '新建项目',
   'create.folder': '新建文件夹',

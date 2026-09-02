@@ -164,6 +164,7 @@ var (
 		{Name: "name", Type: field.TypeString, Size: 100, Default: ""},
 		{Name: "type", Type: field.TypeString, Size: 50, Default: "string"},
 		{Name: "required", Type: field.TypeBool, Default: false},
+		{Name: "enabled", Type: field.TypeBool, Default: true},
 		{Name: "description", Type: field.TypeString, Size: 500, Default: ""},
 		{Name: "example", Type: field.TypeString, Size: 500, Default: ""},
 		{Name: "sort_order", Type: field.TypeInt, Default: 0},
@@ -180,7 +181,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "interface_body_fields_interfaces_body_fields",
-				Columns:    []*schema.Column{InterfaceBodyFieldsColumns[11]},
+				Columns:    []*schema.Column{InterfaceBodyFieldsColumns[12]},
 				RefColumns: []*schema.Column{InterfacesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -277,6 +278,7 @@ var (
 		{Name: "name", Type: field.TypeString, Size: 100, Default: ""},
 		{Name: "type", Type: field.TypeString, Size: 50, Default: "string"},
 		{Name: "required", Type: field.TypeBool, Default: false},
+		{Name: "enabled", Type: field.TypeBool, Default: true},
 		{Name: "description", Type: field.TypeString, Size: 500, Default: ""},
 		{Name: "example", Type: field.TypeString, Size: 500, Default: ""},
 		{Name: "sort_order", Type: field.TypeInt, Default: 0},
@@ -293,7 +295,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "interface_query_params_interfaces_query_params",
-				Columns:    []*schema.Column{InterfaceQueryParamsColumns[10]},
+				Columns:    []*schema.Column{InterfaceQueryParamsColumns[11]},
 				RefColumns: []*schema.Column{InterfacesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -305,6 +307,7 @@ var (
 		{Name: "name", Type: field.TypeString, Size: 100, Default: ""},
 		{Name: "type", Type: field.TypeString, Size: 50, Default: "string"},
 		{Name: "required", Type: field.TypeBool, Default: false},
+		{Name: "enabled", Type: field.TypeBool, Default: true},
 		{Name: "description", Type: field.TypeString, Size: 500, Default: ""},
 		{Name: "example", Type: field.TypeString, Size: 500, Default: ""},
 		{Name: "sort_order", Type: field.TypeInt, Default: 0},
@@ -321,7 +324,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "interface_request_headers_interfaces_request_headers",
-				Columns:    []*schema.Column{InterfaceRequestHeadersColumns[10]},
+				Columns:    []*schema.Column{InterfaceRequestHeadersColumns[11]},
 				RefColumns: []*schema.Column{InterfacesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},

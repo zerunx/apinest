@@ -4884,6 +4884,7 @@ type InterfaceBodyFieldMutation struct {
 	name              *string
 	_type             *string
 	required          *bool
+	enabled           *bool
 	description       *string
 	example           *string
 	sort_order        *int
@@ -5203,6 +5204,42 @@ func (m *InterfaceBodyFieldMutation) ResetRequired() {
 	m.required = nil
 }
 
+// SetEnabled sets the "enabled" field.
+func (m *InterfaceBodyFieldMutation) SetEnabled(b bool) {
+	m.enabled = &b
+}
+
+// Enabled returns the value of the "enabled" field in the mutation.
+func (m *InterfaceBodyFieldMutation) Enabled() (r bool, exists bool) {
+	v := m.enabled
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEnabled returns the old "enabled" field's value of the InterfaceBodyField entity.
+// If the InterfaceBodyField object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *InterfaceBodyFieldMutation) OldEnabled(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEnabled is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEnabled requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEnabled: %w", err)
+	}
+	return oldValue.Enabled, nil
+}
+
+// ResetEnabled resets all changes to the "enabled" field.
+func (m *InterfaceBodyFieldMutation) ResetEnabled() {
+	m.enabled = nil
+}
+
 // SetDescription sets the "description" field.
 func (m *InterfaceBodyFieldMutation) SetDescription(s string) {
 	m.description = &s
@@ -5513,7 +5550,7 @@ func (m *InterfaceBodyFieldMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *InterfaceBodyFieldMutation) Fields() []string {
-	fields := make([]string, 0, 11)
+	fields := make([]string, 0, 12)
 	if m._interface != nil {
 		fields = append(fields, interfacebodyfield.FieldInterfaceID)
 	}
@@ -5528,6 +5565,9 @@ func (m *InterfaceBodyFieldMutation) Fields() []string {
 	}
 	if m.required != nil {
 		fields = append(fields, interfacebodyfield.FieldRequired)
+	}
+	if m.enabled != nil {
+		fields = append(fields, interfacebodyfield.FieldEnabled)
 	}
 	if m.description != nil {
 		fields = append(fields, interfacebodyfield.FieldDescription)
@@ -5565,6 +5605,8 @@ func (m *InterfaceBodyFieldMutation) Field(name string) (ent.Value, bool) {
 		return m.GetType()
 	case interfacebodyfield.FieldRequired:
 		return m.Required()
+	case interfacebodyfield.FieldEnabled:
+		return m.Enabled()
 	case interfacebodyfield.FieldDescription:
 		return m.Description()
 	case interfacebodyfield.FieldExample:
@@ -5596,6 +5638,8 @@ func (m *InterfaceBodyFieldMutation) OldField(ctx context.Context, name string) 
 		return m.OldType(ctx)
 	case interfacebodyfield.FieldRequired:
 		return m.OldRequired(ctx)
+	case interfacebodyfield.FieldEnabled:
+		return m.OldEnabled(ctx)
 	case interfacebodyfield.FieldDescription:
 		return m.OldDescription(ctx)
 	case interfacebodyfield.FieldExample:
@@ -5651,6 +5695,13 @@ func (m *InterfaceBodyFieldMutation) SetField(name string, value ent.Value) erro
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetRequired(v)
+		return nil
+	case interfacebodyfield.FieldEnabled:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEnabled(v)
 		return nil
 	case interfacebodyfield.FieldDescription:
 		v, ok := value.(string)
@@ -5793,6 +5844,9 @@ func (m *InterfaceBodyFieldMutation) ResetField(name string) error {
 		return nil
 	case interfacebodyfield.FieldRequired:
 		m.ResetRequired()
+		return nil
+	case interfacebodyfield.FieldEnabled:
+		m.ResetEnabled()
 		return nil
 	case interfacebodyfield.FieldDescription:
 		m.ResetDescription()
@@ -8809,6 +8863,7 @@ type InterfaceQueryParamMutation struct {
 	name              *string
 	_type             *string
 	required          *bool
+	enabled           *bool
 	description       *string
 	example           *string
 	sort_order        *int
@@ -9070,6 +9125,42 @@ func (m *InterfaceQueryParamMutation) OldRequired(ctx context.Context) (v bool, 
 // ResetRequired resets all changes to the "required" field.
 func (m *InterfaceQueryParamMutation) ResetRequired() {
 	m.required = nil
+}
+
+// SetEnabled sets the "enabled" field.
+func (m *InterfaceQueryParamMutation) SetEnabled(b bool) {
+	m.enabled = &b
+}
+
+// Enabled returns the value of the "enabled" field in the mutation.
+func (m *InterfaceQueryParamMutation) Enabled() (r bool, exists bool) {
+	v := m.enabled
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEnabled returns the old "enabled" field's value of the InterfaceQueryParam entity.
+// If the InterfaceQueryParam object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *InterfaceQueryParamMutation) OldEnabled(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEnabled is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEnabled requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEnabled: %w", err)
+	}
+	return oldValue.Enabled, nil
+}
+
+// ResetEnabled resets all changes to the "enabled" field.
+func (m *InterfaceQueryParamMutation) ResetEnabled() {
+	m.enabled = nil
 }
 
 // SetDescription sets the "description" field.
@@ -9382,7 +9473,7 @@ func (m *InterfaceQueryParamMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *InterfaceQueryParamMutation) Fields() []string {
-	fields := make([]string, 0, 10)
+	fields := make([]string, 0, 11)
 	if m._interface != nil {
 		fields = append(fields, interfacequeryparam.FieldInterfaceID)
 	}
@@ -9394,6 +9485,9 @@ func (m *InterfaceQueryParamMutation) Fields() []string {
 	}
 	if m.required != nil {
 		fields = append(fields, interfacequeryparam.FieldRequired)
+	}
+	if m.enabled != nil {
+		fields = append(fields, interfacequeryparam.FieldEnabled)
 	}
 	if m.description != nil {
 		fields = append(fields, interfacequeryparam.FieldDescription)
@@ -9429,6 +9523,8 @@ func (m *InterfaceQueryParamMutation) Field(name string) (ent.Value, bool) {
 		return m.GetType()
 	case interfacequeryparam.FieldRequired:
 		return m.Required()
+	case interfacequeryparam.FieldEnabled:
+		return m.Enabled()
 	case interfacequeryparam.FieldDescription:
 		return m.Description()
 	case interfacequeryparam.FieldExample:
@@ -9458,6 +9554,8 @@ func (m *InterfaceQueryParamMutation) OldField(ctx context.Context, name string)
 		return m.OldType(ctx)
 	case interfacequeryparam.FieldRequired:
 		return m.OldRequired(ctx)
+	case interfacequeryparam.FieldEnabled:
+		return m.OldEnabled(ctx)
 	case interfacequeryparam.FieldDescription:
 		return m.OldDescription(ctx)
 	case interfacequeryparam.FieldExample:
@@ -9506,6 +9604,13 @@ func (m *InterfaceQueryParamMutation) SetField(name string, value ent.Value) err
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetRequired(v)
+		return nil
+	case interfacequeryparam.FieldEnabled:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEnabled(v)
 		return nil
 	case interfacequeryparam.FieldDescription:
 		v, ok := value.(string)
@@ -9634,6 +9739,9 @@ func (m *InterfaceQueryParamMutation) ResetField(name string) error {
 	case interfacequeryparam.FieldRequired:
 		m.ResetRequired()
 		return nil
+	case interfacequeryparam.FieldEnabled:
+		m.ResetEnabled()
+		return nil
 	case interfacequeryparam.FieldDescription:
 		m.ResetDescription()
 		return nil
@@ -9739,6 +9847,7 @@ type InterfaceRequestHeaderMutation struct {
 	name              *string
 	_type             *string
 	required          *bool
+	enabled           *bool
 	description       *string
 	example           *string
 	sort_order        *int
@@ -10000,6 +10109,42 @@ func (m *InterfaceRequestHeaderMutation) OldRequired(ctx context.Context) (v boo
 // ResetRequired resets all changes to the "required" field.
 func (m *InterfaceRequestHeaderMutation) ResetRequired() {
 	m.required = nil
+}
+
+// SetEnabled sets the "enabled" field.
+func (m *InterfaceRequestHeaderMutation) SetEnabled(b bool) {
+	m.enabled = &b
+}
+
+// Enabled returns the value of the "enabled" field in the mutation.
+func (m *InterfaceRequestHeaderMutation) Enabled() (r bool, exists bool) {
+	v := m.enabled
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEnabled returns the old "enabled" field's value of the InterfaceRequestHeader entity.
+// If the InterfaceRequestHeader object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *InterfaceRequestHeaderMutation) OldEnabled(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEnabled is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEnabled requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEnabled: %w", err)
+	}
+	return oldValue.Enabled, nil
+}
+
+// ResetEnabled resets all changes to the "enabled" field.
+func (m *InterfaceRequestHeaderMutation) ResetEnabled() {
+	m.enabled = nil
 }
 
 // SetDescription sets the "description" field.
@@ -10312,7 +10457,7 @@ func (m *InterfaceRequestHeaderMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *InterfaceRequestHeaderMutation) Fields() []string {
-	fields := make([]string, 0, 10)
+	fields := make([]string, 0, 11)
 	if m._interface != nil {
 		fields = append(fields, interfacerequestheader.FieldInterfaceID)
 	}
@@ -10324,6 +10469,9 @@ func (m *InterfaceRequestHeaderMutation) Fields() []string {
 	}
 	if m.required != nil {
 		fields = append(fields, interfacerequestheader.FieldRequired)
+	}
+	if m.enabled != nil {
+		fields = append(fields, interfacerequestheader.FieldEnabled)
 	}
 	if m.description != nil {
 		fields = append(fields, interfacerequestheader.FieldDescription)
@@ -10359,6 +10507,8 @@ func (m *InterfaceRequestHeaderMutation) Field(name string) (ent.Value, bool) {
 		return m.GetType()
 	case interfacerequestheader.FieldRequired:
 		return m.Required()
+	case interfacerequestheader.FieldEnabled:
+		return m.Enabled()
 	case interfacerequestheader.FieldDescription:
 		return m.Description()
 	case interfacerequestheader.FieldExample:
@@ -10388,6 +10538,8 @@ func (m *InterfaceRequestHeaderMutation) OldField(ctx context.Context, name stri
 		return m.OldType(ctx)
 	case interfacerequestheader.FieldRequired:
 		return m.OldRequired(ctx)
+	case interfacerequestheader.FieldEnabled:
+		return m.OldEnabled(ctx)
 	case interfacerequestheader.FieldDescription:
 		return m.OldDescription(ctx)
 	case interfacerequestheader.FieldExample:
@@ -10436,6 +10588,13 @@ func (m *InterfaceRequestHeaderMutation) SetField(name string, value ent.Value) 
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetRequired(v)
+		return nil
+	case interfacerequestheader.FieldEnabled:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEnabled(v)
 		return nil
 	case interfacerequestheader.FieldDescription:
 		v, ok := value.(string)
@@ -10563,6 +10722,9 @@ func (m *InterfaceRequestHeaderMutation) ResetField(name string) error {
 		return nil
 	case interfacerequestheader.FieldRequired:
 		m.ResetRequired()
+		return nil
+	case interfacerequestheader.FieldEnabled:
+		m.ResetEnabled()
 		return nil
 	case interfacerequestheader.FieldDescription:
 		m.ResetDescription()

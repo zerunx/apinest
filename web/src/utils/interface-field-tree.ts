@@ -7,6 +7,7 @@ export interface FieldTreeNode {
   name: string
   type: string
   required: boolean
+  enabled?: boolean
   description: string
   example: string
   mock?: string
@@ -26,6 +27,7 @@ export function emptyFieldNode(parentId = 0): FieldTreeNode {
     name: '',
     type: 'string',
     required: true,
+    enabled: true,
     description: '',
     example: '',
     mock: '',
@@ -187,6 +189,7 @@ export function compactFieldTree(nodes: FieldTreeNode[]): FieldTreeNode[] {
       const children = compactFieldTree(node.children ?? [])
       return {
         ...node,
+        enabled: node.enabled !== false,
         children: children.length ? children : undefined,
       }
     })

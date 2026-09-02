@@ -1409,7 +1409,7 @@ async function onSelectApi(id: number, options?: { restore?: boolean }) {
     headers = (rowDetail.request_headers as Array<Record<string, unknown>>).map((h) => ({
       key: String(h.name ?? ''),
       value: String(h.example ?? ''),
-      enabled: true,
+      enabled: h.enabled !== false,
     }))
     if (!headers.length) headers = defaultHeaders()
   }

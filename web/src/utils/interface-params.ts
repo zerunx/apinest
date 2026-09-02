@@ -2,6 +2,7 @@ export interface ParamRow {
   name: string
   type: string
   required: boolean
+  enabled?: boolean
   description: string
   example: string
 }
@@ -11,6 +12,7 @@ export function emptyParamRow(): ParamRow {
     name: '',
     type: 'string',
     required: true,
+    enabled: true,
     description: '',
     example: '',
   }
@@ -30,7 +32,10 @@ export function ensureTrailingEmptyRow(rows: ParamRow[]): ParamRow[] {
 }
 
 export function compactParamRows(rows: ParamRow[]): ParamRow[] {
-  return rows.filter(hasParamContent)
+  return rows.filter(hasParamContent).map((row) => ({
+    ...row,
+    enabled: row.enabled !== false,
+  }))
 }
 
 export function setAllParamsRequired(rows: ParamRow[], required: boolean): ParamRow[] {

@@ -174,6 +174,7 @@ func (Repo) ReplaceRequestHeaders(ctx context.Context, tx *ent.Tx, interfaceID i
 			SetName(header.Name).
 			SetType(headerType).
 			SetRequired(header.Required).
+			SetEnabled(resolveEnabled(header.Enabled)).
 			SetDescription(header.Description).
 			SetExample(header.Example).
 			SetSortOrder(index).
@@ -202,6 +203,7 @@ func (Repo) ReplaceQueryParams(ctx context.Context, tx *ent.Tx, interfaceID int6
 			SetName(param.Name).
 			SetType(paramType).
 			SetRequired(param.Required).
+			SetEnabled(resolveEnabled(param.Enabled)).
 			SetDescription(param.Description).
 			SetExample(param.Example).
 			SetSortOrder(index).
@@ -236,6 +238,7 @@ func (Repo) saveBodyFields(ctx context.Context, tx *ent.Tx, interfaceID, parentI
 			SetName(fieldItem.Name).
 			SetType(fieldType).
 			SetRequired(fieldItem.Required).
+			SetEnabled(resolveEnabled(fieldItem.Enabled)).
 			SetDescription(fieldItem.Description).
 			SetExample(fieldItem.Example).
 			SetSortOrder(index).

@@ -242,7 +242,6 @@ export function findJsonTokenRangeAt(
     const end = token.start + token.text.length
     if (caret < token.start || caret > end) continue
 
-    // String keys/values: select inner content only (exclude surrounding quotes).
     if (
       token.kind === 'string' &&
       token.text.length >= 2 &&
@@ -254,7 +253,6 @@ export function findJsonTokenRangeAt(
     return { start: token.start, end }
   }
 
-  // Fallback: bare word (partial / invalid JSON)
   const isWord = (ch: string) => /[A-Za-z0-9_\u4e00-\u9fff$]/.test(ch)
   let i = Math.min(caret, Math.max(0, text.length - 1))
   if (i < 0) return null
@@ -288,7 +286,6 @@ export function indexToLineColumn(text: string, index: number): { line: number; 
   return { line, column }
 }
 
-/** First structural / unexpected-token index, or null if the document is valid. Trailing commas are allowed. */
 function locateJsonSyntaxErrorIndex(text: string): number | null {
   let i = 0
   const atEnd = () => i >= text.length
@@ -388,11 +385,12 @@ function locateJsonSyntaxErrorIndex(text: string): number | null {
       if (!parseValue()) return false
       skip()
       if (text[i] === ',') {
+        const commaIndex = i
         i += 1
         skip()
-        if (text[i] === '}') {
-          i += 1
-          return true
+        if (text[i] === '}' || atEnd()) {
+          i = commaIndex
+          return false
         }
         continue
       }
@@ -415,11 +413,12 @@ function locateJsonSyntaxErrorIndex(text: string): number | null {
       if (!parseValue()) return false
       skip()
       if (text[i] === ',') {
+        const commaIndex = i
         i += 1
         skip()
-        if (text[i] === ']') {
-          i += 1
-          return true
+        if (text[i] === ']' || atEnd()) {
+          i = commaIndex
+          return false
         }
         continue
       }
@@ -437,7 +436,6 @@ function locateJsonSyntaxErrorIndex(text: string): number | null {
   return null
 }
 
-/** Locate first JSON syntax error. Trailing commas are allowed. Empty input is valid. */
 export function findJsonSyntaxError(text: string): JsonSyntaxError | null {
   if (!text.trim()) return null
   const index = locateJsonSyntaxErrorIndex(text)
@@ -446,7 +444,6 @@ export function findJsonSyntaxError(text: string): JsonSyntaxError | null {
   return { index, line, column }
 }
 
-/** True when caret is inside a JSON string literal (not on the quotes). */
 export function isInsideJsonString(text: string, index: number): boolean {
   let i = 0
   while (i < text.length && i < index) {

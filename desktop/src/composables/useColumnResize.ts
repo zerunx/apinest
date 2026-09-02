@@ -2,7 +2,12 @@ import { onBeforeUnmount, ref } from 'vue'
 
 type WidthMap = Record<string, number>
 
-function readStored(key: string, fallback: WidthMap) {
+function clampWidth(n: number, min: number, max?: number) {
+  const capped = Math.max(min, n)
+  return max == null ? capped : Math.min(max, capped)
+}
+
+function readStored(key: string, fallback: WidthMap, mins: WidthMap, maxs?: WidthMap) {
   try {
     const raw = localStorage.getItem(key)
     if (!raw) return { ...fallback }
@@ -10,7 +15,9 @@ function readStored(key: string, fallback: WidthMap) {
     const next = { ...fallback }
     for (const k of Object.keys(fallback)) {
       const n = Number(parsed[k])
-      if (Number.isFinite(n)) next[k] = n
+      if (Number.isFinite(n)) {
+        next[k] = clampWidth(n, mins[k] ?? 48, maxs?.[k])
+      }
     }
     return next
   } catch {
@@ -30,8 +37,9 @@ export function useColumnResize(
   storageKey: string,
   defaults: WidthMap,
   mins: WidthMap,
+  maxs?: WidthMap,
 ) {
-  const widths = ref<WidthMap>(readStored(storageKey, defaults))
+  const widths = ref<WidthMap>(readStored(storageKey, defaults, mins, maxs))
   let activeKey: string | null = null
   let startX = 0
   let startWidth = 0
@@ -39,10 +47,11 @@ export function useColumnResize(
   function onMove(e: MouseEvent) {
     if (!activeKey) return
     const min = mins[activeKey] ?? 48
+    const max = maxs?.[activeKey]
     const delta = e.clientX - startX
     widths.value = {
       ...widths.value,
-      [activeKey]: Math.max(min, startWidth + delta),
+      [activeKey]: clampWidth(startWidth + delta, min, max),
     }
   }
 

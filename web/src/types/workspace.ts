@@ -61,6 +61,7 @@ export interface InterfaceParamItem {
   name: string
   type: string
   required: boolean
+  enabled?: boolean
   description: string
   example: string
 }
@@ -71,6 +72,7 @@ export interface InterfaceBodyField {
   name: string
   type: string
   required: boolean
+  enabled?: boolean
   description: string
   example: string
   children?: InterfaceBodyField[]

@@ -275,28 +275,32 @@ func init() {
 	interfacebodyfieldDescRequired := interfacebodyfieldFields[5].Descriptor()
 	// interfacebodyfield.DefaultRequired holds the default value on creation for the required field.
 	interfacebodyfield.DefaultRequired = interfacebodyfieldDescRequired.Default.(bool)
+	// interfacebodyfieldDescEnabled is the schema descriptor for enabled field.
+	interfacebodyfieldDescEnabled := interfacebodyfieldFields[6].Descriptor()
+	// interfacebodyfield.DefaultEnabled holds the default value on creation for the enabled field.
+	interfacebodyfield.DefaultEnabled = interfacebodyfieldDescEnabled.Default.(bool)
 	// interfacebodyfieldDescDescription is the schema descriptor for description field.
-	interfacebodyfieldDescDescription := interfacebodyfieldFields[6].Descriptor()
+	interfacebodyfieldDescDescription := interfacebodyfieldFields[7].Descriptor()
 	// interfacebodyfield.DefaultDescription holds the default value on creation for the description field.
 	interfacebodyfield.DefaultDescription = interfacebodyfieldDescDescription.Default.(string)
 	// interfacebodyfield.DescriptionValidator is a validator for the "description" field. It is called by the builders before save.
 	interfacebodyfield.DescriptionValidator = interfacebodyfieldDescDescription.Validators[0].(func(string) error)
 	// interfacebodyfieldDescExample is the schema descriptor for example field.
-	interfacebodyfieldDescExample := interfacebodyfieldFields[7].Descriptor()
+	interfacebodyfieldDescExample := interfacebodyfieldFields[8].Descriptor()
 	// interfacebodyfield.DefaultExample holds the default value on creation for the example field.
 	interfacebodyfield.DefaultExample = interfacebodyfieldDescExample.Default.(string)
 	// interfacebodyfield.ExampleValidator is a validator for the "example" field. It is called by the builders before save.
 	interfacebodyfield.ExampleValidator = interfacebodyfieldDescExample.Validators[0].(func(string) error)
 	// interfacebodyfieldDescSortOrder is the schema descriptor for sort_order field.
-	interfacebodyfieldDescSortOrder := interfacebodyfieldFields[8].Descriptor()
+	interfacebodyfieldDescSortOrder := interfacebodyfieldFields[9].Descriptor()
 	// interfacebodyfield.DefaultSortOrder holds the default value on creation for the sort_order field.
 	interfacebodyfield.DefaultSortOrder = interfacebodyfieldDescSortOrder.Default.(int)
 	// interfacebodyfieldDescCreatedAt is the schema descriptor for created_at field.
-	interfacebodyfieldDescCreatedAt := interfacebodyfieldFields[9].Descriptor()
+	interfacebodyfieldDescCreatedAt := interfacebodyfieldFields[10].Descriptor()
 	// interfacebodyfield.DefaultCreatedAt holds the default value on creation for the created_at field.
 	interfacebodyfield.DefaultCreatedAt = interfacebodyfieldDescCreatedAt.Default.(func() utils.DateTime)
 	// interfacebodyfieldDescUpdatedAt is the schema descriptor for updated_at field.
-	interfacebodyfieldDescUpdatedAt := interfacebodyfieldFields[10].Descriptor()
+	interfacebodyfieldDescUpdatedAt := interfacebodyfieldFields[11].Descriptor()
 	// interfacebodyfield.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	interfacebodyfield.DefaultUpdatedAt = interfacebodyfieldDescUpdatedAt.Default.(func() utils.DateTime)
 	// interfacebodyfield.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
@@ -505,28 +509,32 @@ func init() {
 	interfacequeryparamDescRequired := interfacequeryparamFields[4].Descriptor()
 	// interfacequeryparam.DefaultRequired holds the default value on creation for the required field.
 	interfacequeryparam.DefaultRequired = interfacequeryparamDescRequired.Default.(bool)
+	// interfacequeryparamDescEnabled is the schema descriptor for enabled field.
+	interfacequeryparamDescEnabled := interfacequeryparamFields[5].Descriptor()
+	// interfacequeryparam.DefaultEnabled holds the default value on creation for the enabled field.
+	interfacequeryparam.DefaultEnabled = interfacequeryparamDescEnabled.Default.(bool)
 	// interfacequeryparamDescDescription is the schema descriptor for description field.
-	interfacequeryparamDescDescription := interfacequeryparamFields[5].Descriptor()
+	interfacequeryparamDescDescription := interfacequeryparamFields[6].Descriptor()
 	// interfacequeryparam.DefaultDescription holds the default value on creation for the description field.
 	interfacequeryparam.DefaultDescription = interfacequeryparamDescDescription.Default.(string)
 	// interfacequeryparam.DescriptionValidator is a validator for the "description" field. It is called by the builders before save.
 	interfacequeryparam.DescriptionValidator = interfacequeryparamDescDescription.Validators[0].(func(string) error)
 	// interfacequeryparamDescExample is the schema descriptor for example field.
-	interfacequeryparamDescExample := interfacequeryparamFields[6].Descriptor()
+	interfacequeryparamDescExample := interfacequeryparamFields[7].Descriptor()
 	// interfacequeryparam.DefaultExample holds the default value on creation for the example field.
 	interfacequeryparam.DefaultExample = interfacequeryparamDescExample.Default.(string)
 	// interfacequeryparam.ExampleValidator is a validator for the "example" field. It is called by the builders before save.
 	interfacequeryparam.ExampleValidator = interfacequeryparamDescExample.Validators[0].(func(string) error)
 	// interfacequeryparamDescSortOrder is the schema descriptor for sort_order field.
-	interfacequeryparamDescSortOrder := interfacequeryparamFields[7].Descriptor()
+	interfacequeryparamDescSortOrder := interfacequeryparamFields[8].Descriptor()
 	// interfacequeryparam.DefaultSortOrder holds the default value on creation for the sort_order field.
 	interfacequeryparam.DefaultSortOrder = interfacequeryparamDescSortOrder.Default.(int)
 	// interfacequeryparamDescCreatedAt is the schema descriptor for created_at field.
-	interfacequeryparamDescCreatedAt := interfacequeryparamFields[8].Descriptor()
+	interfacequeryparamDescCreatedAt := interfacequeryparamFields[9].Descriptor()
 	// interfacequeryparam.DefaultCreatedAt holds the default value on creation for the created_at field.
 	interfacequeryparam.DefaultCreatedAt = interfacequeryparamDescCreatedAt.Default.(func() utils.DateTime)
 	// interfacequeryparamDescUpdatedAt is the schema descriptor for updated_at field.
-	interfacequeryparamDescUpdatedAt := interfacequeryparamFields[9].Descriptor()
+	interfacequeryparamDescUpdatedAt := interfacequeryparamFields[10].Descriptor()
 	// interfacequeryparam.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	interfacequeryparam.DefaultUpdatedAt = interfacequeryparamDescUpdatedAt.Default.(func() utils.DateTime)
 	// interfacequeryparam.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
@@ -562,28 +570,32 @@ func init() {
 	interfacerequestheaderDescRequired := interfacerequestheaderFields[4].Descriptor()
 	// interfacerequestheader.DefaultRequired holds the default value on creation for the required field.
 	interfacerequestheader.DefaultRequired = interfacerequestheaderDescRequired.Default.(bool)
+	// interfacerequestheaderDescEnabled is the schema descriptor for enabled field.
+	interfacerequestheaderDescEnabled := interfacerequestheaderFields[5].Descriptor()
+	// interfacerequestheader.DefaultEnabled holds the default value on creation for the enabled field.
+	interfacerequestheader.DefaultEnabled = interfacerequestheaderDescEnabled.Default.(bool)
 	// interfacerequestheaderDescDescription is the schema descriptor for description field.
-	interfacerequestheaderDescDescription := interfacerequestheaderFields[5].Descriptor()
+	interfacerequestheaderDescDescription := interfacerequestheaderFields[6].Descriptor()
 	// interfacerequestheader.DefaultDescription holds the default value on creation for the description field.
 	interfacerequestheader.DefaultDescription = interfacerequestheaderDescDescription.Default.(string)
 	// interfacerequestheader.DescriptionValidator is a validator for the "description" field. It is called by the builders before save.
 	interfacerequestheader.DescriptionValidator = interfacerequestheaderDescDescription.Validators[0].(func(string) error)
 	// interfacerequestheaderDescExample is the schema descriptor for example field.
-	interfacerequestheaderDescExample := interfacerequestheaderFields[6].Descriptor()
+	interfacerequestheaderDescExample := interfacerequestheaderFields[7].Descriptor()
 	// interfacerequestheader.DefaultExample holds the default value on creation for the example field.
 	interfacerequestheader.DefaultExample = interfacerequestheaderDescExample.Default.(string)
 	// interfacerequestheader.ExampleValidator is a validator for the "example" field. It is called by the builders before save.
 	interfacerequestheader.ExampleValidator = interfacerequestheaderDescExample.Validators[0].(func(string) error)
 	// interfacerequestheaderDescSortOrder is the schema descriptor for sort_order field.
-	interfacerequestheaderDescSortOrder := interfacerequestheaderFields[7].Descriptor()
+	interfacerequestheaderDescSortOrder := interfacerequestheaderFields[8].Descriptor()
 	// interfacerequestheader.DefaultSortOrder holds the default value on creation for the sort_order field.
 	interfacerequestheader.DefaultSortOrder = interfacerequestheaderDescSortOrder.Default.(int)
 	// interfacerequestheaderDescCreatedAt is the schema descriptor for created_at field.
-	interfacerequestheaderDescCreatedAt := interfacerequestheaderFields[8].Descriptor()
+	interfacerequestheaderDescCreatedAt := interfacerequestheaderFields[9].Descriptor()
 	// interfacerequestheader.DefaultCreatedAt holds the default value on creation for the created_at field.
 	interfacerequestheader.DefaultCreatedAt = interfacerequestheaderDescCreatedAt.Default.(func() utils.DateTime)
 	// interfacerequestheaderDescUpdatedAt is the schema descriptor for updated_at field.
-	interfacerequestheaderDescUpdatedAt := interfacerequestheaderFields[9].Descriptor()
+	interfacerequestheaderDescUpdatedAt := interfacerequestheaderFields[10].Descriptor()
 	// interfacerequestheader.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	interfacerequestheader.DefaultUpdatedAt = interfacerequestheaderDescUpdatedAt.Default.(func() utils.DateTime)
 	// interfacerequestheader.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

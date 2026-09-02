@@ -24,11 +24,12 @@ const highlightStyle = HighlightStyle.define([
   { tag: t.invalid, color: 'var(--raw-hl-error)' },
 ])
 
-/** Repeating sine tile. Period must equal SVG width so the join stays seamless. */
+/** Soft repeating squiggle (VS Code–like). Period must match SVG width. */
 function lintWave(color: string): string {
   const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" width="8" height="4" viewBox="0 0 8 4">` +
-    `<path d="M-4 3.1C-2.6 3.1-1.4.75 0 .75S2.6 3.1 4 3.1 6.6.75 8 .75 10.6 3.1 12 3.1" fill="none" stroke="${color}" stroke-width="1.15"/>` +
+    `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="3" viewBox="0 0 10 3" fill="none">` +
+    `<path d="M0 2.1C1.25 2.1 1.25.9 2.5.9S3.75 2.1 5 2.1 6.25.9 7.5.9 8.75 2.1 10 2.1" ` +
+    `stroke="${color}" stroke-width="1.05" stroke-linecap="round" stroke-linejoin="round"/>` +
     `</svg>`
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`
 }
@@ -169,11 +170,15 @@ function chromeTheme(dark: boolean): Extension {
         backgroundImage: 'none',
         backgroundPosition: 'left bottom',
         backgroundRepeat: 'repeat-x',
-        paddingBottom: '2px',
+        paddingBottom: '1px',
       },
       '.cm-lintRange-error': {
-        backgroundImage: lintWave(dark ? '#f14c4c' : '#d13438'),
-        backgroundSize: '8px 4px',
+        backgroundColor: dark ? 'rgba(241, 76, 76, 0.12)' : 'rgba(209, 52, 56, 0.1)',
+        backgroundImage: lintWave(dark ? 'rgba(241, 76, 76, 0.95)' : 'rgba(209, 52, 56, 0.9)'),
+        backgroundSize: '10px 3px',
+        backgroundPosition: 'left bottom',
+        backgroundRepeat: 'repeat-x',
+        borderRadius: '2px',
       },
       '.cm-searchMatch': {
         backgroundColor: 'var(--raw-find-match)',

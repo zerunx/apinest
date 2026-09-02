@@ -175,7 +175,16 @@
               @resize="startTableColResize"
             />
             <div class="param-table__row param-table__row--head" :style="{ gridTemplateColumns: paramGridColumns }">
-              <span class="param-table__check param-table__check--head" />
+              <label class="param-table__check">
+                <input
+                  type="checkbox"
+                  :checked="queryParamsSelectAll.checked"
+                  :ref="(el) => setCheckboxIndeterminate(el, queryParamsSelectAll.indeterminate)"
+                  :title="t('common.selectAll')"
+                  :aria-label="t('common.selectAll')"
+                  @change="setAllRowsEnabled(queryParams, ($event.target as HTMLInputElement).checked)"
+                />
+              </label>
               <span class="param-table__head-cell">{{ t('create.param.name') }}</span>
               <span class="param-table__head-cell">{{ t('common.value') }}</span>
               <span class="param-table__head-cell">{{ t('create.param.desc') }}</span>
@@ -305,7 +314,16 @@
               @resize="startTableColResize"
             />
             <div class="param-table__row param-table__row--head" :style="{ gridTemplateColumns: paramGridColumns }">
-              <span class="param-table__check param-table__check--head" />
+              <label class="param-table__check">
+                <input
+                  type="checkbox"
+                  :checked="requestHeadersSelectAll.checked"
+                  :ref="(el) => setCheckboxIndeterminate(el, requestHeadersSelectAll.indeterminate)"
+                  :title="t('common.selectAll')"
+                  :aria-label="t('common.selectAll')"
+                  @change="setAllRowsEnabled(requestHeaders, ($event.target as HTMLInputElement).checked)"
+                />
+              </label>
               <span class="param-table__head-cell">{{ t('create.param.name') }}</span>
               <span class="param-table__head-cell">{{ t('common.value') }}</span>
               <span class="param-table__head-cell">{{ t('create.param.desc') }}</span>
@@ -421,7 +439,16 @@
                 class="param-table__row param-table__row--head"
                 :style="{ gridTemplateColumns: formDataGridColumns }"
               >
-                <span class="param-table__check param-table__check--head" />
+                <label class="param-table__check">
+                  <input
+                    type="checkbox"
+                    :checked="formDataSelectAll.checked"
+                    :ref="(el) => setCheckboxIndeterminate(el, formDataSelectAll.indeterminate)"
+                    :title="t('common.selectAll')"
+                    :aria-label="t('common.selectAll')"
+                    @change="setAllRowsEnabled(formDataFields, ($event.target as HTMLInputElement).checked)"
+                  />
+                </label>
                 <span class="param-table__head-cell">{{ t('create.param.name') }}</span>
                 <span class="param-table__head-cell">{{ t('create.param.type') }}</span>
                 <span class="param-table__head-cell">{{ t('common.value') }}</span>
@@ -1224,9 +1251,10 @@ const {
   widths: tableColWidths,
   start: startTableColResize,
 } = useColumnResize(
-  'request_table_col_widths_v6',
-  { key: 180, type: 86, value: 350, desc: 160 },
-  { key: 100, type: 80, value: 200, desc: 80 },
+  'request_table_col_widths',
+  { key: 200, type: 90, value: 380, desc: 160 }, // 默认
+  { key: 140, type: 90, value: 200, desc: 80 },  // 最小
+  { key: 360, type: 140, value: 520, desc: 320 }, // 最大
 )
 
 const paramGridColumns = computed(
@@ -1242,6 +1270,27 @@ const requestHeaders = ref<HeaderRow[]>([defaultHeaderRow()])
 const showHiddenHeaders = ref(false)
 const disabledAutoHeaders = ref<Set<string>>(new Set())
 const queryParams = ref<QueryParamRow[]>([defaultQueryRow()])
+
+function selectAllState(rows: { enabled?: boolean }[]) {
+  const total = rows.length
+  const enabled = rows.filter((r) => r.enabled !== false).length
+  return {
+    checked: total > 0 && enabled === total,
+    indeterminate: enabled > 0 && enabled < total,
+  }
+}
+
+const queryParamsSelectAll = computed(() => selectAllState(queryParams.value))
+const requestHeadersSelectAll = computed(() => selectAllState(requestHeaders.value))
+const formDataSelectAll = computed(() => selectAllState(formDataFields.value))
+
+function setCheckboxIndeterminate(el: unknown, indeterminate: boolean) {
+  if (el instanceof HTMLInputElement) el.indeterminate = indeterminate
+}
+
+function setAllRowsEnabled(rows: { enabled: boolean }[], enabled: boolean) {
+  for (const row of rows) row.enabled = enabled
+}
 const responseHeaders = ref<ParamRow[]>([emptyRow()])
 const resultName = ref('')
 const resultStatus = ref('200')
@@ -1822,7 +1871,7 @@ function resolveRequestUrl(rawInput?: string): string | null {
   }
 }
 
-function compactParams(rows: ParamRow[]) {
+function compactParams(rows: Array<ParamRow & { enabled?: boolean }>) {
   return rows
     .filter((r) => r.name.trim())
     .map((r) => ({
@@ -1831,6 +1880,7 @@ function compactParams(rows: ParamRow[]) {
       required: r.required,
       description: r.description,
       example: r.example,
+      enabled: r.enabled !== false,
     }))
 }
 
@@ -2791,6 +2841,10 @@ watch(
   user-select: none;
 }
 
+.param-table__row--head .param-table__check {
+  pointer-events: auto;
+}
+
 .param-table__head-cell,
 .param-table__head-action {
   display: flex;
@@ -2824,12 +2878,6 @@ watch(
   cursor: pointer;
 }
 
-.param-table__check--head {
-  height: auto;
-  margin: 0;
-  cursor: default;
-}
-
 .param-table__check input {
   appearance: none;
   -webkit-appearance: none;
@@ -2853,6 +2901,12 @@ watch(
   background-color: var(--color-primary);
   border-color: var(--color-primary);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='M3.2 8.2L6.4 11.4L12.8 4.4' stroke='%23fff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+.param-table__check input:indeterminate {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='M3.5 8H12.5' stroke='%23fff' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E");
 }
 
 .param-table__check input:focus-visible {

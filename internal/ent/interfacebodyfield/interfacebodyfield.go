@@ -25,6 +25,8 @@ const (
 	FieldType = "type"
 	// FieldRequired holds the string denoting the required field in the database.
 	FieldRequired = "required"
+	// FieldEnabled holds the string denoting the enabled field in the database.
+	FieldEnabled = "enabled"
 	// FieldDescription holds the string denoting the description field in the database.
 	FieldDescription = "description"
 	// FieldExample holds the string denoting the example field in the database.
@@ -58,6 +60,7 @@ var Columns = []string{
 	FieldName,
 	FieldType,
 	FieldRequired,
+	FieldEnabled,
 	FieldDescription,
 	FieldExample,
 	FieldSortOrder,
@@ -98,6 +101,8 @@ var (
 	TypeValidator func(string) error
 	// DefaultRequired holds the default value on creation for the "required" field.
 	DefaultRequired bool
+	// DefaultEnabled holds the default value on creation for the "enabled" field.
+	DefaultEnabled bool
 	// DefaultDescription holds the default value on creation for the "description" field.
 	DefaultDescription string
 	// DescriptionValidator is a validator for the "description" field. It is called by the builders before save.
@@ -149,6 +154,11 @@ func ByType(opts ...sql.OrderTermOption) OrderOption {
 // ByRequired orders the results by the required field.
 func ByRequired(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldRequired, opts...).ToFunc()
+}
+
+// ByEnabled orders the results by the enabled field.
+func ByEnabled(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldEnabled, opts...).ToFunc()
 }
 
 // ByDescription orders the results by the description field.

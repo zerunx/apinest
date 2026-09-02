@@ -77,6 +77,20 @@ func (_c *InterfaceRequestHeaderCreate) SetNillableRequired(v *bool) *InterfaceR
 	return _c
 }
 
+// SetEnabled sets the "enabled" field.
+func (_c *InterfaceRequestHeaderCreate) SetEnabled(v bool) *InterfaceRequestHeaderCreate {
+	_c.mutation.SetEnabled(v)
+	return _c
+}
+
+// SetNillableEnabled sets the "enabled" field if the given value is not nil.
+func (_c *InterfaceRequestHeaderCreate) SetNillableEnabled(v *bool) *InterfaceRequestHeaderCreate {
+	if v != nil {
+		_c.SetEnabled(*v)
+	}
+	return _c
+}
+
 // SetDescription sets the "description" field.
 func (_c *InterfaceRequestHeaderCreate) SetDescription(v string) *InterfaceRequestHeaderCreate {
 	_c.mutation.SetDescription(v)
@@ -225,6 +239,10 @@ func (_c *InterfaceRequestHeaderCreate) defaults() error {
 		v := interfacerequestheader.DefaultRequired
 		_c.mutation.SetRequired(v)
 	}
+	if _, ok := _c.mutation.Enabled(); !ok {
+		v := interfacerequestheader.DefaultEnabled
+		_c.mutation.SetEnabled(v)
+	}
 	if _, ok := _c.mutation.Description(); !ok {
 		v := interfacerequestheader.DefaultDescription
 		_c.mutation.SetDescription(v)
@@ -277,6 +295,9 @@ func (_c *InterfaceRequestHeaderCreate) check() error {
 	}
 	if _, ok := _c.mutation.Required(); !ok {
 		return &ValidationError{Name: "required", err: errors.New(`ent: missing required field "InterfaceRequestHeader.required"`)}
+	}
+	if _, ok := _c.mutation.Enabled(); !ok {
+		return &ValidationError{Name: "enabled", err: errors.New(`ent: missing required field "InterfaceRequestHeader.enabled"`)}
 	}
 	if _, ok := _c.mutation.Description(); !ok {
 		return &ValidationError{Name: "description", err: errors.New(`ent: missing required field "InterfaceRequestHeader.description"`)}
@@ -354,6 +375,10 @@ func (_c *InterfaceRequestHeaderCreate) createSpec() (*InterfaceRequestHeader, *
 	if value, ok := _c.mutation.Required(); ok {
 		_spec.SetField(interfacerequestheader.FieldRequired, field.TypeBool, value)
 		_node.Required = value
+	}
+	if value, ok := _c.mutation.Enabled(); ok {
+		_spec.SetField(interfacerequestheader.FieldEnabled, field.TypeBool, value)
+		_node.Enabled = value
 	}
 	if value, ok := _c.mutation.Description(); ok {
 		_spec.SetField(interfacerequestheader.FieldDescription, field.TypeString, value)

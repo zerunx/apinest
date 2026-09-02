@@ -85,6 +85,20 @@ func (_u *InterfaceRequestHeaderUpdate) SetNillableRequired(v *bool) *InterfaceR
 	return _u
 }
 
+// SetEnabled sets the "enabled" field.
+func (_u *InterfaceRequestHeaderUpdate) SetEnabled(v bool) *InterfaceRequestHeaderUpdate {
+	_u.mutation.SetEnabled(v)
+	return _u
+}
+
+// SetNillableEnabled sets the "enabled" field if the given value is not nil.
+func (_u *InterfaceRequestHeaderUpdate) SetNillableEnabled(v *bool) *InterfaceRequestHeaderUpdate {
+	if v != nil {
+		_u.SetEnabled(*v)
+	}
+	return _u
+}
+
 // SetDescription sets the "description" field.
 func (_u *InterfaceRequestHeaderUpdate) SetDescription(v string) *InterfaceRequestHeaderUpdate {
 	_u.mutation.SetDescription(v)
@@ -281,6 +295,9 @@ func (_u *InterfaceRequestHeaderUpdate) sqlSave(ctx context.Context) (_node int,
 	if value, ok := _u.mutation.Required(); ok {
 		_spec.SetField(interfacerequestheader.FieldRequired, field.TypeBool, value)
 	}
+	if value, ok := _u.mutation.Enabled(); ok {
+		_spec.SetField(interfacerequestheader.FieldEnabled, field.TypeBool, value)
+	}
 	if value, ok := _u.mutation.Description(); ok {
 		_spec.SetField(interfacerequestheader.FieldDescription, field.TypeString, value)
 	}
@@ -406,6 +423,20 @@ func (_u *InterfaceRequestHeaderUpdateOne) SetRequired(v bool) *InterfaceRequest
 func (_u *InterfaceRequestHeaderUpdateOne) SetNillableRequired(v *bool) *InterfaceRequestHeaderUpdateOne {
 	if v != nil {
 		_u.SetRequired(*v)
+	}
+	return _u
+}
+
+// SetEnabled sets the "enabled" field.
+func (_u *InterfaceRequestHeaderUpdateOne) SetEnabled(v bool) *InterfaceRequestHeaderUpdateOne {
+	_u.mutation.SetEnabled(v)
+	return _u
+}
+
+// SetNillableEnabled sets the "enabled" field if the given value is not nil.
+func (_u *InterfaceRequestHeaderUpdateOne) SetNillableEnabled(v *bool) *InterfaceRequestHeaderUpdateOne {
+	if v != nil {
+		_u.SetEnabled(*v)
 	}
 	return _u
 }
@@ -635,6 +666,9 @@ func (_u *InterfaceRequestHeaderUpdateOne) sqlSave(ctx context.Context) (_node *
 	}
 	if value, ok := _u.mutation.Required(); ok {
 		_spec.SetField(interfacerequestheader.FieldRequired, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.Enabled(); ok {
+		_spec.SetField(interfacerequestheader.FieldEnabled, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.Description(); ok {
 		_spec.SetField(interfacerequestheader.FieldDescription, field.TypeString, value)

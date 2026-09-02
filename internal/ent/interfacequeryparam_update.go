@@ -85,6 +85,20 @@ func (_u *InterfaceQueryParamUpdate) SetNillableRequired(v *bool) *InterfaceQuer
 	return _u
 }
 
+// SetEnabled sets the "enabled" field.
+func (_u *InterfaceQueryParamUpdate) SetEnabled(v bool) *InterfaceQueryParamUpdate {
+	_u.mutation.SetEnabled(v)
+	return _u
+}
+
+// SetNillableEnabled sets the "enabled" field if the given value is not nil.
+func (_u *InterfaceQueryParamUpdate) SetNillableEnabled(v *bool) *InterfaceQueryParamUpdate {
+	if v != nil {
+		_u.SetEnabled(*v)
+	}
+	return _u
+}
+
 // SetDescription sets the "description" field.
 func (_u *InterfaceQueryParamUpdate) SetDescription(v string) *InterfaceQueryParamUpdate {
 	_u.mutation.SetDescription(v)
@@ -281,6 +295,9 @@ func (_u *InterfaceQueryParamUpdate) sqlSave(ctx context.Context) (_node int, er
 	if value, ok := _u.mutation.Required(); ok {
 		_spec.SetField(interfacequeryparam.FieldRequired, field.TypeBool, value)
 	}
+	if value, ok := _u.mutation.Enabled(); ok {
+		_spec.SetField(interfacequeryparam.FieldEnabled, field.TypeBool, value)
+	}
 	if value, ok := _u.mutation.Description(); ok {
 		_spec.SetField(interfacequeryparam.FieldDescription, field.TypeString, value)
 	}
@@ -406,6 +423,20 @@ func (_u *InterfaceQueryParamUpdateOne) SetRequired(v bool) *InterfaceQueryParam
 func (_u *InterfaceQueryParamUpdateOne) SetNillableRequired(v *bool) *InterfaceQueryParamUpdateOne {
 	if v != nil {
 		_u.SetRequired(*v)
+	}
+	return _u
+}
+
+// SetEnabled sets the "enabled" field.
+func (_u *InterfaceQueryParamUpdateOne) SetEnabled(v bool) *InterfaceQueryParamUpdateOne {
+	_u.mutation.SetEnabled(v)
+	return _u
+}
+
+// SetNillableEnabled sets the "enabled" field if the given value is not nil.
+func (_u *InterfaceQueryParamUpdateOne) SetNillableEnabled(v *bool) *InterfaceQueryParamUpdateOne {
+	if v != nil {
+		_u.SetEnabled(*v)
 	}
 	return _u
 }
@@ -635,6 +666,9 @@ func (_u *InterfaceQueryParamUpdateOne) sqlSave(ctx context.Context) (_node *Int
 	}
 	if value, ok := _u.mutation.Required(); ok {
 		_spec.SetField(interfacequeryparam.FieldRequired, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.Enabled(); ok {
+		_spec.SetField(interfacequeryparam.FieldEnabled, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.Description(); ok {
 		_spec.SetField(interfacequeryparam.FieldDescription, field.TypeString, value)
