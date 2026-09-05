@@ -55,6 +55,10 @@ const (
 	EdgeCreatedEnvironmentVariables = "created_environment_variables"
 	// EdgeCreatedProjectShares holds the string denoting the created_project_shares edge name in mutations.
 	EdgeCreatedProjectShares = "created_project_shares"
+	// EdgeCreatedWorkspaceInvites holds the string denoting the created_workspace_invites edge name in mutations.
+	EdgeCreatedWorkspaceInvites = "created_workspace_invites"
+	// EdgeProjectMemberships holds the string denoting the project_memberships edge name in mutations.
+	EdgeProjectMemberships = "project_memberships"
 	// Table holds the table name of the user in the database.
 	Table = "users"
 	// OwnedWorkspacesTable is the table that holds the owned_workspaces relation/edge.
@@ -120,6 +124,20 @@ const (
 	CreatedProjectSharesInverseTable = "project_shares"
 	// CreatedProjectSharesColumn is the table column denoting the created_project_shares relation/edge.
 	CreatedProjectSharesColumn = "created_by"
+	// CreatedWorkspaceInvitesTable is the table that holds the created_workspace_invites relation/edge.
+	CreatedWorkspaceInvitesTable = "workspace_invites"
+	// CreatedWorkspaceInvitesInverseTable is the table name for the WorkspaceInvite entity.
+	// It exists in this package in order to avoid circular dependency with the "workspaceinvite" package.
+	CreatedWorkspaceInvitesInverseTable = "workspace_invites"
+	// CreatedWorkspaceInvitesColumn is the table column denoting the created_workspace_invites relation/edge.
+	CreatedWorkspaceInvitesColumn = "created_by"
+	// ProjectMembershipsTable is the table that holds the project_memberships relation/edge.
+	ProjectMembershipsTable = "project_members"
+	// ProjectMembershipsInverseTable is the table name for the ProjectMember entity.
+	// It exists in this package in order to avoid circular dependency with the "projectmember" package.
+	ProjectMembershipsInverseTable = "project_members"
+	// ProjectMembershipsColumn is the table column denoting the project_memberships relation/edge.
+	ProjectMembershipsColumn = "user_id"
 )
 
 // Columns holds all SQL columns for user fields.
@@ -380,6 +398,34 @@ func ByCreatedProjectShares(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOpt
 		sqlgraph.OrderByNeighborTerms(s, newCreatedProjectSharesStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
+
+// ByCreatedWorkspaceInvitesCount orders the results by created_workspace_invites count.
+func ByCreatedWorkspaceInvitesCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newCreatedWorkspaceInvitesStep(), opts...)
+	}
+}
+
+// ByCreatedWorkspaceInvites orders the results by created_workspace_invites terms.
+func ByCreatedWorkspaceInvites(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newCreatedWorkspaceInvitesStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
+// ByProjectMembershipsCount orders the results by project_memberships count.
+func ByProjectMembershipsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newProjectMembershipsStep(), opts...)
+	}
+}
+
+// ByProjectMemberships orders the results by project_memberships terms.
+func ByProjectMemberships(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newProjectMembershipsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
 func newOwnedWorkspacesStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -441,5 +487,19 @@ func newCreatedProjectSharesStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(CreatedProjectSharesInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, CreatedProjectSharesTable, CreatedProjectSharesColumn),
+	)
+}
+func newCreatedWorkspaceInvitesStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(CreatedWorkspaceInvitesInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, CreatedWorkspaceInvitesTable, CreatedWorkspaceInvitesColumn),
+	)
+}
+func newProjectMembershipsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(ProjectMembershipsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, ProjectMembershipsTable, ProjectMembershipsColumn),
 	)
 }

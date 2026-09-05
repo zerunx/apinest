@@ -79,5 +79,7 @@ func (Workspace) Edges() []ent.Edge {
 			Field("owner_id"),
 		edge.To("members", WorkspaceMember.Type),
 		edge.To("projects", Project.Type),
+		edge.To("invites", WorkspaceInvite.Type),
+		edge.To("project_members", ProjectMember.Type),
 	}
 }

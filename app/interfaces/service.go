@@ -17,10 +17,7 @@ import (
 type Service struct{}
 
 func (Service) List(ctx context.Context, userID int64, params ListRequest) ([]Item, error) {
-	if _, err := workspace.Require(ctx, userID, params.WorkspaceID, workspace.ActionProjectRead); err != nil {
-		return nil, err
-	}
-	if err := project.EnsureExists(ctx, params.WorkspaceID, params.ProjectID); err != nil {
+	if _, err := project.RequireAccess(ctx, userID, params.WorkspaceID, params.ProjectID, workspace.ActionProjectRead); err != nil {
 		return nil, err
 	}
 
@@ -37,10 +34,7 @@ func (Service) List(ctx context.Context, userID int64, params ListRequest) ([]It
 }
 
 func (Service) Detail(ctx context.Context, userID int64, params DetailRequest) (*DetailItem, error) {
-	if _, err := workspace.Require(ctx, userID, params.WorkspaceID, workspace.ActionProjectRead); err != nil {
-		return nil, err
-	}
-	if err := project.EnsureExists(ctx, params.WorkspaceID, params.ProjectID); err != nil {
+	if _, err := project.RequireAccess(ctx, userID, params.WorkspaceID, params.ProjectID, workspace.ActionProjectRead); err != nil {
 		return nil, err
 	}
 	if err := EnsureExists(ctx, params.ProjectID, params.InterfaceID); err != nil {
@@ -75,12 +69,9 @@ func LoadDetail(ctx context.Context, projectID, interfaceID int64) (*DetailItem,
 
 func (Service) Create(ctx context.Context, userID int64, params CreateRequest) (int64, error) {
 	if userID <= 0 {
-		return 0, bizerr.New("未登录")
+		return 0, bizerr.New("æªç»å½")
 	}
-	if _, err := workspace.Require(ctx, userID, params.WorkspaceID, workspace.ActionProjectCreate); err != nil {
-		return 0, err
-	}
-	if err := project.EnsureExists(ctx, params.WorkspaceID, params.ProjectID); err != nil {
+	if _, err := project.RequireAccess(ctx, userID, params.WorkspaceID, params.ProjectID, workspace.ActionProjectCreate); err != nil {
 		return 0, err
 	}
 	if err := folder.EnsureExists(ctx, params.ProjectID, params.FolderID); err != nil {
@@ -119,7 +110,7 @@ func InsertInTx(ctx context.Context, tx *ent.Tx, userID, projectID, folderID int
 	}
 	status := params.Status
 	if status == 0 {
-		status = 1
+		status = 3
 	}
 
 	bodyFormat := params.RequestBody.Format
@@ -133,7 +124,7 @@ func InsertInTx(ctx context.Context, tx *ent.Tx, userID, projectID, folderID int
 
 	name := strings.TrimSpace(params.Name)
 	if name == "" {
-		name = "未命名接口"
+		name = "æªå½åæ¥å£"
 	}
 	if utf8.RuneCountInString(name) > 100 {
 		name = string([]rune(name)[:100])
@@ -188,10 +179,7 @@ func InsertInTx(ctx context.Context, tx *ent.Tx, userID, projectID, folderID int
 }
 
 func (Service) Update(ctx context.Context, userID int64, params UpdateRequest) error {
-	if _, err := workspace.Require(ctx, userID, params.WorkspaceID, workspace.ActionProjectUpdate); err != nil {
-		return err
-	}
-	if err := project.EnsureExists(ctx, params.WorkspaceID, params.ProjectID); err != nil {
+	if _, err := project.RequireAccess(ctx, userID, params.WorkspaceID, params.ProjectID, workspace.ActionProjectUpdate); err != nil {
 		return err
 	}
 	if err := EnsureExists(ctx, params.ProjectID, params.InterfaceID); err != nil {
@@ -200,7 +188,7 @@ func (Service) Update(ctx context.Context, userID int64, params UpdateRequest) e
 
 	status := params.Status
 	if status == 0 {
-		status = 2
+		status = 3
 	}
 
 	bodyFormat := params.RequestBody.Format
@@ -272,10 +260,7 @@ func (Service) Update(ctx context.Context, userID int64, params UpdateRequest) e
 }
 
 func (Service) Delete(ctx context.Context, userID int64, params DeleteRequest) error {
-	if _, err := workspace.Require(ctx, userID, params.WorkspaceID, workspace.ActionProjectDelete); err != nil {
-		return err
-	}
-	if err := project.EnsureExists(ctx, params.WorkspaceID, params.ProjectID); err != nil {
+	if _, err := project.RequireAccess(ctx, userID, params.WorkspaceID, params.ProjectID, workspace.ActionProjectDelete); err != nil {
 		return err
 	}
 	if err := EnsureExists(ctx, params.ProjectID, params.InterfaceID); err != nil {
@@ -286,10 +271,7 @@ func (Service) Delete(ctx context.Context, userID int64, params DeleteRequest) e
 }
 
 func (Service) Reorder(ctx context.Context, userID int64, params ReorderRequest) error {
-	if _, err := workspace.Require(ctx, userID, params.WorkspaceID, workspace.ActionProjectUpdate); err != nil {
-		return err
-	}
-	if err := project.EnsureExists(ctx, params.WorkspaceID, params.ProjectID); err != nil {
+	if _, err := project.RequireAccess(ctx, userID, params.WorkspaceID, params.ProjectID, workspace.ActionProjectUpdate); err != nil {
 		return err
 	}
 	if err := folder.EnsureExists(ctx, params.ProjectID, params.FolderID); err != nil {
@@ -302,7 +284,7 @@ func (Service) Reorder(ctx context.Context, userID int64, params ReorderRequest)
 	}
 
 	if len(params.InterfaceIDs) != len(rows) {
-		return bizerr.New("接口列表不完整")
+		return bizerr.New("æ¥å£åè¡¨ä¸å®æ´")
 	}
 
 	existingIDs := make(map[int64]struct{}, len(rows))
@@ -313,10 +295,10 @@ func (Service) Reorder(ctx context.Context, userID int64, params ReorderRequest)
 	seen := make(map[int64]struct{}, len(params.InterfaceIDs))
 	for _, id := range params.InterfaceIDs {
 		if _, ok := existingIDs[id]; !ok {
-			return bizerr.New("接口不存在或不属于该分组")
+			return bizerr.New("æ¥å£ä¸å­å¨æä¸å±äºè¯¥åç»")
 		}
 		if _, dup := seen[id]; dup {
-			return bizerr.New("接口列表重复")
+			return bizerr.New("æ¥å£åè¡¨éå¤")
 		}
 		seen[id] = struct{}{}
 	}

@@ -95,6 +95,7 @@ function onMenuVisible(open: boolean, which: 'protocol' | 'method') {
       :model-value="url"
       class="interface-url-bar__url"
       :readonly="readonly"
+      spellcheck="false"
       @update:model-value="emit('update:url', $event)"
     />
   </div>

@@ -9,7 +9,7 @@ import InterfaceStatusRadio from '@/interface/InterfaceStatusRadio.vue'
 import InterfaceUrlBar from '@/interface/InterfaceUrlBar.vue'
 import { useInterfaceEditorDirty } from '@/composables/useInterfaceEditorDirty'
 import { useLocale } from '@/composables/useLocale'
-import { interfaceStatusColor, interfaceStatusKey } from '@/constants/interface-status'
+import { interfaceStatusColor, interfaceStatusKey, normalizeInterfaceStatus } from '@/constants/interface-status'
 import { useWorkspaceContext, parseApiId } from '@/composables/useWorkspaceContext'
 import {
   buildInterfaceSavePayload,
@@ -75,7 +75,7 @@ function clearSaveUiTimer() {
     saveUiTimer = null
   }
 }
-const form = reactive(createEmptyInterfaceEditorForm({ method: 'GET', status: 2 }))
+const form = reactive(createEmptyInterfaceEditorForm({ method: 'GET', status: 3 }))
 const docMeta = reactive({
   createdByName: '',
   updatedByName: '',
@@ -109,6 +109,14 @@ const { beginSuppress, captureBaseline } = useInterfaceEditorDirty({
   watchSource: form,
 })
 
+async function setMode(next: DetailMode) {
+  if (mode.value === next) return
+  beginSuppress()
+  mode.value = next
+  await nextTick()
+  await captureBaseline()
+}
+
 function toParamRows(
   items: {
     name: string
@@ -138,7 +146,7 @@ function applyDetail(detail: InterfaceDetail) {
   form.url = detail.url
   form.folderId = detail.folder_id
   form.name = detail.name
-  form.status = detail.status
+  form.status = normalizeInterfaceStatus(detail.status)
   form.requestHeaders = toParamRows(detail.request_headers ?? [])
   form.requestBody = {
     format: detail.request_body?.format || 'json',
@@ -235,15 +243,23 @@ async function loadDetail() {
   }
 }
 
-watch(interfaceId, (id) => {
-  if (openNextApiInEdit.value) {
-    mode.value = 'edit'
-    openNextApiInEdit.value = false
-  } else {
-    mode.value = 'doc'
-  }
-  if (id) void loadDetail()
-}, { immediate: true })
+watch(
+  [interfaceId, openNextApiInEdit],
+  ([id, wantEdit], prev) => {
+    const prevId = prev?.[0]
+    const idChanged = id !== prevId
+
+    if (wantEdit) {
+      mode.value = 'edit'
+      openNextApiInEdit.value = false
+    } else if (idChanged) {
+      mode.value = 'doc'
+    }
+
+    if (id && idChanged) void loadDetail()
+  },
+  { immediate: true },
+)
 
 async function handleSave(): Promise<boolean> {
   if (!interfaceId.value || readOnly.value || saveUi.value === 'saving' || loading.value) return false
@@ -307,7 +323,7 @@ defineExpose({
           type="button"
           class="interface-detail__subnav-item"
           :class="{ 'interface-detail__subnav-item--active': mode === 'doc' }"
-          @click="mode = 'doc'"
+          @click="setMode('doc')"
         >
           {{ t('workspace.apiSubnav.doc') }}
         </button>
@@ -315,7 +331,7 @@ defineExpose({
           type="button"
           class="interface-detail__subnav-item"
           :class="{ 'interface-detail__subnav-item--active': mode === 'edit' }"
-          @click="mode = 'edit'"
+          @click="setMode('edit')"
         >
           {{ t('workspace.apiSubnav.edit') }}
         </button>

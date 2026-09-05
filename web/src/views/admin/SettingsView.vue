@@ -1,9 +1,15 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Close, FolderOpened, Plus, User } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
-import { fetchAdminUsers, fetchAdminWorkspaces, transferWorkspace } from '@/api/admin'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import {
+  deleteAdminUser,
+  fetchAdminUsers,
+  fetchAdminWorkspaces,
+  transferWorkspace,
+  updateAdminUser,
+} from '@/api/admin'
 import { useLocale } from '@/composables/useLocale'
 import { useWorkspaceContext } from '@/composables/useWorkspaceContext'
 import type { AdminUserItem, AdminWorkspaceItem } from '@/types/admin'
@@ -12,7 +18,7 @@ type MenuKey = 'users' | 'workspaces'
 
 const router = useRouter()
 const { t } = useLocale()
-const { openCreateWorkspace } = useWorkspaceContext()
+const { createWorkspaceVisible, openCreateWorkspace } = useWorkspaceContext()
 
 const activeMenu = ref<MenuKey>('users')
 const users = ref<AdminUserItem[]>([])
@@ -20,6 +26,20 @@ const workspaces = ref<AdminWorkspaceItem[]>([])
 const loadingUsers = ref(false)
 const loadingWorkspaces = ref(false)
 const transferringId = ref<number | null>(null)
+const editingId = ref<number | null>(null)
+const deletingId = ref<number | null>(null)
+const editVisible = ref(false)
+const saving = ref(false)
+
+const editForm = reactive({
+  id: 0,
+  name: '',
+  account: '',
+  email: '',
+  password: '',
+  is_admin: false,
+  status: 1 as 0 | 1,
+})
 
 const menus = computed(() => [
   { key: 'users' as MenuKey, label: t('admin.users'), icon: User },
@@ -61,6 +81,68 @@ async function handleTransfer(workspace: AdminWorkspaceItem, ownerId: number) {
   }
 }
 
+function openEditUser(row: AdminUserItem) {
+  editingId.value = row.id
+  editForm.id = row.id
+  editForm.name = row.name || ''
+  editForm.account = row.account || ''
+  editForm.email = row.email || ''
+  editForm.password = ''
+  editForm.is_admin = !!row.is_admin
+  editForm.status = row.status === 0 ? 0 : 1
+  editVisible.value = true
+}
+
+async function handleSaveUser() {
+  const account = editForm.account.trim()
+  if (!account) {
+    ElMessage.warning(t('admin.accountRequired'))
+    return
+  }
+
+  saving.value = true
+  try {
+    await updateAdminUser(editForm.id, {
+      name: editForm.name.trim(),
+      account,
+      email: editForm.email.trim(),
+      password: editForm.password.trim() || undefined,
+      is_admin: editForm.is_admin,
+      status: editForm.status,
+    })
+    ElMessage.success(t('admin.updateUserSuccess'))
+    editVisible.value = false
+    await loadUsers()
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : t('admin.updateUserFailed'))
+  } finally {
+    saving.value = false
+    editingId.value = null
+  }
+}
+
+async function handleDeleteUser(row: AdminUserItem) {
+  const label = row.name || row.account || String(row.id)
+  try {
+    await ElMessageBox.confirm(t('admin.deleteUserConfirm', { name: label }), t('admin.deleteUser'), {
+      type: 'warning',
+    })
+  } catch {
+    return
+  }
+
+  deletingId.value = row.id
+  try {
+    await deleteAdminUser(row.id)
+    ElMessage.success(t('admin.deleteUserSuccess'))
+    await loadUsers()
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : t('admin.deleteUserFailed'))
+  } finally {
+    deletingId.value = null
+  }
+}
+
 function switchMenu(key: MenuKey) {
   activeMenu.value = key
 }
@@ -70,9 +152,14 @@ function closeSettings() {
 }
 
 function handleCreateWorkspaceAdmin() {
-  closeSettings()
   openCreateWorkspace()
 }
+
+watch(createWorkspaceVisible, async (visible, wasVisible) => {
+  if (wasVisible && !visible) {
+    await loadWorkspaces()
+  }
+})
 
 onMounted(async () => {
   await Promise.all([loadUsers(), loadWorkspaces()])
@@ -122,6 +209,35 @@ onMounted(async () => {
                 </el-tag>
               </template>
             </el-table-column>
+            <el-table-column :label="t('admin.columns.status')" width="90">
+              <template #default="{ row }">
+                <el-tag :type="row.status === 1 ? 'success' : 'info'" size="small">
+                  {{ row.status === 1 ? t('admin.statusEnabled') : t('admin.statusDisabled') }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column :label="t('admin.columns.actions')" width="140" fixed="right">
+              <template #default="{ row }">
+                <el-button
+                  type="primary"
+                  link
+                  class="admin-settings__action-btn"
+                  :loading="editingId === row.id && editVisible"
+                  @click="openEditUser(row)"
+                >
+                  {{ t('common.edit') }}
+                </el-button>
+                <el-button
+                  type="danger"
+                  link
+                  class="admin-settings__action-btn"
+                  :loading="deletingId === row.id"
+                  @click="handleDeleteUser(row)"
+                >
+                  {{ t('common.delete') }}
+                </el-button>
+              </template>
+            </el-table-column>
           </el-table>
         </el-card>
 
@@ -160,6 +276,66 @@ onMounted(async () => {
         </el-card>
       </section>
     </div>
+
+    <el-dialog
+      v-model="editVisible"
+      :title="t('admin.editUser')"
+      width="460px"
+      destroy-on-close
+      @closed="editingId = null"
+    >
+      <el-form label-position="top" @submit.prevent="handleSaveUser">
+        <el-form-item :label="t('admin.columns.name')">
+          <el-input
+            v-model="editForm.name"
+            :placeholder="t('admin.namePlaceholder')"
+            maxlength="50"
+          />
+        </el-form-item>
+        <el-form-item :label="t('admin.columns.account')" required>
+          <el-input
+            v-model="editForm.account"
+            :placeholder="t('admin.accountPlaceholder')"
+            maxlength="50"
+          />
+        </el-form-item>
+        <el-form-item :label="t('admin.columns.email')">
+          <el-input
+            v-model="editForm.email"
+            :placeholder="t('admin.emailPlaceholder')"
+            maxlength="100"
+          />
+        </el-form-item>
+        <el-form-item :label="t('admin.passwordOptional')">
+          <el-input
+            v-model="editForm.password"
+            class="admin-settings__password"
+            type="password"
+            show-password
+            autocomplete="new-password"
+            :placeholder="t('admin.passwordPlaceholder')"
+            maxlength="72"
+          />
+        </el-form-item>
+        <el-form-item :label="t('admin.isAdmin')">
+          <div class="admin-settings__field-block">
+            <el-switch v-model="editForm.is_admin" />
+          </div>
+        </el-form-item>
+        <el-form-item :label="t('admin.status')">
+          <el-select v-model="editForm.status" style="width: 100%" popper-class="app-action-dropdown">
+            <el-option :label="t('admin.statusEnabled')" :value="1" />
+            <el-option :label="t('admin.statusDisabled')" :value="0" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="editVisible = false">{{ t('common.cancel') }}</el-button>
+        <el-button type="primary" :loading="saving" @click="handleSaveUser">
+          {{ t('common.save') }}
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -309,5 +485,64 @@ onMounted(async () => {
 .admin-settings__create-btn:hover {
   background: var(--color-active);
   border-color: var(--color-primary);
+}
+
+.admin-settings__action-btn {
+  display: inline-flex;
+  flex-shrink: 0;
+  height: auto;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.admin-settings__action-btn + .admin-settings__action-btn {
+  margin-left: 4px;
+}
+
+.admin-settings__action-btn:not(.is-disabled):hover,
+.admin-settings__action-btn:not(.is-disabled):focus {
+  background-color: color-mix(in srgb, var(--color-primary) 18%, transparent);
+  color: var(--color-primary);
+}
+
+.admin-settings__action-btn.el-button--danger:not(.is-disabled):hover,
+.admin-settings__action-btn.el-button--danger:not(.is-disabled):focus {
+  background-color: color-mix(in srgb, var(--color-danger) 18%, transparent);
+  color: var(--color-danger);
+}
+
+.admin-settings__field-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.admin-settings__field-hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--color-text-secondary);
+}
+
+.admin-settings__password :deep(.el-input__suffix) {
+  margin-right: 2px;
+}
+
+.admin-settings__password :deep(.el-input__password) {
+  font-size: 18px;
+  width: 32px;
+  height: 32px;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.admin-settings__password :deep(.el-input__password:hover) {
+  background-color: var(--color-hover);
+  color: var(--color-text);
 }
 </style>

@@ -31,12 +31,29 @@ export function useInterfaceEditorDirty(options: {
     options.setDirty(options.getSnapshot() !== baseline)
   }
 
+  let dirtyTimer: ReturnType<typeof setTimeout> | null = null
+  function scheduleSyncDirty() {
+    if (dirtyTimer != null) return
+    dirtyTimer = setTimeout(() => {
+      dirtyTimer = null
+      syncDirty()
+    }, 80)
+  }
+
   function beginSuppress() {
     suppress.value = true
+    if (dirtyTimer != null) {
+      clearTimeout(dirtyTimer)
+      dirtyTimer = null
+    }
   }
 
   async function captureBaseline() {
     suppress.value = true
+    if (dirtyTimer != null) {
+      clearTimeout(dirtyTimer)
+      dirtyTimer = null
+    }
     await nextTick()
     await nextTick()
     baseline = options.getSnapshot()
@@ -46,7 +63,7 @@ export function useInterfaceEditorDirty(options: {
     }
   }
 
-  watch(options.watchSource, syncDirty, { deep: true })
+  watch(options.watchSource, scheduleSyncDirty, { deep: true })
 
   onMounted(() => {
     viewActive.value = true
@@ -60,6 +77,10 @@ export function useInterfaceEditorDirty(options: {
   })
   onBeforeUnmount(() => {
     viewActive.value = false
+    if (dirtyTimer != null) {
+      clearTimeout(dirtyTimer)
+      dirtyTimer = null
+    }
   })
 
   return {

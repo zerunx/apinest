@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
+import { Delete, Edit } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   createEnvironmentVariable,
@@ -13,7 +14,6 @@ import type { EnvironmentVariableItem } from '@/types/workspace'
 const { t } = useLocale()
 const {
   activeTab,
-  activeProject,
   activeWorkspaceId,
   activeProjectId,
   activeEnvironmentId,
@@ -58,6 +58,10 @@ watch(dialogVisible, (visible) => {
 })
 
 function openCreateDialog() {
+  if (!currentEnvironmentId.value) {
+    ElMessage.warning(t('environment.noEnvironmentForVariables'))
+    return
+  }
   dialogMode.value = 'create'
   form.key = ''
   form.value = ''
@@ -162,21 +166,16 @@ async function handleDelete(variableId: number, key: string) {
 <template>
   <div class="variable-manage workspace-panel">
     <div class="variable-manage__toolbar workspace-panel__toolbar">
-      <div>
-        <h2>{{ t('environment.variables') }}</h2>
-        <p v-if="activeProject && currentEnvironmentName">
-          {{ t('environment.variableManageDesc', { project: activeProject.name, env: currentEnvironmentName }) }}
-        </p>
-      </div>
       <el-button
         type="primary"
         class="workspace-action-btn"
-        :disabled="!currentEnvironmentId"
         @click="openCreateDialog"
       >
-        <span class="workspace-action-btn__plus">+</span>
         <span>{{ t('environment.createVariable') }}</span>
       </el-button>
+      <p v-if="currentEnvironmentName" class="workspace-panel__toolbar-desc">
+        {{ t('environment.variableManageDesc', { env: currentEnvironmentName }) }}
+      </p>
     </div>
 
     <el-table
@@ -188,24 +187,32 @@ async function handleDelete(variableId: number, key: string) {
       <el-table-column prop="value" :label="t('environment.variableValue')" min-width="200" show-overflow-tooltip />
       <el-table-column prop="description" :label="t('environment.variableDescription')" min-width="160" show-overflow-tooltip />
       <el-table-column prop="updated_at" :label="t('workspace.columns.updatedAt')" min-width="180" />
-      <el-table-column :label="t('member.columns.actions')" width="160" fixed="right">
+      <el-table-column
+        :label="t('member.columns.actions')"
+        width="108"
+        class-name="workspace-table-actions-col"
+        label-class-name="workspace-table-actions-col"
+      >
         <template #default="{ row }">
-          <el-button
-            type="primary"
-            link
-            :loading="editingId === row.id"
-            @click="openEditDialog(row)"
-          >
-            {{ t('common.edit') }}
-          </el-button>
-          <el-button
-            type="danger"
-            link
-            :loading="deletingId === row.id"
-            @click="handleDelete(row.id, row.key)"
-          >
-            {{ t('common.delete') }}
-          </el-button>
+          <div class="workspace-table-actions">
+            <button
+              type="button"
+              class="workspace-table-action-btn"
+              :title="t('common.edit')"
+              @click="openEditDialog(row)"
+            >
+              <el-icon :size="14"><Edit /></el-icon>
+            </button>
+            <button
+              type="button"
+              class="workspace-table-action-btn workspace-table-action-btn--danger"
+              :title="t('common.delete')"
+              :disabled="deletingId === row.id"
+              @click="handleDelete(row.id, row.key)"
+            >
+              <el-icon :size="14"><Delete /></el-icon>
+            </button>
+          </div>
         </template>
       </el-table-column>
     </el-table>
@@ -253,10 +260,6 @@ async function handleDelete(variableId: number, key: string) {
 </template>
 
 <style scoped>
-.variable-manage__toolbar {
-  padding: 10px 10px 10px 8px;
-}
-
 .variable-manage :deep(.el-dialog .el-input__inner),
 .variable-manage :deep(.el-dialog .el-textarea__inner) {
   color: var(--color-text) !important;

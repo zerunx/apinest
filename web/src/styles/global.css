@@ -155,7 +155,7 @@
 
   --color-workspace-content: #212121;
   --color-workspace-elevated: #2a2a2a;
-  --color-workspace-inset: #2a2a2a;
+  --color-workspace-inset: #323232;
   --color-workspace-tab-text: #a8a8a8;
   --color-workspace-tab-text-active: #e1e1e1;
   --color-workspace-item-hover: rgba(255, 255, 255, 0.1);
@@ -305,17 +305,33 @@ a {
 
 .el-table {
   --el-table-border-color: var(--color-border);
+  --el-table-bg-color: var(--color-surface);
   --el-table-header-bg-color: var(--color-surface);
   --el-table-tr-bg-color: var(--color-surface);
+  --el-table-expanded-cell-bg-color: var(--color-surface);
   --el-table-row-hover-bg-color: transparent;
+  --el-table-current-row-bg-color: var(--color-active);
   --el-table-header-text-color: var(--color-text-secondary);
   --el-table-text-color: var(--color-text);
-  background: var(--color-surface);
+  background-color: var(--color-surface);
   font-size: 14px;
 }
 
+/* Theme switch: EP animates cell backgrounds which looks like a flash. */
+.el-table--enable-row-transition .el-table__body td.el-table__cell,
+.el-table .el-table__cell {
+  transition: none !important;
+}
+
+.el-table__header-wrapper,
+.el-table__body-wrapper,
+.el-table__footer-wrapper,
+.el-table__empty-block {
+  background-color: var(--el-table-bg-color);
+}
+
 .el-table th.el-table__cell {
-  background: var(--color-surface);
+  background-color: var(--el-table-header-bg-color) !important;
   color: var(--color-text-secondary);
   font-weight: 500;
   font-size: 14px;
@@ -323,24 +339,44 @@ a {
 }
 
 .el-table td.el-table__cell {
+  background-color: var(--el-table-tr-bg-color) !important;
   border-bottom: 1px solid var(--color-border);
   font-size: 14px;
 }
 
 .el-table tr {
-  background: var(--color-surface);
+  background-color: var(--el-table-tr-bg-color);
 }
 
-.el-table__body tr:hover > td.el-table__cell {
-  background-color: transparent !important;
+.el-table__body tr:hover > td.el-table__cell,
+.el-table__body tr.hover-row > td.el-table__cell {
+  background-color: var(--el-table-row-hover-bg-color) !important;
 }
 
 .el-table--striped .el-table__body tr.el-table__row--striped td.el-table__cell {
-  background: var(--color-surface);
+  background-color: var(--el-table-tr-bg-color) !important;
 }
 
-.el-table--striped .el-table__body tr.el-table__row--striped:hover > td.el-table__cell {
-  background-color: transparent !important;
+.el-table--striped .el-table__body tr.el-table__row--striped:hover > td.el-table__cell,
+.el-table--striped .el-table__body tr.el-table__row--striped.hover-row > td.el-table__cell {
+  background-color: var(--el-table-row-hover-bg-color) !important;
+}
+
+/* EP hardcodes #fff here; override so dark theme / theme switches don't flash white. */
+.el-table__header-wrapper tr td.el-table__fixed-right-patch,
+.el-table__header-wrapper tr th.el-table__fixed-right-patch,
+.el-table__body-wrapper tr td.el-table__fixed-right-patch,
+.el-table__body-wrapper tr th.el-table__fixed-right-patch,
+.el-table__footer-wrapper tr td.el-table__fixed-right-patch,
+.el-table__footer-wrapper tr th.el-table__fixed-right-patch {
+  background: var(--el-table-header-bg-color) !important;
+}
+
+.el-table__fixed,
+.el-table__fixed-right,
+.el-table__fixed-left-patch,
+.el-table__fixed-right-patch {
+  background-color: var(--el-table-bg-color) !important;
 }
 
 .el-card {
@@ -697,6 +733,13 @@ a {
   border: none;
 }
 
+.app-action-dropdown .el-autocomplete-suggestion,
+.app-action-dropdown .el-autocomplete-suggestion__wrap {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
 .app-action-dropdown .el-select-dropdown__item {
   min-height: 36px;
   padding: 0 16px;
@@ -870,32 +913,42 @@ a {
 
 .workspace-panel__toolbar {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  align-items: center;
+  justify-content: flex-start;
   gap: 16px;
-  padding: 10px 10px 10px 8px;
+  padding: 12px 10px 12px 16px;
   background: var(--color-workspace-content);
 }
 
-.workspace-panel__toolbar h2 {
-  margin: 0 0 6px;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--color-text);
-}
-
-.workspace-panel__toolbar p {
+.workspace-panel__toolbar-desc {
   margin: 0;
+  min-width: 0;
+  padding-left: 4px;
   font-size: 14px;
+  font-weight: 400;
   color: var(--color-text-secondary);
+  line-height: 1.4;
 }
 
 .workspace-data-table {
   width: 100%;
-  --el-table-bg-color: var(--color-workspace-content);
-  --el-table-tr-bg-color: var(--color-workspace-content);
-  --el-table-header-bg-color: var(--color-workspace-content);
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-header-bg-color: transparent;
   --el-table-row-hover-bg-color: var(--color-workspace-row-hover);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  overflow: visible;
+  background: var(--color-workspace-elevated);
+}
+
+.workspace-data-table .el-table__inner-wrapper {
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.workspace-data-table .el-table__inner-wrapper::before {
+  display: none;
 }
 
 .workspace-data-table .el-table__body tr {
@@ -903,37 +956,54 @@ a {
 }
 
 .workspace-data-table .el-table__body-wrapper {
-  background: var(--color-workspace-content);
+  background: transparent;
 }
 
 .workspace-data-table th.el-table__cell,
 .workspace-data-table td.el-table__cell {
-  background-color: var(--color-workspace-content) !important;
+  background-color: transparent !important;
+  border-bottom-color: var(--color-border) !important;
+  transition: none !important;
+}
+
+.workspace-data-table .el-table__header-wrapper th.el-table__cell {
+  background-color: var(--color-workspace-inset) !important;
+  color: var(--color-text-secondary);
+  font-weight: 600;
 }
 
 .workspace-data-table .el-table__body tr {
-  background: var(--color-workspace-content);
+  background: transparent;
 }
 
 .workspace-data-table .el-table__body tr:hover > td.el-table__cell {
   background-color: var(--color-workspace-row-hover) !important;
 }
 
+.workspace-data-table .el-table__body tr:last-child td.el-table__cell {
+  border-bottom: none !important;
+}
+
 .workspace-data-table .el-table__fixed,
 .workspace-data-table .el-table__fixed-right {
-  background-color: var(--color-workspace-content);
+  background-color: var(--color-workspace-elevated);
 }
 
 .workspace-data-table .el-table__fixed-right-patch,
 .workspace-data-table .el-table__fixed-left-patch {
-  background-color: var(--color-workspace-content);
+  background-color: var(--color-workspace-elevated);
 }
 
 .workspace-data-table td.el-table-fixed-column--left,
 .workspace-data-table th.el-table-fixed-column--left,
 .workspace-data-table td.el-table-fixed-column--right,
 .workspace-data-table th.el-table-fixed-column--right {
-  background-color: var(--color-workspace-content) !important;
+  background-color: var(--color-workspace-elevated) !important;
+}
+
+.workspace-data-table .el-table__header th.el-table-fixed-column--left,
+.workspace-data-table .el-table__header th.el-table-fixed-column--right {
+  background-color: var(--color-workspace-inset) !important;
 }
 
 .workspace-data-table .el-table__body tr:hover > td.el-table-fixed-column--left,
@@ -942,9 +1012,19 @@ a {
 }
 
 .workspace-data-table .el-table__cell {
-  padding: 0 12px;
-  height: 40px;
+  padding: 0 16px;
+  height: 48px;
   font-size: 14px;
+}
+
+.workspace-data-table .el-table__header .el-table__cell {
+  height: 44px;
+}
+
+.workspace-panel > .workspace-data-table,
+.workspace-panel .workspace-data-table {
+  margin: 0 10px 16px 16px;
+  width: calc(100% - 26px);
 }
 
 .workspace-data-table .el-button.is-link {
@@ -979,25 +1059,69 @@ a {
   color: var(--color-danger);
 }
 
-.workspace-data-table .el-table__header .el-table__cell {
-  height: 40px;
-}
-
-.workspace-data-table .el-table__body tr {
-  height: 40px;
-}
-
-.workspace-data-table .el-table__inner-wrapper::before {
-  display: none;
-}
-
 .workspace-data-table .el-table__border-left-patch,
 .workspace-data-table .el-table__border-bottom-patch {
   display: none;
 }
 
+.workspace-data-table .el-table__empty-block {
+  min-height: 120px;
+}
+
+.workspace-data-table .el-table__empty-text {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
 .workspace-data-table--clickable .el-table__body tr {
   cursor: pointer;
+}
+
+.workspace-table-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 2px;
+}
+
+.workspace-table-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.workspace-table-action-btn:hover:not(:disabled) {
+  background: var(--color-workspace-control-hover);
+  color: var(--color-text);
+}
+
+.workspace-table-action-btn--danger:hover:not(:disabled) {
+  color: #f48771;
+}
+
+.workspace-table-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.workspace-data-table td.workspace-table-actions-col .cell,
+.workspace-data-table th.workspace-table-actions-col .cell {
+  overflow: visible;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding-left: 8px !important;
+  padding-right: 28px !important;
+  white-space: nowrap;
 }
 
 /* Project share delete confirm — keep near share dialog */

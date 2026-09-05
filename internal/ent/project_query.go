@@ -12,6 +12,7 @@ import (
 	"nest-api/internal/ent/folder"
 	"nest-api/internal/ent/predicate"
 	"nest-api/internal/ent/project"
+	"nest-api/internal/ent/projectmember"
 	"nest-api/internal/ent/projectshare"
 	"nest-api/internal/ent/user"
 	"nest-api/internal/ent/workspace"
@@ -35,6 +36,7 @@ type ProjectQuery struct {
 	withInterfaces   *APIQuery
 	withEnvironments *EnvironmentQuery
 	withShares       *ProjectShareQuery
+	withMembers      *ProjectMemberQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -196,6 +198,28 @@ func (_q *ProjectQuery) QueryShares() *ProjectShareQuery {
 			sqlgraph.From(project.Table, project.FieldID, selector),
 			sqlgraph.To(projectshare.Table, projectshare.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, project.SharesTable, project.SharesColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryMembers chains the current query on the "members" edge.
+func (_q *ProjectQuery) QueryMembers() *ProjectMemberQuery {
+	query := (&ProjectMemberClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(project.Table, project.FieldID, selector),
+			sqlgraph.To(projectmember.Table, projectmember.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, project.MembersTable, project.MembersColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -401,6 +425,7 @@ func (_q *ProjectQuery) Clone() *ProjectQuery {
 		withInterfaces:   _q.withInterfaces.Clone(),
 		withEnvironments: _q.withEnvironments.Clone(),
 		withShares:       _q.withShares.Clone(),
+		withMembers:      _q.withMembers.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
@@ -470,6 +495,17 @@ func (_q *ProjectQuery) WithShares(opts ...func(*ProjectShareQuery)) *ProjectQue
 		opt(query)
 	}
 	_q.withShares = query
+	return _q
+}
+
+// WithMembers tells the query-builder to eager-load the nodes that are connected to
+// the "members" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *ProjectQuery) WithMembers(opts ...func(*ProjectMemberQuery)) *ProjectQuery {
+	query := (&ProjectMemberClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withMembers = query
 	return _q
 }
 
@@ -551,13 +587,14 @@ func (_q *ProjectQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Proj
 	var (
 		nodes       = []*Project{}
 		_spec       = _q.querySpec()
-		loadedTypes = [6]bool{
+		loadedTypes = [7]bool{
 			_q.withWorkspace != nil,
 			_q.withCreator != nil,
 			_q.withFolders != nil,
 			_q.withInterfaces != nil,
 			_q.withEnvironments != nil,
 			_q.withShares != nil,
+			_q.withMembers != nil,
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
@@ -615,6 +652,13 @@ func (_q *ProjectQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Proj
 		if err := _q.loadShares(ctx, query, nodes,
 			func(n *Project) { n.Edges.Shares = []*ProjectShare{} },
 			func(n *Project, e *ProjectShare) { n.Edges.Shares = append(n.Edges.Shares, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withMembers; query != nil {
+		if err := _q.loadMembers(ctx, query, nodes,
+			func(n *Project) { n.Edges.Members = []*ProjectMember{} },
+			func(n *Project, e *ProjectMember) { n.Edges.Members = append(n.Edges.Members, e) }); err != nil {
 			return nil, err
 		}
 	}
@@ -784,6 +828,36 @@ func (_q *ProjectQuery) loadShares(ctx context.Context, query *ProjectShareQuery
 	}
 	query.Where(predicate.ProjectShare(func(s *sql.Selector) {
 		s.Where(sql.InValues(s.C(project.SharesColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.ProjectID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "project_id" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *ProjectQuery) loadMembers(ctx context.Context, query *ProjectMemberQuery, nodes []*Project, init func(*Project), assign func(*Project, *ProjectMember)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int64]*Project)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(projectmember.FieldProjectID)
+	}
+	query.Where(predicate.ProjectMember(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(project.MembersColumn), fks...))
 	}))
 	neighbors, err := query.All(ctx)
 	if err != nil {

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { reactive, ref, watch } from 'vue'
+import { Delete, Edit } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   createEnvironment,
@@ -152,28 +153,24 @@ watch(activeProjectId, () => {
 <template>
   <div class="environment-manage workspace-panel">
     <div class="environment-manage__toolbar workspace-panel__toolbar">
-      <div>
-        <h2>{{ t('workspace.modules.environment') }}</h2>
-        <p v-if="activeProject">
-          {{ t('environment.manageDesc', { name: activeProject.name }) }}
-        </p>
-      </div>
       <el-button type="primary" class="workspace-action-btn" @click="openCreateDialog">
         <span>{{ t('environment.create') }}</span>
       </el-button>
+      <p v-if="activeProject" class="workspace-panel__toolbar-desc">
+        {{ t('environment.manageDesc', { name: activeProject.name }) }}
+      </p>
     </div>
 
     <el-table v-loading="loadingEnvironments" :data="environments" class="workspace-data-table">
       <el-table-column prop="id" label="ID" width="80" />
       <el-table-column prop="name" :label="t('workspace.columns.name')" min-width="140" />
       <el-table-column prop="remark" :label="t('environment.remark')" min-width="200" show-overflow-tooltip />
-      <el-table-column :label="t('environment.default')" min-width="110" width="120">
+      <el-table-column :label="t('environment.default')" min-width="120" width="130">
         <template #default="{ row }">
           <span v-if="row.is_default" class="environment-manage__default">{{ t('environment.yes') }}</span>
           <el-button
             v-else
-            type="primary"
-            link
+            size="small"
             @click="handleSetDefault(row)"
           >
             {{ t('environment.setDefault') }}
@@ -181,24 +178,32 @@ watch(activeProjectId, () => {
         </template>
       </el-table-column>
       <el-table-column prop="created_at" :label="t('workspace.columns.createdAt')" min-width="180" />
-      <el-table-column :label="t('member.columns.actions')" width="160" fixed="right">
+      <el-table-column
+        :label="t('member.columns.actions')"
+        width="108"
+        class-name="workspace-table-actions-col"
+        label-class-name="workspace-table-actions-col"
+      >
         <template #default="{ row }">
-          <el-button
-            type="primary"
-            link
-            :loading="editingId === row.id"
-            @click="openEditDialog(row)"
-          >
-            {{ t('common.edit') }}
-          </el-button>
-          <el-button
-            type="danger"
-            link
-            :loading="deletingId === row.id"
-            @click="handleDelete(row.id, row.name)"
-          >
-            {{ t('common.delete') }}
-          </el-button>
+          <div class="workspace-table-actions">
+            <button
+              type="button"
+              class="workspace-table-action-btn"
+              :title="t('common.edit')"
+              @click="openEditDialog(row)"
+            >
+              <el-icon :size="14"><Edit /></el-icon>
+            </button>
+            <button
+              type="button"
+              class="workspace-table-action-btn workspace-table-action-btn--danger"
+              :title="t('common.delete')"
+              :disabled="deletingId === row.id"
+              @click="handleDelete(row.id, row.name)"
+            >
+              <el-icon :size="14"><Delete /></el-icon>
+            </button>
+          </div>
         </template>
       </el-table-column>
     </el-table>
@@ -241,10 +246,6 @@ watch(activeProjectId, () => {
 </template>
 
 <style scoped>
-.environment-manage__toolbar {
-  padding: 10px 10px 10px 8px;
-}
-
 .environment-manage__default {
   color: #49cc90;
   font-size: 14px;

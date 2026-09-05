@@ -1,18 +1,28 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { Connection, FolderOpened, Lightning, Operation } from '@element-plus/icons-vue'
 import { useLocale } from '@/composables/useLocale'
 import { useWorkspaceContext } from '@/composables/useWorkspaceContext'
 import type { AppModule } from '@/types/workspace'
 
 const { t } = useLocale()
-const { activeModule, setModule } = useWorkspaceContext()
+const { activeModule, activeWorkspace, setModule } = useWorkspaceContext()
 
-const modules: { key: AppModule; icon: typeof Connection; labelKey: string }[] = [
+const allModules: { key: AppModule; icon: typeof Connection; labelKey: string }[] = [
   { key: 'api', icon: Connection, labelKey: 'workspace.modules.api' },
   { key: 'quick-test', icon: Lightning, labelKey: 'workspace.modules.quickTest' },
   { key: 'environment', icon: Operation, labelKey: 'workspace.modules.environment' },
   { key: 'project', icon: FolderOpened, labelKey: 'workspace.modules.project' },
 ]
+
+const modules = computed(() => {
+  const role = activeWorkspace.value?.role
+  // Viewers do not see workspace/space management module.
+  if (role === 4) {
+    return allModules.filter((item) => item.key !== 'project')
+  }
+  return allModules
+})
 </script>
 
 <template>
@@ -70,7 +80,7 @@ const modules: { key: AppModule; icon: typeof Connection; labelKey: string }[] =
 }
 
 .module-sidebar__item:hover {
-  background: var(--color-hover);
+  background: var(--color-workspace-item-hover);
   color: var(--color-text);
 }
 

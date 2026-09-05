@@ -66,9 +66,13 @@ type UserEdges struct {
 	CreatedEnvironmentVariables []*EnvironmentVariable `json:"created_environment_variables,omitempty"`
 	// CreatedProjectShares holds the value of the created_project_shares edge.
 	CreatedProjectShares []*ProjectShare `json:"created_project_shares,omitempty"`
+	// CreatedWorkspaceInvites holds the value of the created_workspace_invites edge.
+	CreatedWorkspaceInvites []*WorkspaceInvite `json:"created_workspace_invites,omitempty"`
+	// ProjectMemberships holds the value of the project_memberships edge.
+	ProjectMemberships []*ProjectMember `json:"project_memberships,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [9]bool
+	loadedTypes [11]bool
 }
 
 // OwnedWorkspacesOrErr returns the OwnedWorkspaces value or an error if the edge
@@ -150,6 +154,24 @@ func (e UserEdges) CreatedProjectSharesOrErr() ([]*ProjectShare, error) {
 		return e.CreatedProjectShares, nil
 	}
 	return nil, &NotLoadedError{edge: "created_project_shares"}
+}
+
+// CreatedWorkspaceInvitesOrErr returns the CreatedWorkspaceInvites value or an error if the edge
+// was not loaded in eager-loading.
+func (e UserEdges) CreatedWorkspaceInvitesOrErr() ([]*WorkspaceInvite, error) {
+	if e.loadedTypes[9] {
+		return e.CreatedWorkspaceInvites, nil
+	}
+	return nil, &NotLoadedError{edge: "created_workspace_invites"}
+}
+
+// ProjectMembershipsOrErr returns the ProjectMemberships value or an error if the edge
+// was not loaded in eager-loading.
+func (e UserEdges) ProjectMembershipsOrErr() ([]*ProjectMember, error) {
+	if e.loadedTypes[10] {
+		return e.ProjectMemberships, nil
+	}
+	return nil, &NotLoadedError{edge: "project_memberships"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -311,6 +333,16 @@ func (_m *User) QueryCreatedEnvironmentVariables() *EnvironmentVariableQuery {
 // QueryCreatedProjectShares queries the "created_project_shares" edge of the User entity.
 func (_m *User) QueryCreatedProjectShares() *ProjectShareQuery {
 	return NewUserClient(_m.config).QueryCreatedProjectShares(_m)
+}
+
+// QueryCreatedWorkspaceInvites queries the "created_workspace_invites" edge of the User entity.
+func (_m *User) QueryCreatedWorkspaceInvites() *WorkspaceInviteQuery {
+	return NewUserClient(_m.config).QueryCreatedWorkspaceInvites(_m)
+}
+
+// QueryProjectMemberships queries the "project_memberships" edge of the User entity.
+func (_m *User) QueryProjectMemberships() *ProjectMemberQuery {
+	return NewUserClient(_m.config).QueryProjectMemberships(_m)
 }
 
 // Update returns a builder for updating this User.

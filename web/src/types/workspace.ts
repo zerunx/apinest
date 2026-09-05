@@ -54,7 +54,8 @@ export interface ApiTreeNode {
   children?: ApiTreeNode[]
 }
 
-export type InterfaceStatus = 1 | 2 | 3 | 4 | 5 | 6
+/** 1 已发布 / 2 联调中 / 3 开发中 / 6 已废弃 */
+export type InterfaceStatus = 1 | 2 | 3 | 6
 
 export interface InterfaceParamItem {
   id?: number
@@ -159,6 +160,7 @@ export type WorkspaceTabKind =
   | 'workspace-list'
   | 'project-list'
   | 'member-list'
+  | 'project-member-list'
   | 'env-list'
   | 'env-variables'
   | 'quick-test'

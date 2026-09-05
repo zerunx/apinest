@@ -22,7 +22,7 @@ var Database = DatabaseConfig{
 	Port:     utils.Int("DB_PORT", 5432),
 	User:     utils.String("DB_USER", "postgres"),
 	Password: utils.String("DB_PASSWORD", "postgres"),
-	DBName:   utils.String("DB_NAME", "go_starter"),
+	DBName:   utils.String("DB_NAME", "nest"),
 
 	SSLMode:         utils.String("DB_SSLMODE", "disable"),
 	MaxIdleConns:    utils.Int("DB_MAX_IDLE_CONNS", 10),

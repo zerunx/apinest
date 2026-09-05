@@ -36,6 +36,8 @@ type Tx struct {
 	InterfaceResult *InterfaceResultClient
 	// Project is the client for interacting with the Project builders.
 	Project *ProjectClient
+	// ProjectMember is the client for interacting with the ProjectMember builders.
+	ProjectMember *ProjectMemberClient
 	// ProjectShare is the client for interacting with the ProjectShare builders.
 	ProjectShare *ProjectShareClient
 	// ProjectShareInterface is the client for interacting with the ProjectShareInterface builders.
@@ -44,6 +46,8 @@ type Tx struct {
 	User *UserClient
 	// Workspace is the client for interacting with the Workspace builders.
 	Workspace *WorkspaceClient
+	// WorkspaceInvite is the client for interacting with the WorkspaceInvite builders.
+	WorkspaceInvite *WorkspaceInviteClient
 	// WorkspaceMember is the client for interacting with the WorkspaceMember builders.
 	WorkspaceMember *WorkspaceMemberClient
 
@@ -189,10 +193,12 @@ func (tx *Tx) init() {
 	tx.InterfaceRequestHeader = NewInterfaceRequestHeaderClient(tx.config)
 	tx.InterfaceResult = NewInterfaceResultClient(tx.config)
 	tx.Project = NewProjectClient(tx.config)
+	tx.ProjectMember = NewProjectMemberClient(tx.config)
 	tx.ProjectShare = NewProjectShareClient(tx.config)
 	tx.ProjectShareInterface = NewProjectShareInterfaceClient(tx.config)
 	tx.User = NewUserClient(tx.config)
 	tx.Workspace = NewWorkspaceClient(tx.config)
+	tx.WorkspaceInvite = NewWorkspaceInviteClient(tx.config)
 	tx.WorkspaceMember = NewWorkspaceMemberClient(tx.config)
 }
 

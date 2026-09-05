@@ -45,9 +45,13 @@ type WorkspaceEdges struct {
 	Members []*WorkspaceMember `json:"members,omitempty"`
 	// Projects holds the value of the projects edge.
 	Projects []*Project `json:"projects,omitempty"`
+	// Invites holds the value of the invites edge.
+	Invites []*WorkspaceInvite `json:"invites,omitempty"`
+	// ProjectMembers holds the value of the project_members edge.
+	ProjectMembers []*ProjectMember `json:"project_members,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [3]bool
+	loadedTypes [5]bool
 }
 
 // OwnerOrErr returns the Owner value or an error if the edge
@@ -77,6 +81,24 @@ func (e WorkspaceEdges) ProjectsOrErr() ([]*Project, error) {
 		return e.Projects, nil
 	}
 	return nil, &NotLoadedError{edge: "projects"}
+}
+
+// InvitesOrErr returns the Invites value or an error if the edge
+// was not loaded in eager-loading.
+func (e WorkspaceEdges) InvitesOrErr() ([]*WorkspaceInvite, error) {
+	if e.loadedTypes[3] {
+		return e.Invites, nil
+	}
+	return nil, &NotLoadedError{edge: "invites"}
+}
+
+// ProjectMembersOrErr returns the ProjectMembers value or an error if the edge
+// was not loaded in eager-loading.
+func (e WorkspaceEdges) ProjectMembersOrErr() ([]*ProjectMember, error) {
+	if e.loadedTypes[4] {
+		return e.ProjectMembers, nil
+	}
+	return nil, &NotLoadedError{edge: "project_members"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -176,6 +198,16 @@ func (_m *Workspace) QueryMembers() *WorkspaceMemberQuery {
 // QueryProjects queries the "projects" edge of the Workspace entity.
 func (_m *Workspace) QueryProjects() *ProjectQuery {
 	return NewWorkspaceClient(_m.config).QueryProjects(_m)
+}
+
+// QueryInvites queries the "invites" edge of the Workspace entity.
+func (_m *Workspace) QueryInvites() *WorkspaceInviteQuery {
+	return NewWorkspaceClient(_m.config).QueryInvites(_m)
+}
+
+// QueryProjectMembers queries the "project_members" edge of the Workspace entity.
+func (_m *Workspace) QueryProjectMembers() *ProjectMemberQuery {
+	return NewWorkspaceClient(_m.config).QueryProjectMembers(_m)
 }
 
 // Update returns a builder for updating this Workspace.

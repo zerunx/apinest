@@ -136,7 +136,11 @@ watch(
 watch(
   () => props.readonly,
   (readonly) => {
-    if (!readonly) editMounted.value = true
+    if (readonly) return
+    // Paint the edit chrome first, then mount heavy tables next frame.
+    requestAnimationFrame(() => {
+      editMounted.value = true
+    })
   },
 )
 

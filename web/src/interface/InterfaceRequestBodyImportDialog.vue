@@ -65,10 +65,6 @@ function submit(mode: BodyImportMode) {
     destroy-on-close
     @update:model-value="emit('update:visible', $event)"
   >
-    <div class="interface-body-import__tip">
-      <el-icon :size="14"><InfoFilled /></el-icon>
-      <span>{{ t('workspace.interfaceForm.importJsonTip') }}</span>
-    </div>
 
     <div class="interface-body-raw interface-body-raw--dialog">
       <div class="interface-body-raw__toolbar">

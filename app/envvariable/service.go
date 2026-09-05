@@ -13,10 +13,7 @@ import (
 type Service struct{}
 
 func requireScope(ctx context.Context, userID, workspaceID, projectID, environmentID int64, action workspace.Action) error {
-	if _, err := workspace.Require(ctx, userID, workspaceID, action); err != nil {
-		return err
-	}
-	if err := project.EnsureExists(ctx, workspaceID, projectID); err != nil {
+	if _, err := project.RequireAccess(ctx, userID, workspaceID, projectID, action); err != nil {
 		return err
 	}
 	return environment.EnsureExists(ctx, projectID, environmentID)

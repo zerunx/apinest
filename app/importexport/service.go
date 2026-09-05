@@ -20,7 +20,7 @@ import (
 type Service struct{}
 
 func (Service) Export(ctx context.Context, userID int64, params ExportRequest) (*Document, error) {
-	if _, err := workspace.Require(ctx, userID, params.WorkspaceID, workspace.ActionProjectRead); err != nil {
+	if _, err := project.RequireAccess(ctx, userID, params.WorkspaceID, params.ProjectID, workspace.ActionProjectRead); err != nil {
 		return nil, err
 	}
 	proj, err := project.Repo{}.Get(ctx, params.WorkspaceID, params.ProjectID)
@@ -87,10 +87,7 @@ func (Service) Import(ctx context.Context, userID int64, params ImportRequest) (
 	if source != SourceApinest {
 		return nil, bizerr.New("该导入格式暂未支持")
 	}
-	if _, err := workspace.Require(ctx, userID, params.WorkspaceID, workspace.ActionProjectCreate); err != nil {
-		return nil, err
-	}
-	if err := project.EnsureExists(ctx, params.WorkspaceID, params.ProjectID); err != nil {
+	if _, err := project.RequireAccess(ctx, userID, params.WorkspaceID, params.ProjectID, workspace.ActionProjectCreate); err != nil {
 		return nil, err
 	}
 

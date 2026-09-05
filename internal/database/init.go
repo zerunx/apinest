@@ -41,7 +41,7 @@ func InitWithConfig(cfg configs.DatabaseConfig) error {
 
 	client := newClient(driver)
 
-	if err := runMigrate(client); err != nil {
+	if err := runMigrate(client, db); err != nil {
 		db.Close()
 		return err
 	}

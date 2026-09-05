@@ -109,6 +109,151 @@ pub fn create_local_project(db: State<'_, Db>, args: CreateProjectArgs) -> AppRe
     })
 }
 
+#[derive(Debug, Deserialize)]
+pub struct UpdateWorkspaceArgs {
+    pub id: i64,
+    pub name: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateProjectArgs {
+    pub id: i64,
+    pub workspace_id: i64,
+    pub name: String,
+}
+
+fn delete_local_project_cascade(
+    conn: &rusqlite::Connection,
+    server_id: i64,
+    workspace_id: i64,
+    project_id: i64,
+) -> AppResult<()> {
+    conn.execute(
+        "DELETE FROM environment_variables
+         WHERE server_id = ?1 AND environment_id IN (
+           SELECT id FROM environments
+           WHERE server_id = ?1 AND workspace_id = ?2 AND project_id = ?3
+         )",
+        params![server_id, workspace_id, project_id],
+    )?;
+    conn.execute(
+        "DELETE FROM environments
+         WHERE server_id = ?1 AND workspace_id = ?2 AND project_id = ?3",
+        params![server_id, workspace_id, project_id],
+    )?;
+    conn.execute(
+        "DELETE FROM grpc_rpcs WHERE server_id = ?1 AND interface_id IN (
+           SELECT id FROM interfaces
+           WHERE server_id = ?1 AND workspace_id = ?2 AND project_id = ?3
+         )",
+        params![server_id, workspace_id, project_id],
+    )?;
+    conn.execute(
+        "DELETE FROM interface_details WHERE server_id = ?1 AND interface_id IN (
+           SELECT id FROM interfaces
+           WHERE server_id = ?1 AND workspace_id = ?2 AND project_id = ?3
+         )",
+        params![server_id, workspace_id, project_id],
+    )?;
+    conn.execute(
+        "DELETE FROM interfaces
+         WHERE server_id = ?1 AND workspace_id = ?2 AND project_id = ?3",
+        params![server_id, workspace_id, project_id],
+    )?;
+    conn.execute(
+        "DELETE FROM folders
+         WHERE server_id = ?1 AND workspace_id = ?2 AND project_id = ?3",
+        params![server_id, workspace_id, project_id],
+    )?;
+    let n = conn.execute(
+        "DELETE FROM projects
+         WHERE server_id = ?1 AND workspace_id = ?2 AND id = ?3",
+        params![server_id, workspace_id, project_id],
+    )?;
+    if n == 0 {
+        return Err(AppError::msg("项目不存在"));
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn update_local_workspace(db: State<'_, Db>, args: UpdateWorkspaceArgs) -> AppResult<()> {
+    let name = args.name.trim().to_string();
+    if name.is_empty() {
+        return Err(AppError::msg("工作空间名称不能为空"));
+    }
+    let server_id = current_server_id(&db)?;
+    db.with_conn(|conn| {
+        let now = now_iso();
+        let n = conn.execute(
+            "UPDATE workspaces SET name = ?1, synced_at = ?2, is_local = 1
+             WHERE server_id = ?3 AND id = ?4",
+            params![name, now, server_id, args.id],
+        )?;
+        if n == 0 {
+            return Err(AppError::msg("工作空间不存在"));
+        }
+        Ok(())
+    })
+}
+
+#[tauri::command]
+pub fn delete_local_workspace(db: State<'_, Db>, workspace_id: i64) -> AppResult<()> {
+    let server_id = current_server_id(&db)?;
+    db.with_conn(|conn| {
+        let mut stmt = conn.prepare(
+            "SELECT id FROM projects WHERE server_id = ?1 AND workspace_id = ?2",
+        )?;
+        let project_ids: Vec<i64> = stmt
+            .query_map(params![server_id, workspace_id], |r| r.get(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        drop(stmt);
+        for project_id in project_ids {
+            delete_local_project_cascade(conn, server_id, workspace_id, project_id)?;
+        }
+        crate::commands::dictionary::delete_workspace_dictionaries(conn, server_id, workspace_id)?;
+        let n = conn.execute(
+            "DELETE FROM workspaces WHERE server_id = ?1 AND id = ?2",
+            params![server_id, workspace_id],
+        )?;
+        if n == 0 {
+            return Err(AppError::msg("工作空间不存在"));
+        }
+        Ok(())
+    })
+}
+
+#[tauri::command]
+pub fn update_local_project(db: State<'_, Db>, args: UpdateProjectArgs) -> AppResult<()> {
+    let name = args.name.trim().to_string();
+    if name.is_empty() {
+        return Err(AppError::msg("项目名称不能为空"));
+    }
+    let server_id = current_server_id(&db)?;
+    db.with_conn(|conn| {
+        let now = now_iso();
+        let n = conn.execute(
+            "UPDATE projects SET name = ?1, synced_at = ?2, is_local = 1
+             WHERE server_id = ?3 AND workspace_id = ?4 AND id = ?5",
+            params![name, now, server_id, args.workspace_id, args.id],
+        )?;
+        if n == 0 {
+            return Err(AppError::msg("项目不存在"));
+        }
+        Ok(())
+    })
+}
+
+#[tauri::command]
+pub fn delete_local_project(
+    db: State<'_, Db>,
+    workspace_id: i64,
+    project_id: i64,
+) -> AppResult<()> {
+    let server_id = current_server_id(&db)?;
+    db.with_conn(|conn| delete_local_project_cascade(conn, server_id, workspace_id, project_id))
+}
+
 #[tauri::command]
 pub fn create_local_folder(
     db: State<'_, Db>,

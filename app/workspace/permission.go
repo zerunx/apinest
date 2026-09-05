@@ -33,7 +33,7 @@ var rolePermissions = map[uint8]map[Action]struct{}{
 	RoleEditor: permSet(
 		ActionWorkspaceRead,
 		ActionMemberRead,
-		ActionProjectRead,
+		ActionProjectRead, ActionProjectCreate, ActionProjectUpdate, ActionProjectDelete,
 	),
 	RoleViewer: permSet(
 		ActionWorkspaceRead,

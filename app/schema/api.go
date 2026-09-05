@@ -64,8 +64,8 @@ func (API) Fields() []ent.Field {
 			Comment("接口路径"),
 
 		field.Uint8("status").
-			Default(2).
-			Comment("状态：1: 已发布, 2: 测试中, 3: 开发中, 4: 异常, 5: 维护, 6: 废弃"),
+			Default(3).
+			Comment("状态：1: 已发布, 2: 联调中, 3: 开发中, 6: 已废弃"),
 
 		field.String("request_body_format").
 			MaxLen(20).

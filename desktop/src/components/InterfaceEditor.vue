@@ -2473,7 +2473,7 @@ async function onSave(): Promise<boolean> {
           name: name.value.trim(),
           method: method.value,
           url: saveUrl,
-          status: 1,
+          status: props.initial?.status ?? 3,
           detail: buildDetail(),
         },
       })
@@ -2489,7 +2489,7 @@ async function onSave(): Promise<boolean> {
           name: name.value.trim(),
           method: method.value,
           url: saveUrl,
-          status: 1,
+          status: props.initial?.status ?? 3,
           detail: buildDetail(),
         },
       })
@@ -2689,7 +2689,7 @@ watch(
 }
 
 .body-none-hint {
-  margin: 0 0 0 18px;
+  margin: 0;
   font-size: 13px;
   line-height: 1.85;
 }

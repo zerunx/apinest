@@ -8,10 +8,13 @@
           :placeholder="t('project.empty')"
           :search-placeholder="t('project.search')"
           :empty-result="t('project.none')"
-          :create-label="t('project.label')"
+          :create-label="t('create.project')"
+          :item-actions="true"
           variant="project"
           @update:model-value="onPickProject"
           @create="openCreateProject"
+          @edit="openEditProject"
+          @delete="openDeleteProject"
         />
       </div>
 
@@ -73,7 +76,9 @@
           >
             <span class="method" :class="tab.method.toLowerCase()">{{ tab.method }}</span>
             <span class="req-tab-name">{{ tab.name || t('request.untitled') }}</span>
-            <span class="req-tab-close" title="Close" @click.stop="requestCloseTab(tab.id)">×</span>
+            <span class="req-tab-close" title="Close" @click.stop="requestCloseTab(tab.id)">
+              <span class="req-tab-close-x">×</span>
+            </span>
           </button>
           <button type="button" class="tab-add" :title="t('request.newTab')" @click="addTab">
             +
@@ -164,10 +169,11 @@
 
     <NameDialog
       v-model:open="projectDialogOpen"
-      :title="t('create.project')"
+      :title="projectDialogTitle"
       :label="t('project.label')"
+      :initial="projectDialogInitial"
       :anchor="dialogAnchor"
-      @confirm="confirmCreateProject"
+      @confirm="confirmProjectName"
     />
     <NameDialog
       v-model:open="folderDialogOpen"
@@ -189,6 +195,13 @@
       :message="deleteDialogMessage"
       :anchor="dialogAnchor"
       @confirm="confirmDelete"
+    />
+    <ConfirmDialog
+      v-model:open="projectDeleteOpen"
+      :title="t('project.delete')"
+      :message="t('project.deleteConfirm', { name: projectDeleteTarget?.name || '' })"
+      :anchor="dialogAnchor"
+      @confirm="confirmDeleteProject"
     />
     <ConfirmDialog
       v-model:open="saveBeforeCloseOpen"
@@ -344,6 +357,7 @@ const {
   selectProject,
   selectEnvironment,
   loadProjects,
+  refreshAfterSync,
 } = useWorkspaceContext()
 
 const tree = ref<TreeItem[]>([])
@@ -355,6 +369,14 @@ const canDragApis = computed(() => !search.value.trim() && !reorderingApis.value
 const activeInterfaceId = ref<number | null>(null)
 const tabsEl = ref<HTMLElement | null>(null)
 const projectDialogOpen = ref(false)
+const projectDialogMode = ref<'create' | 'edit'>('create')
+const projectDialogInitial = ref('')
+const projectEditTarget = ref<{ id: number; name: string } | null>(null)
+const projectDeleteOpen = ref(false)
+const projectDeleteTarget = ref<{ id: number; name: string } | null>(null)
+const projectDialogTitle = computed(() =>
+  projectDialogMode.value === 'edit' ? t('project.rename') : t('create.project'),
+)
 const envManageOpen = ref(false)
 const folderDialogOpen = ref(false)
 const folderParentId = ref(0)
@@ -516,7 +538,7 @@ function applyTabToForm(tab: RequestTab, options?: { remount?: boolean }) {
     method: tab.method,
     url: tab.url,
     folder_id: folderId,
-    status: (tab.detail as { status?: number } | null)?.status ?? 1,
+    status: (tab.detail as { status?: number } | null)?.status ?? 3,
     detail: {
       ...(tab.detail ?? {}),
       ...(folderId != null ? { folder_id: folderId } : {}),
@@ -936,7 +958,24 @@ function openCreateProject(event: MouseEvent) {
     return
   }
   setDialogAnchor(event)
+  projectDialogMode.value = 'create'
+  projectDialogInitial.value = ''
+  projectEditTarget.value = null
   projectDialogOpen.value = true
+}
+
+function openEditProject(item: { id: number; name: string }, event: MouseEvent) {
+  setDialogAnchor(event)
+  projectDialogMode.value = 'edit'
+  projectDialogInitial.value = item.name
+  projectEditTarget.value = item
+  projectDialogOpen.value = true
+}
+
+function openDeleteProject(item: { id: number; name: string }, event: MouseEvent) {
+  setDialogAnchor(event)
+  projectDeleteTarget.value = item
+  projectDeleteOpen.value = true
 }
 
 function openCreateFolder(parentId = 0, event?: MouseEvent) {
@@ -968,9 +1007,23 @@ async function openCreateApi(folderId?: number) {
   void persistTabLayout()
 }
 
-async function confirmCreateProject(name: string) {
+async function confirmProjectName(name: string) {
   if (!workspaceId.value) return
   try {
+    if (projectDialogMode.value === 'edit' && projectEditTarget.value) {
+      await invoke('update_local_project', {
+        args: {
+          id: projectEditTarget.value.id,
+          workspace_id: workspaceId.value,
+          name,
+        },
+      })
+      projectDialogOpen.value = false
+      projectEditTarget.value = null
+      await loadProjects()
+      showToast(t('project.updateSuccess'), 1500, 'success')
+      return
+    }
     const row = await invoke<{ id: number }>('create_local_project', {
       args: { workspace_id: workspaceId.value, name },
     })
@@ -979,7 +1032,24 @@ async function confirmCreateProject(name: string) {
     await selectProject(row.id)
     await reloadTree()
   } catch (e) {
-    alert(String(e))
+    showToast(String(e), 2200, 'error')
+  }
+}
+
+async function confirmDeleteProject() {
+  if (!workspaceId.value || !projectDeleteTarget.value) return
+  try {
+    await invoke('delete_local_project', {
+      workspaceId: workspaceId.value,
+      projectId: projectDeleteTarget.value.id,
+    })
+    projectDeleteOpen.value = false
+    projectDeleteTarget.value = null
+    await refreshAfterSync()
+    await reloadTree()
+    showToast(t('project.deleteSuccess'), 1500, 'success')
+  } catch (e) {
+    showToast(String(e), 2200, 'error')
   }
 }
 
@@ -1600,18 +1670,36 @@ async function onSelectApi(id: number, options?: { restore?: boolean }) {
 }
 
 .req-tab-close {
+  /*
+   * Optical offsets (saved for revert):
+   *   --tab-close-bg-nudge:  1px
+   *   --tab-close-dot-nudge: 1px
+   *   --tab-close-x-nudge:   0px   (× looked fine in tab; glyph sits low in box)
+   * Center preview (box geometric middle):
+   *   bg/dot 0; × -1px so glyph strokes sit on box center
+   */
+  --tab-close-bg-nudge: 0px;
+  --tab-close-dot-nudge: 0px;
+  --tab-close-x-nudge: -1px;
   position: relative;
   width: 18px;
   height: 18px;
   border-radius: 4px;
-  display: inline-grid;
-  place-items: center;
-  font-size: 16px;
-  line-height: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  line-height: 1;
   padding: 0;
   opacity: 0.35;
   flex-shrink: 0;
-  transform: translateY(-1px);
+  isolation: isolate;
+}
+
+.req-tab-close-x {
+  display: block;
+  line-height: 1;
+  transform: translateY(var(--tab-close-x-nudge));
 }
 
 .req-tab:hover .req-tab-close,
@@ -1622,14 +1710,13 @@ async function onSelectApi(id: number, options?: { restore?: boolean }) {
 .req-tab.dirty:not(:hover) .req-tab-close {
   color: transparent;
   opacity: 1;
-  transform: none;
 }
 
 .req-tab.dirty:not(:hover) .req-tab-close::before {
   content: '';
   position: absolute;
   left: 50%;
-  top: 50%;
+  top: calc(50% + var(--tab-close-dot-nudge));
   width: 8px;
   height: 8px;
   border-radius: 50%;
@@ -1639,7 +1726,20 @@ async function onSelectApi(id: number, options?: { restore?: boolean }) {
 
 .req-tab-close:hover {
   opacity: 1 !important;
-  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.req-tab-close:hover::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: var(--tab-close-bg-nudge);
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--color-text) 16%, transparent);
+  pointer-events: none;
+  z-index: -1;
 }
 
 .tab-add {

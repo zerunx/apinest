@@ -2,6 +2,7 @@ import { computed, ref } from 'vue'
 import { fetchCurrentUser, login as loginApi, register as registerApi } from '@/api/auth'
 import type { LoginPayload, RegisterPayload, UserProfile } from '@/types/auth'
 import { clearAuth, getAccessToken, getRefreshToken, getStoredUser, saveAuth } from '@/utils/auth-storage'
+import { clearWorkspaceLayoutSession } from '@/utils/workspace-layout-storage'
 
 const user = ref<UserProfile | null>(getStoredUser())
 let bootstrapTask: Promise<void> | null = null
@@ -52,6 +53,7 @@ export function useAuth() {
     clearAuth()
     user.value = null
     bootstrapTask = null
+    clearWorkspaceLayoutSession()
   }
 
   return {

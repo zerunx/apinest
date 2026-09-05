@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowDown, Check, Folder, Plus, Search } from '@element-plus/icons-vue'
+import { ArrowDown, Check, Folder, Search } from '@element-plus/icons-vue'
 import { computed, ref } from 'vue'
 import { useLocale } from '@/composables/useLocale'
 import { useWorkspaceContext } from '@/composables/useWorkspaceContext'
@@ -100,7 +100,6 @@ function handleCreateProject() {
       </ul>
       <div class="ws-project-popover__footer">
         <button type="button" class="ws-project-popover__create" @click="handleCreateWorkspace">
-          <el-icon :size="16"><Plus /></el-icon>
           <span>{{ t('workspace.createWorkspace') }}</span>
         </button>
       </div>

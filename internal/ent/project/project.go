@@ -39,6 +39,8 @@ const (
 	EdgeEnvironments = "environments"
 	// EdgeShares holds the string denoting the shares edge name in mutations.
 	EdgeShares = "shares"
+	// EdgeMembers holds the string denoting the members edge name in mutations.
+	EdgeMembers = "members"
 	// Table holds the table name of the project in the database.
 	Table = "projects"
 	// WorkspaceTable is the table that holds the workspace relation/edge.
@@ -83,6 +85,13 @@ const (
 	SharesInverseTable = "project_shares"
 	// SharesColumn is the table column denoting the shares relation/edge.
 	SharesColumn = "project_id"
+	// MembersTable is the table that holds the members relation/edge.
+	MembersTable = "project_members"
+	// MembersInverseTable is the table name for the ProjectMember entity.
+	// It exists in this package in order to avoid circular dependency with the "projectmember" package.
+	MembersInverseTable = "project_members"
+	// MembersColumn is the table column denoting the members relation/edge.
+	MembersColumn = "project_id"
 )
 
 // Columns holds all SQL columns for project fields.
@@ -239,6 +248,20 @@ func ByShares(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 		sqlgraph.OrderByNeighborTerms(s, newSharesStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
+
+// ByMembersCount orders the results by members count.
+func ByMembersCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newMembersStep(), opts...)
+	}
+}
+
+// ByMembers orders the results by members terms.
+func ByMembers(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newMembersStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
 func newWorkspaceStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -279,5 +302,12 @@ func newSharesStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(SharesInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, SharesTable, SharesColumn),
+	)
+}
+func newMembersStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(MembersInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, MembersTable, MembersColumn),
 	)
 }

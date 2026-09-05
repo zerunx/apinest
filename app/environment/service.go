@@ -12,10 +12,7 @@ import (
 type Service struct{}
 
 func (Service) List(ctx context.Context, userID int64, params ListRequest) ([]Item, error) {
-	if _, err := workspace.Require(ctx, userID, params.WorkspaceID, workspace.ActionProjectRead); err != nil {
-		return nil, err
-	}
-	if err := project.EnsureExists(ctx, params.WorkspaceID, params.ProjectID); err != nil {
+	if _, err := project.RequireAccess(ctx, userID, params.WorkspaceID, params.ProjectID, workspace.ActionProjectRead); err != nil {
 		return nil, err
 	}
 
@@ -39,10 +36,7 @@ func (Service) List(ctx context.Context, userID int64, params ListRequest) ([]It
 }
 
 func (Service) Create(ctx context.Context, userID int64, params CreateRequest) error {
-	if _, err := workspace.Require(ctx, userID, params.WorkspaceID, workspace.ActionProjectCreate); err != nil {
-		return err
-	}
-	if err := project.EnsureExists(ctx, params.WorkspaceID, params.ProjectID); err != nil {
+	if _, err := project.RequireAccess(ctx, userID, params.WorkspaceID, params.ProjectID, workspace.ActionProjectCreate); err != nil {
 		return err
 	}
 
@@ -66,10 +60,7 @@ func (Service) Create(ctx context.Context, userID int64, params CreateRequest) e
 }
 
 func (Service) Update(ctx context.Context, userID int64, params UpdateRequest) error {
-	if _, err := workspace.Require(ctx, userID, params.WorkspaceID, workspace.ActionProjectUpdate); err != nil {
-		return err
-	}
-	if err := project.EnsureExists(ctx, params.WorkspaceID, params.ProjectID); err != nil {
+	if _, err := project.RequireAccess(ctx, userID, params.WorkspaceID, params.ProjectID, workspace.ActionProjectUpdate); err != nil {
 		return err
 	}
 	if err := EnsureExists(ctx, params.ProjectID, params.EnvironmentID); err != nil {
@@ -86,10 +77,7 @@ func (Service) Update(ctx context.Context, userID int64, params UpdateRequest) e
 }
 
 func (Service) Delete(ctx context.Context, userID int64, params DeleteRequest) error {
-	if _, err := workspace.Require(ctx, userID, params.WorkspaceID, workspace.ActionProjectDelete); err != nil {
-		return err
-	}
-	if err := project.EnsureExists(ctx, params.WorkspaceID, params.ProjectID); err != nil {
+	if _, err := project.RequireAccess(ctx, userID, params.WorkspaceID, params.ProjectID, workspace.ActionProjectDelete); err != nil {
 		return err
 	}
 	if err := EnsureExists(ctx, params.ProjectID, params.EnvironmentID); err != nil {

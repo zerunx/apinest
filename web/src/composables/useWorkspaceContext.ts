@@ -19,7 +19,7 @@ import { fetchEnvironmentVariables } from '@/api/envvariable'
 import { createProject as apiCreateProject, fetchProjects } from '@/api/project'
 import { createWorkspace as apiCreateWorkspace, fetchWorkspaces } from '@/api/workspace'
 import { useAuth } from '@/composables/useAuth'
-import { readWorkspaceLayout, writeWorkspaceLayout } from '@/utils/workspace-layout-storage'
+import { readWorkspaceLayout, writeWorkspaceLayout, clearWorkspaceLayoutSession } from '@/utils/workspace-layout-storage'
 import type { StoredWorkspaceTab } from '@/utils/workspace-layout-storage'
 import type {
   InterfaceItem,
@@ -244,6 +244,7 @@ function getTabModule(tab: WorkspaceTab): AppModule {
     case 'workspace-list':
     case 'project-list':
     case 'member-list':
+    case 'project-member-list':
       return 'project'
     case 'env-list':
     case 'env-variables':
@@ -342,6 +343,30 @@ export function useWorkspaceContext() {
     selectedFolderId.value = null
     selectedApiId.value = null
     creatingApi.value = false
+  }
+
+  /** Drop in-memory + persisted workspace selection (call on logout / account switch). */
+  function resetSession() {
+    navigationHydrated = false
+    bootstrapComplete = false
+    activeModule.value = 'api'
+    activeWorkspaceId.value = null
+    activeProjectId.value = null
+    expandedNodeIds.value = new Set()
+    selectedFolderId.value = null
+    selectedApiId.value = null
+    activeEnvironmentId.value = null
+    workspaces.value = []
+    projects.value = []
+    apiTree.value = []
+    interfaces.value = []
+    environments.value = []
+    environmentVariables.value = []
+    resetWorkspaceTabs()
+    Object.keys(createFormSessionByApiId).forEach((key) => {
+      delete createFormSessionByApiId[key as unknown as number]
+    })
+    clearWorkspaceLayoutSession()
   }
 
   function clearTabSelection() {
@@ -446,11 +471,14 @@ export function useWorkspaceContext() {
     activateTab(CREATE_API_TAB_ID)
   }
 
-  function openSpaceSectionTab(section: 'workspaces' | 'projects' | 'members') {
+  function openSpaceSectionTab(
+    section: 'workspaces' | 'projects' | 'members' | 'project-members',
+  ) {
     const tabMap = {
       workspaces: { id: 'workspace-list', kind: 'workspace-list' as const },
       projects: { id: 'project-list', kind: 'project-list' as const },
       members: { id: 'member-list', kind: 'member-list' as const },
+      'project-members': { id: 'project-member-list', kind: 'project-member-list' as const },
     }
     const tab = tabMap[section]
     upsertTab({
@@ -458,7 +486,7 @@ export function useWorkspaceContext() {
       kind: tab.kind,
       module: 'project',
       label: tab.id,
-      closable: false,
+      closable: true,
     })
     activateTab(tab.id)
   }
@@ -547,9 +575,11 @@ export function useWorkspaceContext() {
     }
 
     switch (module) {
-      case 'project':
-        openSpaceSectionTab('workspaces')
+      case 'project': {
+        const role = activeWorkspace.value?.role
+        openSpaceSectionTab(role === 1 || role === 2 ? 'workspaces' : 'projects')
         break
+      }
       case 'quick-test':
         openQuickTestTab()
         break
@@ -804,6 +834,13 @@ export function useWorkspaceContext() {
         apiTree.value = []
         interfaces.value = []
       }
+    } catch {
+      // Ignore stale workspace from a previous account; bootstrap remaps selection.
+      projects.value = []
+      activeProjectId.value = null
+      resetWorkspaceTabs()
+      apiTree.value = []
+      interfaces.value = []
     } finally {
       loadingProjects.value = false
     }
@@ -947,7 +984,18 @@ export function useWorkspaceContext() {
         if (!environments.value.some((item) => item.id === tab.environmentId)) continue
       }
 
-      restoredTabs.push({ ...tab, module })
+      const spaceKinds = new Set([
+        'workspace-list',
+        'project-list',
+        'member-list',
+        'project-member-list',
+      ])
+      restoredTabs.push({
+        ...tab,
+        module,
+        // Space-management tabs used to be non-closable; force closable on restore.
+        closable: spaceKinds.has(tab.kind) ? true : tab.closable,
+      })
     }
 
     const fallbackIds = [
@@ -998,6 +1046,8 @@ export function useWorkspaceContext() {
   }
 
   async function bootstrap() {
+    bootstrapComplete = false
+    navigationHydrated = false
     await loadWorkspaces()
     await loadProjects()
     await refreshApiData()
@@ -1258,6 +1308,7 @@ export function useWorkspaceContext() {
   }
 
   watch(activeWorkspaceId, () => {
+    if (!bootstrapComplete) return
     loadProjects()
   })
 
@@ -1370,6 +1421,7 @@ export function useWorkspaceContext() {
     activeTab,
     activeModuleTab,
     bootstrap,
+    resetSession,
     refreshWorkspaces,
     refreshProjects,
     refreshApiData,

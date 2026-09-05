@@ -156,8 +156,24 @@ CREATE TABLE IF NOT EXISTS local_drafts (
   updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS dictionary_entries (
+  id INTEGER NOT NULL,
+  server_id INTEGER NOT NULL,
+  workspace_id INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  field_type TEXT NOT NULL DEFAULT 'string',
+  description TEXT NOT NULL DEFAULT '',
+  default_value TEXT NOT NULL DEFAULT '',
+  source_system_key TEXT,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  synced_at TEXT NOT NULL,
+  is_local INTEGER NOT NULL DEFAULT 1,
+  PRIMARY KEY (server_id, id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_folders_project ON folders(server_id, project_id, parent_id);
 CREATE INDEX IF NOT EXISTS idx_interfaces_folder ON interfaces(server_id, project_id, folder_id);
 CREATE INDEX IF NOT EXISTS idx_grpc_rpcs_interface ON grpc_rpcs(server_id, interface_id);
 CREATE INDEX IF NOT EXISTS idx_projects_workspace ON projects(server_id, workspace_id);
 CREATE INDEX IF NOT EXISTS idx_env_vars ON environment_variables(server_id, environment_id);
+CREATE INDEX IF NOT EXISTS idx_dictionary_workspace ON dictionary_entries(server_id, workspace_id);

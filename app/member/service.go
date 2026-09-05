@@ -21,7 +21,10 @@ func (Service) List(ctx context.Context, userID int64, params ListRequest) ([]It
 
 	members, err := database.DB.WorkspaceMember.
 		Query().
-		Where(workspacemember.WorkspaceIDEQ(params.WorkspaceID)).
+		Where(
+			workspacemember.WorkspaceIDEQ(params.WorkspaceID),
+			workspacemember.HasUser(),
+		).
 		WithUser().
 		Order(ent.Asc(workspacemember.FieldID)).
 		All(ctx)
@@ -31,18 +34,19 @@ func (Service) List(ctx context.Context, userID int64, params ListRequest) ([]It
 
 	items := make([]Item, 0, len(members))
 	for _, m := range members {
-		item := Item{
+		u := m.Edges.User
+		if u == nil {
+			continue
+		}
+		items = append(items, Item{
 			ID:        m.ID,
 			UserID:    m.UserID,
 			Role:      m.Role,
 			CreatedAt: m.CreatedAt.Format(utils.DateTimeFormat),
-		}
-		if u := m.Edges.User; u != nil {
-			item.Name = u.Name
-			item.Account = u.Account
-			item.Avatar = u.Avatar
-		}
-		items = append(items, item)
+			Name:      u.Name,
+			Account:   u.Account,
+			Avatar:    u.Avatar,
+		})
 	}
 	return items, nil
 }

@@ -37,26 +37,49 @@
         <span class="picker-icon" v-html="iconSvg" />
         <span>{{ emptyLabel }}</span>
       </button>
-      <button
+      <div
         v-for="item in filtered"
         :key="item.id"
-        type="button"
-        class="picker-item"
+        class="picker-row"
         :class="{ active: item.id === modelValue }"
-        @click="pick(item.id)"
       >
-        <span class="picker-icon" v-html="iconSvg" />
-        <span>{{ item.name }}</span>
-      </button>
+        <button type="button" class="picker-item picker-item-main" @click="pick(item.id)">
+          <span class="picker-icon" v-html="iconSvg" />
+          <span class="picker-item-name">{{ item.name }}</span>
+        </button>
+        <div v-if="itemActions" class="picker-item-actions">
+          <button
+            type="button"
+            class="picker-action"
+            :title="t('common.edit')"
+            @click.stop="onEdit(item, $event)"
+          >
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+              <path d="M12 20h9" />
+              <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            class="picker-action danger"
+            :title="t('common.delete')"
+            @click.stop="onDelete(item, $event)"
+          >
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+              <path d="M3 6h18" />
+              <path d="M8 6V4h8v2" />
+              <path d="M19 6l-1 14H6L5 6" />
+              <path d="M10 11v6M14 11v6" />
+            </svg>
+          </button>
+        </div>
+      </div>
       <p v-if="!filtered.length" class="picker-empty muted">{{ emptyResult }}</p>
-      <button
-        v-if="createLabel"
-        type="button"
-        class="picker-item picker-create"
-        @click="onCreate($event)"
-      >
-        + {{ createLabel }}
-      </button>
+      <div v-if="createLabel" class="picker-footer">
+        <button type="button" class="picker-create" @click="onCreate($event)">
+          <span>{{ createLabel }}</span>
+        </button>
+      </div>
       <button
         v-if="manageLabel"
         type="button"
@@ -72,6 +95,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { bindOutsidePointerDismiss } from '../composables/useOverlayDismiss'
+import { useI18n } from '../i18n'
 
 export type PickerItem = { id: number; name: string }
 
@@ -88,6 +112,7 @@ const props = withDefaults(
     align?: 'left' | 'right'
     createLabel?: string
     manageLabel?: string
+    itemActions?: boolean
   }>(),
   {
     allowEmpty: false,
@@ -96,6 +121,7 @@ const props = withDefaults(
     align: 'left',
     createLabel: '',
     manageLabel: '',
+    itemActions: false,
   },
 )
 
@@ -103,8 +129,11 @@ const emit = defineEmits<{
   'update:modelValue': [number | null]
   create: [MouseEvent]
   manage: [MouseEvent]
+  edit: [item: PickerItem, event: MouseEvent]
+  delete: [item: PickerItem, event: MouseEvent]
 }>()
 
+const { t } = useI18n()
 const open = ref(false)
 const query = ref('')
 const rootRef = ref<HTMLElement | null>(null)
@@ -147,6 +176,16 @@ function onCreate(event: MouseEvent) {
 function onManage(event: MouseEvent) {
   open.value = false
   emit('manage', event)
+}
+
+function onEdit(item: PickerItem, event: MouseEvent) {
+  open.value = false
+  emit('edit', item, event)
+}
+
+function onDelete(item: PickerItem, event: MouseEvent) {
+  open.value = false
+  emit('delete', item, event)
 }
 
 let unbindOutside: (() => void) | null = null
@@ -221,7 +260,7 @@ onUnmounted(() => {
   top: calc(100% + 6px);
   left: 0;
   z-index: 40;
-  width: 240px;
+  width: 260px;
   padding: 8px;
   border-radius: 10px;
   background: var(--color-menu);
@@ -250,6 +289,18 @@ onUnmounted(() => {
   border-color: var(--color-primary);
 }
 
+.picker-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border-radius: 6px;
+}
+
+.picker-row:hover,
+.picker-row.active {
+  background: var(--color-menu-hover);
+}
+
 .picker-item {
   width: 100%;
   display: flex;
@@ -269,22 +320,94 @@ onUnmounted(() => {
   background: var(--color-menu-hover);
 }
 
+.picker-item-main {
+  flex: 1;
+  min-width: 0;
+  padding-right: 4px;
+}
+
+.picker-row:hover .picker-item-main,
+.picker-row.active .picker-item-main,
+.picker-item-main:hover {
+  background: transparent;
+}
+
+.picker-item-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.picker-item-actions {
+  display: none;
+  align-items: center;
+  gap: 1px;
+  padding-right: 4px;
+  flex-shrink: 0;
+}
+
+.picker-row:hover .picker-item-actions,
+.picker-row.active .picker-item-actions {
+  display: inline-flex;
+}
+
+.picker-action {
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.picker-action:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.picker-action.danger:hover {
+  background: var(--color-danger-hover);
+  color: var(--color-danger);
+}
+
 .picker-empty {
   margin: 4px 0;
   padding: 8px 10px;
   font-size: 13px;
 }
 
-.picker-create {
+.picker-footer {
   margin-top: 4px;
+  padding-top: 8px;
   border-top: 1px solid var(--color-border);
-  border-radius: 6px;
-  color: var(--color-primary);
-  font-weight: 600;
+}
+
+.picker-create {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 38px;
+  border: 1px dashed var(--color-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-primary-light);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .picker-create:hover {
-  background: var(--color-menu-hover);
+  background: var(--color-active);
+  border-color: var(--color-primary);
 }
 
 .picker-manage {

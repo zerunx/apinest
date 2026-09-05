@@ -131,9 +131,7 @@ const showVariableManage = computed(
     !!activeProject.value,
 )
 
-const showQuickTest = computed(
-  () => activeModule.value === 'quick-test' && activeModuleTab.value?.kind === 'quick-test',
-)
+const showQuickTest = computed(() => activeModule.value === 'quick-test')
 
 const showApiTabbar = computed(
   () => activeModule.value === 'api' && contextMode.value === 'project',
@@ -143,12 +141,11 @@ const showTabbar = computed(
   () =>
     showApiTabbar.value ||
     activeModule.value === 'project' ||
-    (activeModule.value === 'environment' && !!activeProject.value) ||
-    activeModule.value === 'quick-test',
+    (activeModule.value === 'environment' && !!activeProject.value),
 )
 
 const showRuntimeEnvSelect = computed(
-  () => !!activeProject.value && (activeModule.value === 'api' || activeModule.value === 'quick-test'),
+  () => !!activeProject.value && activeModule.value === 'api',
 )
 
 const tabSupportsContextMenu = computed(() => activeModule.value === 'api')
@@ -217,6 +214,7 @@ function tabLabel(tab: WorkspaceTab) {
   if (tab.kind === 'workspace-list') return t('workspace.workspaceManage')
   if (tab.kind === 'project-list') return t('workspace.projectManage')
   if (tab.kind === 'member-list') return t('member.title')
+  if (tab.kind === 'project-member-list') return t('workspace.projectMembers')
   if (tab.kind === 'env-list') return t('workspace.modules.environment')
   if (tab.kind === 'env-variables' && tab.id === 'env-variables-empty') return t('environment.variables')
   if (tab.kind === 'quick-test') return t('workspace.modules.quickTest')
@@ -224,7 +222,7 @@ function tabLabel(tab: WorkspaceTab) {
 }
 
 function isTabClosable(tab: WorkspaceTab) {
-  return tab.closable !== false && activeModule.value === 'api'
+  return tab.closable !== false
 }
 
 function handleAddApi() {
@@ -364,7 +362,10 @@ onBeforeUnmount(() => {
           v-for="tab in moduleTabs"
           :key="tab.id"
           class="workspace-main__tab"
-          :class="{ 'workspace-main__tab--active': activeTabId === tab.id }"
+          :class="{
+            'workspace-main__tab--active': activeTabId === tab.id,
+            'workspace-main__tab--dirty': !!tab.dirty,
+          }"
           @click="handleTabClick(tab)"
           @contextmenu.prevent="openTabContextMenu($event, tab)"
         >
@@ -377,7 +378,6 @@ onBeforeUnmount(() => {
           </span>
           <span class="workspace-main__tab-label">
             {{ tabLabel(tab) }}
-            <span v-if="tab.dirty" class="workspace-main__tab-dirty">*</span>
           </span>
           <button
             v-if="isTabClosable(tab)"
@@ -395,18 +395,36 @@ onBeforeUnmount(() => {
         <el-select
           :model-value="activeEnvironmentId"
           class="workspace-main__env-select"
-          popper-class="app-action-dropdown"
+          popper-class="app-action-dropdown workspace-main__env-dropdown"
           :placeholder="t('workspace.noEnvironment')"
           :disabled="!environments.length"
           :suffix-icon="''"
           @change="(id: number) => selectEnvironment(id)"
         >
+          <template #prefix>
+            <span class="workspace-main__env-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1" />
+              </svg>
+            </span>
+          </template>
           <el-option
             v-for="item in environments"
             :key="item.id"
             :label="item.name"
             :value="item.id"
-          />
+          >
+            <span class="workspace-main__env-option">
+              <span class="workspace-main__env-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1" />
+                </svg>
+              </span>
+              <span>{{ item.name }}</span>
+            </span>
+          </el-option>
         </el-select>
       </div>
     </div>
@@ -477,8 +495,8 @@ onBeforeUnmount(() => {
 
       <template v-else-if="showQuickTest">
         <div class="workspace-main__placeholder">
-          <h2>{{ pageTitle }}</h2>
-          <p>{{ pageDesc }}</p>
+          <h2>{{ t('workspace.modules.quickTest') }}</h2>
+          <p>{{ t('workspace.quickTestDesc') }}</p>
         </div>
       </template>
 
@@ -496,7 +514,6 @@ onBeforeUnmount(() => {
         <div v-if="showFolderView" class="workspace-main__folder-view">
             <div class="workspace-main__toolbar">
               <el-button type="primary" class="workspace-action-btn" @click="handleAddApi">
-                <span class="workspace-action-btn__plus">+</span>
                 <span>{{ t('workspace.addApi') }}</span>
               </el-button>
             </div>
@@ -660,6 +677,12 @@ onBeforeUnmount(() => {
   background: var(--color-workspace-content);
 }
 
+.workspace-main__tabbar--simple .workspace-main__tab--solo {
+  min-width: 140px;
+  max-width: 240px;
+  cursor: default;
+}
+
 .workspace-main__tabbar-tabs {
   display: flex;
   align-items: stretch;
@@ -693,8 +716,6 @@ onBeforeUnmount(() => {
 }
 
 .workspace-main__tab--solo {
-  min-width: auto;
-  max-width: none;
   border-right: none;
   background: var(--color-workspace-content);
   color: var(--color-workspace-tab-text-active);
@@ -771,17 +792,13 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
-.workspace-main__tab-dirty {
-  margin-left: 2px;
-  color: #fca130;
-}
-
 .workspace-main__tab-close {
+  position: relative;
   width: 20px;
   height: 20px;
   margin-right: -2px;
   border: none;
-  border-radius: 50%;
+  border-radius: 4px;
   background: transparent;
   color: var(--color-text-secondary);
   font-size: 14px;
@@ -791,11 +808,47 @@ onBeforeUnmount(() => {
   justify-content: center;
   padding: 0;
   flex-shrink: 0;
+  opacity: 0.45;
+}
+
+.workspace-main__tab:hover .workspace-main__tab-close,
+.workspace-main__tab--active:not(.workspace-main__tab--dirty) .workspace-main__tab-close {
+  opacity: 0.85;
+}
+
+.workspace-main__tab--dirty:not(:hover) .workspace-main__tab-close {
+  color: transparent;
+  opacity: 1;
+}
+
+.workspace-main__tab--dirty:not(:hover) .workspace-main__tab-close .el-icon {
+  opacity: 0;
+}
+
+.workspace-main__tab--dirty:not(:hover) .workspace-main__tab-close::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  transform: translate(-50%, -50%);
 }
 
 .workspace-main__tab-close:hover {
+  opacity: 1 !important;
   background: var(--color-workspace-menu-hover);
   color: var(--color-workspace-tab-text-active);
+}
+
+.workspace-main__tab--dirty .workspace-main__tab-close:hover::before {
+  display: none;
+}
+
+.workspace-main__tab--dirty .workspace-main__tab-close:hover .el-icon {
+  opacity: 1;
 }
 
 .workspace-main__tabbar-env {
@@ -808,14 +861,22 @@ onBeforeUnmount(() => {
 }
 
 .workspace-main__env-select {
-  width: 140px;
+  width: 160px;
 }
 
 .workspace-main__env-select :deep(.el-select__wrapper) {
   background: transparent;
   box-shadow: none !important;
-  padding: 0 4px;
+  padding: 0 4px 0 2px;
   min-height: 32px;
+  gap: 6px;
+}
+
+.workspace-main__env-select :deep(.el-select__prefix) {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-workspace-tab-text-active);
+  margin-right: 0;
 }
 
 .workspace-main__env-select :deep(.el-select__selected-item) {
@@ -826,6 +887,26 @@ onBeforeUnmount(() => {
 .workspace-main__env-select :deep(.el-select__suffix),
 .workspace-main__env-select :deep(.el-select__caret) {
   display: none;
+}
+
+.workspace-main__env-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: inherit;
+  opacity: 0.85;
+}
+
+.workspace-main__env-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.workspace-main__env-dropdown .el-select-dropdown__item {
+  padding-left: 12px;
 }
 
 .workspace-main__tab-menu {
@@ -1061,20 +1142,12 @@ onBeforeUnmount(() => {
   color: #49cc90;
 }
 
-.workspace-main__status--testing {
-  color: #fca130;
+.workspace-main__status--integrating {
+  color: #409eff;
 }
 
 .workspace-main__status--developing {
   color: #61affe;
-}
-
-.workspace-main__status--abnormal {
-  color: #f93e3e;
-}
-
-.workspace-main__status--maintenance {
-  color: #fca130;
 }
 
 .workspace-main__status--deprecated {

@@ -112,10 +112,7 @@ func toItem(row *ent.ProjectShare, interfaceIDs []int64) Item {
 }
 
 func (Service) List(ctx context.Context, userID int64, params ListRequest) ([]Item, error) {
-	if _, err := workspace.Require(ctx, userID, params.WorkspaceID, workspace.ActionProjectRead); err != nil {
-		return nil, err
-	}
-	if err := project.EnsureExists(ctx, params.WorkspaceID, params.ProjectID); err != nil {
+	if _, err := project.RequireAccess(ctx, userID, params.WorkspaceID, params.ProjectID, workspace.ActionProjectRead); err != nil {
 		return nil, err
 	}
 
@@ -136,12 +133,11 @@ func (Service) List(ctx context.Context, userID int64, params ListRequest) ([]It
 }
 
 func (Service) Get(ctx context.Context, userID int64, params GetRequest) (*Item, error) {
-	if _, err := workspace.Require(ctx, userID, params.WorkspaceID, workspace.ActionProjectRead); err != nil {
-		return nil, err
-	}
-
 	row, err := Repo{}.GetByID(ctx, params.WorkspaceID, params.ShareID)
 	if err != nil {
+		return nil, err
+	}
+	if _, err := project.RequireAccess(ctx, userID, params.WorkspaceID, row.ProjectID, workspace.ActionProjectRead); err != nil {
 		return nil, err
 	}
 
@@ -154,10 +150,7 @@ func (Service) Get(ctx context.Context, userID int64, params GetRequest) (*Item,
 }
 
 func (Service) Create(ctx context.Context, userID int64, params CreateRequest) (*Item, error) {
-	if _, err := workspace.Require(ctx, userID, params.WorkspaceID, workspace.ActionProjectUpdate); err != nil {
-		return nil, err
-	}
-	if err := project.EnsureExists(ctx, params.WorkspaceID, params.ProjectID); err != nil {
+	if _, err := project.RequireAccess(ctx, userID, params.WorkspaceID, params.ProjectID, workspace.ActionProjectUpdate); err != nil {
 		return nil, err
 	}
 
@@ -234,13 +227,12 @@ func (Service) Create(ctx context.Context, userID int64, params CreateRequest) (
 }
 
 func (Service) Update(ctx context.Context, userID int64, params UpdateRequest) (*Item, error) {
-	if _, err := workspace.Require(ctx, userID, params.WorkspaceID, workspace.ActionProjectUpdate); err != nil {
-		return nil, err
-	}
-
 	repo := Repo{}
 	row, err := repo.GetByIDForUpdate(ctx, params.WorkspaceID, params.ShareID)
 	if err != nil {
+		return nil, err
+	}
+	if _, err := project.RequireAccess(ctx, userID, params.WorkspaceID, row.ProjectID, workspace.ActionProjectUpdate); err != nil {
 		return nil, err
 	}
 
@@ -302,7 +294,11 @@ func (Service) Update(ctx context.Context, userID int64, params UpdateRequest) (
 }
 
 func (Service) Delete(ctx context.Context, userID int64, params DeleteRequest) error {
-	if _, err := workspace.Require(ctx, userID, params.WorkspaceID, workspace.ActionProjectUpdate); err != nil {
+	row, err := Repo{}.GetByID(ctx, params.WorkspaceID, params.ShareID)
+	if err != nil {
+		return err
+	}
+	if _, err := project.RequireAccess(ctx, userID, params.WorkspaceID, row.ProjectID, workspace.ActionProjectUpdate); err != nil {
 		return err
 	}
 

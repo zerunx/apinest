@@ -4,6 +4,11 @@ import (
 	"context"
 
 	"nest-api/app/workspace"
+	"nest-api/internal/database"
+	"nest-api/internal/ent"
+	entproject "nest-api/internal/ent/project"
+	"nest-api/internal/ent/projectmember"
+	"nest-api/internal/ent/workspacemember"
 	"nest-api/internal/utils"
 	bizerr "nest-api/pkg/errors"
 )
@@ -11,11 +16,32 @@ import (
 type Service struct{}
 
 func (Service) List(ctx context.Context, userID int64, params ListRequest) ([]Item, error) {
-	if _, err := workspace.Require(ctx, userID, params.WorkspaceID, workspace.ActionProjectRead); err != nil {
+	access, err := workspace.Require(ctx, userID, params.WorkspaceID, workspace.ActionProjectRead)
+	if err != nil {
 		return nil, err
 	}
 
-	projects, err := Repo{}.ListByWorkspace(ctx, params.WorkspaceID)
+	var projects []*ent.Project
+	if workspace.IsWorkspaceAdmin(access.Role) {
+		projects, err = Repo{}.ListByWorkspace(ctx, params.WorkspaceID)
+	} else {
+		ids, listErr := ListProjectIDsForUser(ctx, params.WorkspaceID, userID)
+		if listErr != nil {
+			return nil, listErr
+		}
+		if len(ids) == 0 {
+			return []Item{}, nil
+		}
+		projects, err = database.DB.Project.
+			Query().
+			Where(
+				entproject.WorkspaceIDEQ(params.WorkspaceID),
+				entproject.IDIn(ids...),
+			).
+			WithCreator().
+			Order(ent.Desc(entproject.FieldID)).
+			All(ctx)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -39,23 +65,30 @@ func (Service) Create(ctx context.Context, userID int64, params CreateRequest) e
 		return err
 	}
 
-	_, err := Repo{}.Create(ctx, params.WorkspaceID, userID, params.Name)
-	return err
+	p, err := Repo{}.Create(ctx, params.WorkspaceID, userID, params.Name)
+	if err != nil {
+		return err
+	}
+	return AddMember(ctx, params.WorkspaceID, p.ID, userID)
 }
 
 func (Service) Update(ctx context.Context, userID int64, params UpdateRequest) error {
-	if _, err := workspace.Require(ctx, userID, params.WorkspaceID, workspace.ActionProjectUpdate); err != nil {
+	access, err := RequireAccess(ctx, userID, params.WorkspaceID, params.ProjectID, workspace.ActionProjectUpdate)
+	if err != nil {
 		return err
 	}
-	if err := EnsureExists(ctx, params.WorkspaceID, params.ProjectID); err != nil {
+	if err := assertCanManageProject(ctx, access, params.WorkspaceID, params.ProjectID); err != nil {
 		return err
 	}
-
 	return (Repo{}).UpdateName(ctx, params.ProjectID, params.Name)
 }
 
 func (Service) Delete(ctx context.Context, userID int64, params DeleteRequest) error {
-	if _, err := workspace.Require(ctx, userID, params.WorkspaceID, workspace.ActionProjectDelete); err != nil {
+	access, err := RequireAccess(ctx, userID, params.WorkspaceID, params.ProjectID, workspace.ActionProjectDelete)
+	if err != nil {
+		return err
+	}
+	if err := assertCanManageProject(ctx, access, params.WorkspaceID, params.ProjectID); err != nil {
 		return err
 	}
 
@@ -65,6 +98,53 @@ func (Service) Delete(ctx context.Context, userID int64, params DeleteRequest) e
 	}
 	if n == 0 {
 		return bizerr.New("项目不存在")
+	}
+	_, err = database.DB.ProjectMember.
+		Delete().
+		Where(projectmember.ProjectIDEQ(params.ProjectID)).
+		Exec(ctx)
+	return err
+}
+
+func assertCanManageProject(ctx context.Context, access *workspace.Access, workspaceID, projectID int64) error {
+	if workspace.IsWorkspaceAdmin(access.Role) {
+		return nil
+	}
+	p, err := Repo{}.Get(ctx, workspaceID, projectID)
+	if err != nil {
+		return err
+	}
+	if p.CreatedBy != access.UserID {
+		return bizerr.New("只能修改或删除自己创建的项目")
+	}
+	return nil
+}
+
+// BackfillMembersForExistingProjects grants creators + workspace admins access to legacy projects.
+func BackfillMembersForExistingProjects(ctx context.Context) error {
+	projects, err := database.DB.Project.Query().All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, p := range projects {
+		if err := AddMember(ctx, p.WorkspaceID, p.ID, p.CreatedBy); err != nil {
+			return err
+		}
+		admins, err := database.DB.WorkspaceMember.
+			Query().
+			Where(
+				workspacemember.WorkspaceIDEQ(p.WorkspaceID),
+				workspacemember.RoleIn(workspace.RoleOwner, workspace.RoleAdmin),
+			).
+			All(ctx)
+		if err != nil {
+			return err
+		}
+		for _, m := range admins {
+			if err := AddMember(ctx, p.WorkspaceID, p.ID, m.UserID); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }

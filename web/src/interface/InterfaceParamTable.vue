@@ -4,6 +4,7 @@ import { Delete } from '@element-plus/icons-vue'
 import { reorderList, useTableRowDrag } from '@/composables/useTableRowDrag'
 import { useLocale } from '@/composables/useLocale'
 import InterfaceDocCopyCell from '@/interface/InterfaceDocCopyCell.vue'
+import InterfaceTypeSelect from '@/interface/InterfaceTypeSelect.vue'
 import {
   compactParamRows,
   emptyParamRow,
@@ -135,11 +136,12 @@ watch(
   (rows) => {
     if (props.readonly || !rows.length) return
     const last = rows[rows.length - 1]
-    if (hasParamContent(last)) {
-      syncRows(rows)
-    }
+    if (!hasParamContent(last)) return
+    // Only append a trailing empty row — avoid deep clone loops on every edit.
+    const next = ensureTrailingEmptyRow(rows)
+    if (next === rows || next.length === rows.length) return
+    emit('update:modelValue', next)
   },
-  { deep: true },
 )
 
 defineExpose({ compact: () => compactParamRows(props.modelValue) })
@@ -234,14 +236,12 @@ defineExpose({ compact: () => compactParamRows(props.modelValue) })
         </td>
         <td class="interface-param-table__col-type">
           <span v-if="readonly" class="interface-param-table__text">{{ typeLabel(row.type) }}</span>
-          <select
+          <InterfaceTypeSelect
             v-else
-            class="interface-param-table__native-select"
-            :value="row.type"
-            @change="updateRow(index, { type: nativeValue($event) })"
-          >
-            <option v-for="type in fieldTypeOptions" :key="type" :value="type">{{ type }}</option>
-          </select>
+            :model-value="row.type || 'string'"
+            :options="fieldTypeOptions"
+            @update:model-value="updateRow(index, { type: $event })"
+          />
         </td>
         <td class="interface-param-table__center">
           <span v-if="readonly" class="interface-param-table__text">{{ requiredLabel(row.required) }}</span>

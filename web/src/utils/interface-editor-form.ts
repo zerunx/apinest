@@ -45,7 +45,7 @@ export function createEmptyInterfaceEditorForm(
     url: '/',
     folderId: null,
     name: '',
-    status: defaults?.status ?? 1,
+    status: defaults?.status ?? 3,
     requestHeaders: [emptyParamRow()],
     requestBody: {
       format: 'json',

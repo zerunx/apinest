@@ -25,35 +25,42 @@ export function removeMember(workspaceId: number, memberId: number) {
   )
 }
 
+export type InviteLinkRole = 3 | 4
+
 export interface InviteLinkInfo {
   workspace_id: number
   workspace_name: string
   invite_code: string
   invite_url: string
   site_url: string
+  role: InviteLinkRole
+  expires_at: string
 }
 
 export interface InvitePreviewInfo {
   workspace_id: number
   workspace_name: string
   invite_code: string
+  role: InviteLinkRole
+  expires_at: string
 }
 
 export interface AcceptInviteResult {
   workspace_id: number
   workspace_name: string
   already_member: boolean
+  role: InviteLinkRole
 }
 
-export function fetchInviteLink(workspaceId: number) {
+export function fetchInviteLink(workspaceId: number, role: InviteLinkRole) {
   return getData<InviteLinkInfo>(
-    http.get('/v1/members/invite/link', { params: { workspace_id: workspaceId } }),
+    http.get('/v1/members/invite/link', { params: { workspace_id: workspaceId, role } }),
   )
 }
 
-export function refreshInviteLink(workspaceId: number) {
+export function refreshInviteLink(workspaceId: number, role: InviteLinkRole) {
   return getData<InviteLinkInfo>(
-    http.post('/v1/members/invite/link/refresh', { workspace_id: workspaceId }),
+    http.post('/v1/members/invite/link/refresh', { workspace_id: workspaceId, role }),
   )
 }
 

@@ -41,7 +41,7 @@ function clearSaveUiTimer() {
     saveUiTimer = null
   }
 }
-const form = reactive(createEmptyInterfaceEditorForm({ method: 'POST', status: 1 }))
+const form = reactive(createEmptyInterfaceEditorForm({ method: 'POST', status: 3 }))
 const savedInterfaceId = ref<number | null>(null)
 const folderMenuOpen = ref(false)
 const editorTabId = computed(() =>
@@ -82,7 +82,7 @@ async function resetForNewApi() {
   beginSuppress()
   resetInterfaceEditorForm(form, {
     method: 'POST',
-    status: 1,
+    status: 3,
     folderId: resolveFolderId(),
   })
   form.responseResults = [defaultResponseResult(t('workspace.interfaceForm.defaultSuccess'))]

@@ -13,9 +13,11 @@ import (
 	"nest-api/internal/ent/folder"
 	"nest-api/internal/ent/predicate"
 	"nest-api/internal/ent/project"
+	"nest-api/internal/ent/projectmember"
 	"nest-api/internal/ent/projectshare"
 	"nest-api/internal/ent/user"
 	"nest-api/internal/ent/workspace"
+	"nest-api/internal/ent/workspaceinvite"
 	"nest-api/internal/ent/workspacemember"
 
 	"entgo.io/ent"
@@ -40,6 +42,8 @@ type UserQuery struct {
 	withCreatedEnvironments         *EnvironmentQuery
 	withCreatedEnvironmentVariables *EnvironmentVariableQuery
 	withCreatedProjectShares        *ProjectShareQuery
+	withCreatedWorkspaceInvites     *WorkspaceInviteQuery
+	withProjectMemberships          *ProjectMemberQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -274,6 +278,50 @@ func (_q *UserQuery) QueryCreatedProjectShares() *ProjectShareQuery {
 	return query
 }
 
+// QueryCreatedWorkspaceInvites chains the current query on the "created_workspace_invites" edge.
+func (_q *UserQuery) QueryCreatedWorkspaceInvites() *WorkspaceInviteQuery {
+	query := (&WorkspaceInviteClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(user.Table, user.FieldID, selector),
+			sqlgraph.To(workspaceinvite.Table, workspaceinvite.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, user.CreatedWorkspaceInvitesTable, user.CreatedWorkspaceInvitesColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryProjectMemberships chains the current query on the "project_memberships" edge.
+func (_q *UserQuery) QueryProjectMemberships() *ProjectMemberQuery {
+	query := (&ProjectMemberClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(user.Table, user.FieldID, selector),
+			sqlgraph.To(projectmember.Table, projectmember.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, user.ProjectMembershipsTable, user.ProjectMembershipsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
 // First returns the first User entity from the query.
 // Returns a *NotFoundError when no User was found.
 func (_q *UserQuery) First(ctx context.Context) (*User, error) {
@@ -475,6 +523,8 @@ func (_q *UserQuery) Clone() *UserQuery {
 		withCreatedEnvironments:         _q.withCreatedEnvironments.Clone(),
 		withCreatedEnvironmentVariables: _q.withCreatedEnvironmentVariables.Clone(),
 		withCreatedProjectShares:        _q.withCreatedProjectShares.Clone(),
+		withCreatedWorkspaceInvites:     _q.withCreatedWorkspaceInvites.Clone(),
+		withProjectMemberships:          _q.withProjectMemberships.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
@@ -580,6 +630,28 @@ func (_q *UserQuery) WithCreatedProjectShares(opts ...func(*ProjectShareQuery)) 
 	return _q
 }
 
+// WithCreatedWorkspaceInvites tells the query-builder to eager-load the nodes that are connected to
+// the "created_workspace_invites" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *UserQuery) WithCreatedWorkspaceInvites(opts ...func(*WorkspaceInviteQuery)) *UserQuery {
+	query := (&WorkspaceInviteClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withCreatedWorkspaceInvites = query
+	return _q
+}
+
+// WithProjectMemberships tells the query-builder to eager-load the nodes that are connected to
+// the "project_memberships" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *UserQuery) WithProjectMemberships(opts ...func(*ProjectMemberQuery)) *UserQuery {
+	query := (&ProjectMemberClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withProjectMemberships = query
+	return _q
+}
+
 // GroupBy is used to group vertices by one or more fields/columns.
 // It is often used with aggregate functions, like: count, max, mean, min, sum.
 //
@@ -658,7 +730,7 @@ func (_q *UserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*User, e
 	var (
 		nodes       = []*User{}
 		_spec       = _q.querySpec()
-		loadedTypes = [9]bool{
+		loadedTypes = [11]bool{
 			_q.withOwnedWorkspaces != nil,
 			_q.withWorkspaceMemberships != nil,
 			_q.withCreatedProjects != nil,
@@ -668,6 +740,8 @@ func (_q *UserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*User, e
 			_q.withCreatedEnvironments != nil,
 			_q.withCreatedEnvironmentVariables != nil,
 			_q.withCreatedProjectShares != nil,
+			_q.withCreatedWorkspaceInvites != nil,
+			_q.withProjectMemberships != nil,
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
@@ -752,6 +826,22 @@ func (_q *UserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*User, e
 		if err := _q.loadCreatedProjectShares(ctx, query, nodes,
 			func(n *User) { n.Edges.CreatedProjectShares = []*ProjectShare{} },
 			func(n *User, e *ProjectShare) { n.Edges.CreatedProjectShares = append(n.Edges.CreatedProjectShares, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withCreatedWorkspaceInvites; query != nil {
+		if err := _q.loadCreatedWorkspaceInvites(ctx, query, nodes,
+			func(n *User) { n.Edges.CreatedWorkspaceInvites = []*WorkspaceInvite{} },
+			func(n *User, e *WorkspaceInvite) {
+				n.Edges.CreatedWorkspaceInvites = append(n.Edges.CreatedWorkspaceInvites, e)
+			}); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withProjectMemberships; query != nil {
+		if err := _q.loadProjectMemberships(ctx, query, nodes,
+			func(n *User) { n.Edges.ProjectMemberships = []*ProjectMember{} },
+			func(n *User, e *ProjectMember) { n.Edges.ProjectMemberships = append(n.Edges.ProjectMemberships, e) }); err != nil {
 			return nil, err
 		}
 	}
@@ -1023,6 +1113,66 @@ func (_q *UserQuery) loadCreatedProjectShares(ctx context.Context, query *Projec
 		node, ok := nodeids[fk]
 		if !ok {
 			return fmt.Errorf(`unexpected referenced foreign-key "created_by" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *UserQuery) loadCreatedWorkspaceInvites(ctx context.Context, query *WorkspaceInviteQuery, nodes []*User, init func(*User), assign func(*User, *WorkspaceInvite)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int64]*User)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(workspaceinvite.FieldCreatedBy)
+	}
+	query.Where(predicate.WorkspaceInvite(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(user.CreatedWorkspaceInvitesColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.CreatedBy
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "created_by" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *UserQuery) loadProjectMemberships(ctx context.Context, query *ProjectMemberQuery, nodes []*User, init func(*User), assign func(*User, *ProjectMember)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int64]*User)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(projectmember.FieldUserID)
+	}
+	query.Where(predicate.ProjectMember(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(user.ProjectMembershipsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.UserID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "user_id" returned %v for node %v`, fk, n.ID)
 		}
 		assign(node, n)
 	}

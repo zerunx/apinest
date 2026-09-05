@@ -6,18 +6,22 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+	"time"
 
 	appworkspace "nest-api/app/workspace"
 	"nest-api/internal/database"
 	"nest-api/internal/ent"
 	"nest-api/internal/ent/workspace"
+	"nest-api/internal/ent/workspaceinvite"
 	"nest-api/internal/ent/workspacemember"
 	"nest-api/internal/runtime"
+	"nest-api/internal/utils"
 	bizerr "nest-api/pkg/errors"
 )
 
 const inviteCodeCharset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-const inviteCodeLength = 6
+const inviteCodeLength = 12
+const inviteTTL = 7 * 24 * time.Hour
 
 func generateInviteCode() (string, error) {
 	b := make([]byte, inviteCodeLength)
@@ -32,53 +36,6 @@ func generateInviteCode() (string, error) {
 	return string(b), nil
 }
 
-func ensureInviteCode(ctx context.Context, workspaceID int64) (string, error) {
-	ws, err := database.DB.Workspace.
-		Query().
-		Where(workspace.IDEQ(workspaceID)).
-		Only(ctx)
-	if err != nil {
-		if ent.IsNotFound(err) {
-			return "", bizerr.New("工作空间不存在")
-		}
-		return "", err
-	}
-	if strings.TrimSpace(ws.InviteCode) != "" {
-		return ws.InviteCode, nil
-	}
-	return assignInviteCode(ctx, workspaceID)
-}
-
-func assignInviteCode(ctx context.Context, workspaceID int64) (string, error) {
-	for range 8 {
-		code, err := generateInviteCode()
-		if err != nil {
-			return "", err
-		}
-
-		exists, err := database.DB.Workspace.
-			Query().
-			Where(workspace.InviteCodeEQ(code)).
-			Exist(ctx)
-		if err != nil {
-			return "", err
-		}
-		if exists {
-			continue
-		}
-
-		_, err = database.DB.Workspace.
-			UpdateOneID(workspaceID).
-			SetInviteCode(code).
-			Save(ctx)
-		if err != nil {
-			return "", err
-		}
-		return code, nil
-	}
-	return "", bizerr.New("生成邀请码失败，请重试")
-}
-
 func buildInviteURL(code string) string {
 	base := strings.TrimRight(runtime.SiteURL(), "/")
 	if base == "" {
@@ -87,9 +44,73 @@ func buildInviteURL(code string) string {
 	return fmt.Sprintf("%s/invite?inviteCode=%s", base, code)
 }
 
+func inviteExpiresAt() utils.DateTime {
+	return utils.DateTime{Time: time.Now().Add(inviteTTL)}
+}
+
+func toInviteLinkResponse(ws *ent.Workspace, inv *ent.WorkspaceInvite) *InviteLinkResponse {
+	return &InviteLinkResponse{
+		WorkspaceID:   ws.ID,
+		WorkspaceName: ws.Name,
+		InviteCode:    inv.InviteCode,
+		InviteURL:     buildInviteURL(inv.InviteCode),
+		SiteURL:       runtime.SiteURL(),
+		Role:          inv.Role,
+		ExpiresAt:     inv.ExpiresAt.Format(utils.DateTimeFormat),
+	}
+}
+
+func createInvite(ctx context.Context, workspaceID, userID int64, role uint8) (*ent.WorkspaceInvite, error) {
+	for range 8 {
+		code, err := generateInviteCode()
+		if err != nil {
+			return nil, err
+		}
+		exists, err := database.DB.WorkspaceInvite.
+			Query().
+			Where(workspaceinvite.InviteCodeEQ(code)).
+			Exist(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if exists {
+			continue
+		}
+		return database.DB.WorkspaceInvite.
+			Create().
+			SetWorkspaceID(workspaceID).
+			SetInviteCode(code).
+			SetRole(role).
+			SetCreatedBy(userID).
+			SetExpiresAt(inviteExpiresAt()).
+			Save(ctx)
+	}
+	return nil, bizerr.New("生成邀请码失败，请重试")
+}
+
+func findActiveInvite(ctx context.Context, workspaceID int64, role uint8) (*ent.WorkspaceInvite, error) {
+	now := utils.Now()
+	return database.DB.WorkspaceInvite.
+		Query().
+		Where(
+			workspaceinvite.WorkspaceIDEQ(workspaceID),
+			workspaceinvite.RoleEQ(role),
+			workspaceinvite.ExpiresAtGT(now),
+		).
+		Order(ent.Desc(workspaceinvite.FieldID)).
+		First(ctx)
+}
+
 func (Service) GetInviteLink(ctx context.Context, userID int64, params InviteLinkRequest) (*InviteLinkResponse, error) {
 	if _, err := appworkspace.Require(ctx, userID, params.WorkspaceID, appworkspace.ActionMemberInvite); err != nil {
 		return nil, err
+	}
+	role := params.Role
+	if role == 0 {
+		role = appworkspace.RoleViewer
+	}
+	if !appworkspace.IsInviteLinkRole(role) {
+		return nil, bizerr.New("邀请角色仅支持编辑者或查看者")
 	}
 
 	ws, err := database.DB.Workspace.
@@ -103,24 +124,30 @@ func (Service) GetInviteLink(ctx context.Context, userID int64, params InviteLin
 		return nil, err
 	}
 
-	code, err := ensureInviteCode(ctx, params.WorkspaceID)
+	inv, err := findActiveInvite(ctx, params.WorkspaceID, role)
 	if err != nil {
-		return nil, err
+		if !ent.IsNotFound(err) {
+			return nil, err
+		}
+		inv, err = createInvite(ctx, params.WorkspaceID, userID, role)
+		if err != nil {
+			return nil, err
+		}
 	}
-
-	return &InviteLinkResponse{
-		WorkspaceID:   ws.ID,
-		WorkspaceName: ws.Name,
-		InviteCode:    code,
-		InviteURL:     buildInviteURL(code),
-		SiteURL:       runtime.SiteURL(),
-	}, nil
+	return toInviteLinkResponse(ws, inv), nil
 }
 
 func (Service) RefreshInviteLink(ctx context.Context, userID int64, params InviteLinkRequest) (*InviteLinkResponse, error) {
 	if _, err := appworkspace.Require(ctx, userID, params.WorkspaceID, appworkspace.ActionMemberInvite); err != nil {
 		return nil, err
 	}
+	role := params.Role
+	if role == 0 {
+		role = appworkspace.RoleViewer
+	}
+	if !appworkspace.IsInviteLinkRole(role) {
+		return nil, bizerr.New("邀请角色仅支持编辑者或查看者")
+	}
 
 	ws, err := database.DB.Workspace.
 		Query().
@@ -133,58 +160,77 @@ func (Service) RefreshInviteLink(ctx context.Context, userID int64, params Invit
 		return nil, err
 	}
 
-	code, err := assignInviteCode(ctx, params.WorkspaceID)
+	// Expire existing active invites for this role.
+	_, err = database.DB.WorkspaceInvite.
+		Update().
+		Where(
+			workspaceinvite.WorkspaceIDEQ(params.WorkspaceID),
+			workspaceinvite.RoleEQ(role),
+			workspaceinvite.ExpiresAtGT(utils.Now()),
+		).
+		SetExpiresAt(utils.Now()).
+		Save(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	return &InviteLinkResponse{
-		WorkspaceID:   ws.ID,
-		WorkspaceName: ws.Name,
-		InviteCode:    code,
-		InviteURL:     buildInviteURL(code),
-		SiteURL:       runtime.SiteURL(),
-	}, nil
+	inv, err := createInvite(ctx, params.WorkspaceID, userID, role)
+	if err != nil {
+		return nil, err
+	}
+	return toInviteLinkResponse(ws, inv), nil
 }
 
-func (Service) PreviewInvite(ctx context.Context, params InvitePreviewRequest) (*InvitePreviewResponse, error) {
-	code := strings.TrimSpace(params.InviteCode)
+func loadInviteByCode(ctx context.Context, code string) (*ent.WorkspaceInvite, *ent.Workspace, error) {
+	code = strings.TrimSpace(code)
 	if code == "" {
-		return nil, bizerr.New("邀请码无效")
+		return nil, nil, bizerr.New("邀请码无效")
+	}
+
+	inv, err := database.DB.WorkspaceInvite.
+		Query().
+		Where(workspaceinvite.InviteCodeEQ(code)).
+		Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, nil, bizerr.New("邀请链接无效或已过期")
+		}
+		return nil, nil, err
+	}
+	if !inv.ExpiresAt.After(time.Now()) {
+		return nil, nil, bizerr.New("邀请链接无效或已过期")
 	}
 
 	ws, err := database.DB.Workspace.
 		Query().
-		Where(workspace.InviteCodeEQ(code)).
+		Where(workspace.IDEQ(inv.WorkspaceID)).
 		Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			return nil, bizerr.New("邀请链接无效或已过期")
+			return nil, nil, bizerr.New("工作空间不存在")
 		}
+		return nil, nil, err
+	}
+	return inv, ws, nil
+}
+
+func (Service) PreviewInvite(ctx context.Context, params InvitePreviewRequest) (*InvitePreviewResponse, error) {
+	inv, ws, err := loadInviteByCode(ctx, params.InviteCode)
+	if err != nil {
 		return nil, err
 	}
-
 	return &InvitePreviewResponse{
 		WorkspaceID:   ws.ID,
 		WorkspaceName: ws.Name,
-		InviteCode:    code,
+		InviteCode:    inv.InviteCode,
+		Role:          inv.Role,
+		ExpiresAt:     inv.ExpiresAt.Format(utils.DateTimeFormat),
 	}, nil
 }
 
 func (Service) AcceptInvite(ctx context.Context, userID int64, params AcceptInviteRequest) (*AcceptInviteResponse, error) {
-	code := strings.TrimSpace(params.InviteCode)
-	if code == "" {
-		return nil, bizerr.New("邀请码无效")
-	}
-
-	ws, err := database.DB.Workspace.
-		Query().
-		Where(workspace.InviteCodeEQ(code)).
-		Only(ctx)
+	inv, ws, err := loadInviteByCode(ctx, params.InviteCode)
 	if err != nil {
-		if ent.IsNotFound(err) {
-			return nil, bizerr.New("邀请链接无效或已过期")
-		}
 		return nil, err
 	}
 
@@ -203,14 +249,20 @@ func (Service) AcceptInvite(ctx context.Context, userID int64, params AcceptInvi
 			WorkspaceID:   ws.ID,
 			WorkspaceName: ws.Name,
 			AlreadyMember: true,
+			Role:          inv.Role,
 		}, nil
+	}
+
+	role := inv.Role
+	if !appworkspace.IsInviteLinkRole(role) {
+		role = appworkspace.RoleViewer
 	}
 
 	_, err = database.DB.WorkspaceMember.
 		Create().
 		SetWorkspaceID(ws.ID).
 		SetUserID(userID).
-		SetRole(appworkspace.RoleEditor).
+		SetRole(role).
 		Save(ctx)
 	if err != nil {
 		return nil, err
@@ -220,5 +272,6 @@ func (Service) AcceptInvite(ctx context.Context, userID int64, params AcceptInvi
 		WorkspaceID:   ws.ID,
 		WorkspaceName: ws.Name,
 		AlreadyMember: false,
+		Role:          role,
 	}, nil
 }

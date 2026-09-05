@@ -444,6 +444,52 @@ func HasProjectsWith(preds ...predicate.Project) predicate.Workspace {
 	})
 }
 
+// HasInvites applies the HasEdge predicate on the "invites" edge.
+func HasInvites() predicate.Workspace {
+	return predicate.Workspace(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, InvitesTable, InvitesColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasInvitesWith applies the HasEdge predicate on the "invites" edge with a given conditions (other predicates).
+func HasInvitesWith(preds ...predicate.WorkspaceInvite) predicate.Workspace {
+	return predicate.Workspace(func(s *sql.Selector) {
+		step := newInvitesStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasProjectMembers applies the HasEdge predicate on the "project_members" edge.
+func HasProjectMembers() predicate.Workspace {
+	return predicate.Workspace(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, ProjectMembersTable, ProjectMembersColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasProjectMembersWith applies the HasEdge predicate on the "project_members" edge with a given conditions (other predicates).
+func HasProjectMembersWith(preds ...predicate.ProjectMember) predicate.Workspace {
+	return predicate.Workspace(func(s *sql.Selector) {
+		step := newProjectMembersStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // And groups predicates with the AND operator between them.
 func And(predicates ...predicate.Workspace) predicate.Workspace {
 	return predicate.Workspace(sql.AndPredicates(predicates...))

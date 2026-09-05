@@ -21,3 +21,12 @@ type WorkspaceItem struct {
 type TransferWorkspaceRequest struct {
 	OwnerID int64 `json:"owner_id" binding:"required,min=1"`
 }
+
+type UpdateUserRequest struct {
+	Name     string `json:"name" binding:"omitempty,max=50"`
+	Account  string `json:"account" binding:"required,min=3,max=50"`
+	Email    string `json:"email" binding:"omitempty,max=100"`
+	Password string `json:"password" binding:"omitempty,min=6,max=72"`
+	IsAdmin  bool   `json:"is_admin"`
+	Status   int8   `json:"status" binding:"oneof=0 1"`
+}

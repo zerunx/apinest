@@ -6,7 +6,9 @@ const THEME_KEY = 'apinest_theme'
 const theme = ref<ThemeMode>((localStorage.getItem(THEME_KEY) as ThemeMode) || 'dark')
 
 function applyTheme(mode: ThemeMode) {
-  document.documentElement.setAttribute('data-theme', mode)
+  const root = document.documentElement
+  root.setAttribute('data-theme', mode)
+  root.style.colorScheme = mode
   localStorage.setItem(THEME_KEY, mode)
 }
 

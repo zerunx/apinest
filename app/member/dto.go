@@ -32,7 +32,8 @@ type DeleteRequest struct {
 }
 
 type InviteLinkRequest struct {
-	WorkspaceID int64 `form:"workspace_id" json:"workspace_id" binding:"required,min=1"`
+	WorkspaceID int64  `form:"workspace_id" json:"workspace_id" binding:"required,min=1"`
+	Role        uint8  `form:"role" json:"role"`
 }
 
 type InviteLinkResponse struct {
@@ -41,24 +42,29 @@ type InviteLinkResponse struct {
 	InviteCode    string `json:"invite_code"`
 	InviteURL     string `json:"invite_url"`
 	SiteURL       string `json:"site_url"`
+	Role          uint8  `json:"role"`
+	ExpiresAt     string `json:"expires_at"`
 }
 
 type InvitePreviewRequest struct {
-	InviteCode string `form:"invite_code" binding:"required,min=1,max=12"`
+	InviteCode string `form:"invite_code" binding:"required,min=1,max=32"`
 }
 
 type InvitePreviewResponse struct {
 	WorkspaceID   int64  `json:"workspace_id"`
 	WorkspaceName string `json:"workspace_name"`
 	InviteCode    string `json:"invite_code"`
+	Role          uint8  `json:"role"`
+	ExpiresAt     string `json:"expires_at"`
 }
 
 type AcceptInviteRequest struct {
-	InviteCode string `json:"invite_code" binding:"required,min=1,max=12"`
+	InviteCode string `json:"invite_code" binding:"required,min=1,max=32"`
 }
 
 type AcceptInviteResponse struct {
 	WorkspaceID   int64  `json:"workspace_id"`
 	WorkspaceName string `json:"workspace_name"`
 	AlreadyMember bool   `json:"already_member"`
+	Role          uint8  `json:"role"`
 }

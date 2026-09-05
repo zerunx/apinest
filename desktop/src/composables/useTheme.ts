@@ -7,7 +7,9 @@ const theme = ref<ThemeMode>('light')
 let initialized = false
 
 function applyTheme(mode: ThemeMode) {
-  document.documentElement.setAttribute('data-theme', mode)
+  const root = document.documentElement
+  root.setAttribute('data-theme', mode)
+  root.style.colorScheme = mode
 }
 
 export async function initTheme() {

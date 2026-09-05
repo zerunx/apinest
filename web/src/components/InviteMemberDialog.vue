@@ -2,7 +2,11 @@
 import { computed, ref, watch } from 'vue'
 import { RefreshRight } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { fetchInviteLink, refreshInviteLink } from '@/api/member'
+import {
+  fetchInviteLink,
+  refreshInviteLink,
+  type InviteLinkRole,
+} from '@/api/member'
 import { useLocale } from '@/composables/useLocale'
 import { useWorkspaceContext } from '@/composables/useWorkspaceContext'
 
@@ -14,16 +18,25 @@ const visible = defineModel<boolean>({ default: false })
 const loading = ref(false)
 const refreshing = ref(false)
 const inviteUrl = ref('')
+const expiresAt = ref('')
+const inviteRole = ref<InviteLinkRole>(4)
 
 const workspaceName = computed(() => activeWorkspace.value?.name || '')
+
+const roleOptions = computed(() => [
+  { value: 3 as InviteLinkRole, label: t('member.roles.editor') },
+  { value: 4 as InviteLinkRole, label: t('member.roles.viewer') },
+])
 
 async function loadInviteLink() {
   if (!activeWorkspaceId.value) return
 
   loading.value = true
   try {
-    const data = await fetchInviteLink(activeWorkspaceId.value)
+    const data = await fetchInviteLink(activeWorkspaceId.value, inviteRole.value)
     inviteUrl.value = data.invite_url
+    expiresAt.value = data.expires_at
+    inviteRole.value = data.role
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : t('member.inviteLinkFailed'))
     visible.value = false
@@ -37,8 +50,10 @@ async function handleRefresh() {
 
   refreshing.value = true
   try {
-    const data = await refreshInviteLink(activeWorkspaceId.value)
+    const data = await refreshInviteLink(activeWorkspaceId.value, inviteRole.value)
     inviteUrl.value = data.invite_url
+    expiresAt.value = data.expires_at
+    inviteRole.value = data.role
     ElMessage.success(t('member.inviteLinkRefreshed'))
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : t('member.inviteLinkRefreshFailed'))
@@ -60,9 +75,17 @@ async function copyLink() {
 watch(visible, (open) => {
   if (open) {
     inviteUrl.value = ''
+    expiresAt.value = ''
+    inviteRole.value = 4
     loadInviteLink()
   }
 })
+
+function selectRole(role: InviteLinkRole) {
+  if (inviteRole.value === role) return
+  inviteRole.value = role
+  if (visible.value) void loadInviteLink()
+}
 </script>
 
 <template>
@@ -77,6 +100,23 @@ watch(visible, (open) => {
     <div v-loading="loading" class="invite-member-dialog__body">
       <p>{{ t('member.inviteIntro') }}</p>
       <p>{{ t('member.inviteWorkspaceName', { name: workspaceName }) }}</p>
+
+      <div class="invite-member-dialog__field">
+        <span class="invite-member-dialog__label">{{ t('member.inviteRoleLabel') }}</span>
+        <div class="invite-member-dialog__roles" role="group">
+          <button
+            v-for="item in roleOptions"
+            :key="item.value"
+            type="button"
+            class="invite-member-dialog__role-btn"
+            :class="{ 'invite-member-dialog__role-btn--active': inviteRole === item.value }"
+            @click="selectRole(item.value)"
+          >
+            {{ item.label }}
+          </button>
+        </div>
+      </div>
+
       <p>{{ t('member.inviteClickLink') }}</p>
       <div class="invite-member-dialog__link-row">
         <span class="invite-member-dialog__link">{{ inviteUrl || '—' }}</span>
@@ -92,6 +132,9 @@ watch(visible, (open) => {
           </el-icon>
         </button>
       </div>
+      <p v-if="expiresAt" class="invite-member-dialog__meta">
+        {{ t('member.inviteExpiresLabel') }}：{{ expiresAt }}
+      </p>
     </div>
 
     <template #footer>
@@ -116,11 +159,62 @@ watch(visible, (open) => {
 }
 
 .invite-member-dialog__body > p,
-.invite-member-dialog__link-row {
+.invite-member-dialog__link-row,
+.invite-member-dialog__field,
+.invite-member-dialog__meta {
   margin: 0;
   font-size: 14px;
   line-height: 1.6;
   color: var(--color-text);
+}
+
+.invite-member-dialog__field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.invite-member-dialog__label {
+  font-weight: 600;
+}
+
+.invite-member-dialog__roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.invite-member-dialog__role-btn {
+  min-width: 88px;
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-workspace-elevated);
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.invite-member-dialog__role-btn:hover {
+  border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border));
+  color: var(--color-text);
+}
+
+.invite-member-dialog__role-btn--active {
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 14%, transparent);
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.invite-member-dialog__meta {
+  color: var(--color-text-secondary);
+  font-size: 13px;
 }
 
 .invite-member-dialog__link-row {

@@ -38,6 +38,24 @@ export type EnvironmentVariableRow = {
   enabled: boolean
 }
 
+export type DictionaryEntryRow = {
+  id: number
+  workspace_id: number
+  name: string
+  field_type: string
+  description: string
+  default_value: string
+  source_system_key: string | null
+}
+
+export type SystemDictionaryItem = {
+  key: string
+  name: string
+  field_type: string
+  description: string
+  default_value: string
+}
+
 export type HeaderPair = {
   key: string
   value: string

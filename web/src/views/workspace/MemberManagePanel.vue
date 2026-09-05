@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { Delete } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { fetchMembers, inviteMember, removeMember, updateMemberRole } from '@/api/member'
 import { useLocale } from '@/composables/useLocale'
@@ -133,27 +134,29 @@ onMounted(() => {
 <template>
   <div class="member-panel workspace-panel">
     <div class="member-panel__toolbar workspace-panel__toolbar">
-      <div>
-        <h2>{{ t('member.title') }}</h2>
-        <p v-if="activeWorkspace">
-          {{ t('member.desc', { name: activeWorkspace.name }) }}
-        </p>
-      </div>
-      <el-button type="primary" @click="inviteVisible = true">
-        {{ t('member.invite') }}
+      <el-button type="primary" class="workspace-action-btn" @click="inviteVisible = true">
+        <span>{{ t('member.invite') }}</span>
       </el-button>
+      <p v-if="activeWorkspace" class="workspace-panel__toolbar-desc">
+        {{ t('member.desc', { name: activeWorkspace.name }) }}
+      </p>
     </div>
 
-    <el-table v-loading="loading" :data="members" class="workspace-data-table">
-      <el-table-column prop="name" :label="t('member.columns.name')" min-width="120" />
-      <el-table-column prop="account" :label="t('member.columns.account')" min-width="140" />
-      <el-table-column :label="t('member.columns.role')" width="160">
+    <el-table
+      v-loading="loading"
+      :data="members"
+      class="workspace-data-table member-panel__table"
+      :header-cell-style="{ borderBottom: 'none' }"
+    >
+      <el-table-column prop="name" :label="t('member.columns.name')" min-width="140" show-overflow-tooltip />
+      <el-table-column prop="account" :label="t('member.columns.account')" min-width="160" show-overflow-tooltip />
+      <el-table-column :label="t('member.columns.role')" min-width="140" width="168">
         <template #default="{ row }">
           <el-select
             v-if="canManageMember(row)"
+            class="member-panel__role-select"
             :model-value="row.role"
             :loading="updatingId === row.id"
-            style="width: 130px"
             popper-class="app-action-dropdown"
             @change="(value: WorkspaceRole) => handleRoleChange(row, value)"
           >
@@ -164,21 +167,29 @@ onMounted(() => {
               :value="item.value"
             />
           </el-select>
-          <el-tag v-else type="warning" size="small">{{ roleLabel(row.role) }}</el-tag>
+          <span v-else class="member-panel__role-badge">{{ roleLabel(row.role) }}</span>
         </template>
       </el-table-column>
       <el-table-column prop="created_at" :label="t('member.columns.joinedAt')" min-width="180" />
-      <el-table-column :label="t('member.columns.actions')" width="100" fixed="right">
+      <el-table-column
+        :label="t('member.columns.actions')"
+        width="108"
+        class-name="workspace-table-actions-col"
+        label-class-name="workspace-table-actions-col"
+      >
         <template #default="{ row }">
-          <el-button
-            v-if="canManageMember(row)"
-            type="danger"
-            link
-            :loading="removingId === row.id"
-            @click="handleRemove(row)"
-          >
-            {{ t('member.remove') }}
-          </el-button>
+          <div v-if="canManageMember(row)" class="workspace-table-actions">
+            <button
+              type="button"
+              class="workspace-table-action-btn workspace-table-action-btn--danger"
+              :title="t('member.remove')"
+              :disabled="removingId === row.id"
+              @click="handleRemove(row)"
+            >
+              <el-icon :size="14"><Delete /></el-icon>
+            </button>
+          </div>
+          <span v-else class="member-panel__muted">—</span>
         </template>
       </el-table-column>
     </el-table>
@@ -189,7 +200,7 @@ onMounted(() => {
           <el-input
             v-model="inviteForm.userId"
             :placeholder="t('member.userIdPlaceholder')"
-            type="number"
+            inputmode="numeric"
           />
         </el-form-item>
         <el-form-item :label="t('member.columns.role')" required>
@@ -214,11 +225,32 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.member-panel {
-  padding: 10px 8px 20px;
+.member-panel__role-select {
+  width: 100%;
 }
 
-.member-panel__toolbar {
-  margin-bottom: 12px;
+.member-panel__role-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+  color: var(--color-primary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.member-panel__muted {
+  color: var(--color-text-secondary);
+  opacity: 0.55;
+}
+
+.member-panel__table :deep(td .cell:has(.member-panel__role-select)) {
+  overflow: visible;
+}
+
+.member-panel__table :deep(.member-panel__role-select .el-select__wrapper) {
+  width: 100%;
 }
 </style>

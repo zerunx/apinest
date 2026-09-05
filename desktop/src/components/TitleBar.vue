@@ -34,28 +34,69 @@
             :placeholder="t('workspace.search')"
             autofocus
           />
-          <button
-            v-for="w in filteredWorkspaces"
-            :key="w.id"
-            type="button"
-            class="ws-item"
-            :class="{ active: w.id === workspaceId }"
-            @click="onPickWorkspace(w.id)"
-          >
-            <span class="ws-icon">
-              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8">
-                <circle cx="9" cy="8" r="3.2" />
-                <circle cx="16.5" cy="9.5" r="2.6" />
-                <path d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5" />
-                <path d="M13.2 16.2c.7-1.7 2.2-2.7 4.1-2.7 1.5 0 2.8.6 3.6 1.7" />
-              </svg>
-            </span>
-            <span>{{ w.name }}</span>
-          </button>
-          <p v-if="!filteredWorkspaces.length" class="ws-empty muted">{{ t('workspace.none') }}</p>
-          <button type="button" class="ws-item ws-create" @click="openCreateWorkspace($event)">
-            + {{ t('workspace.label') }}
-          </button>
+          <div class="ws-list">
+            <div
+              v-for="w in filteredWorkspaces"
+              :key="w.id"
+              class="ws-row"
+              :class="{ active: w.id === workspaceId }"
+            >
+              <button type="button" class="ws-item ws-item-main" @click="onPickWorkspace(w.id)">
+                <span class="ws-icon">
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <circle cx="9" cy="8" r="3.2" />
+                    <circle cx="16.5" cy="9.5" r="2.6" />
+                    <path d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5" />
+                    <path d="M13.2 16.2c.7-1.7 2.2-2.7 4.1-2.7 1.5 0 2.8.6 3.6 1.7" />
+                  </svg>
+                </span>
+                <span class="ws-item-name">{{ w.name }}</span>
+              </button>
+              <div class="ws-item-actions">
+                <button
+                  type="button"
+                  class="ws-action"
+                  :title="t('dict.title')"
+                  @click.stop="openDictionary(w)"
+                >
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                    <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H12v18H6.5A2.5 2.5 0 0 1 4 18.5v-13z" />
+                    <path d="M20 5.5A2.5 2.5 0 0 0 17.5 3H12v18h5.5A2.5 2.5 0 0 0 20 18.5v-13z" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  class="ws-action"
+                  :title="t('common.edit')"
+                  @click.stop="openEditWorkspace(w, $event)"
+                >
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  class="ws-action danger"
+                  :title="t('common.delete')"
+                  @click.stop="openDeleteWorkspace(w, $event)"
+                >
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                    <path d="M3 6h18" />
+                    <path d="M8 6V4h8v2" />
+                    <path d="M19 6l-1 14H6L5 6" />
+                    <path d="M10 11v6M14 11v6" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <p v-if="!filteredWorkspaces.length" class="ws-empty muted">{{ t('workspace.none') }}</p>
+          </div>
+          <div class="ws-footer">
+            <button type="button" class="ws-create" @click="openCreateWorkspace($event)">
+              <span>{{ t('create.workspace') }}</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -139,10 +180,23 @@
   <SettingsDialog />
   <NameDialog
     v-model:open="wsDialogOpen"
-    :title="t('create.workspace')"
+    :title="wsDialogTitle"
     :label="t('workspace.label')"
+    :initial="wsDialogInitial"
     :anchor="wsDialogAnchor"
-    @confirm="confirmCreateWorkspace"
+    @confirm="confirmWorkspaceName"
+  />
+  <ConfirmDialog
+    v-model:open="wsDeleteOpen"
+    :title="t('workspace.delete')"
+    :message="t('workspace.deleteConfirm', { name: wsDeleteTarget?.name || '' })"
+    :anchor="wsDialogAnchor"
+    @confirm="confirmDeleteWorkspace"
+  />
+  <DictionaryManageDialog
+    v-model:open="dictOpen"
+    :workspace-id="dictWorkspaceId"
+    :workspace-name="dictWorkspaceName"
   />
 </template>
 
@@ -153,16 +207,27 @@ import { invoke } from '@tauri-apps/api/core'
 import { useI18n } from '../i18n'
 import { useAppUi } from '../composables/useAppUi'
 import { useWorkspaceContext } from '../composables/useWorkspaceContext'
+import { useToast } from '../composables/useToast'
 import SettingsDialog from './SettingsDialog.vue'
 import NameDialog from './NameDialog.vue'
+import ConfirmDialog from './ConfirmDialog.vue'
+import DictionaryManageDialog from './DictionaryManageDialog.vue'
 import { anchorFromEvent, type DialogAnchor } from '../composables/useDialogAnchor'
 import { bindOutsidePointerDismiss } from '../composables/useOverlayDismiss'
 import { isMacOS } from '../utils/platform'
+import type { WorkspaceRow } from '../types'
 
 const { t } = useI18n()
+const { showToast } = useToast()
 const { session, refreshSession, openSettings, openLogin } = useAppUi()
-const { workspaces, workspaceId, currentWorkspace, selectWorkspace, loadWorkspaces } =
-  useWorkspaceContext()
+const {
+  workspaces,
+  workspaceId,
+  currentWorkspace,
+  selectWorkspace,
+  loadWorkspaces,
+  refreshAfterSync,
+} = useWorkspaceContext()
 
 /** Native traffic lights on macOS; custom buttons only on Windows/Linux. */
 const isMac = isMacOS()
@@ -173,7 +238,19 @@ const avatarOpen = ref(false)
 const wsWrapRef = ref<HTMLElement | null>(null)
 const avatarWrapRef = ref<HTMLElement | null>(null)
 const wsDialogOpen = ref(false)
+const wsDialogMode = ref<'create' | 'edit'>('create')
+const wsDialogInitial = ref('')
+const wsEditTarget = ref<WorkspaceRow | null>(null)
+const wsDeleteOpen = ref(false)
+const wsDeleteTarget = ref<WorkspaceRow | null>(null)
 const wsDialogAnchor = ref<DialogAnchor | null>(null)
+const dictOpen = ref(false)
+const dictWorkspaceId = ref<number | null>(null)
+const dictWorkspaceName = ref('')
+
+const wsDialogTitle = computed(() =>
+  wsDialogMode.value === 'edit' ? t('workspace.rename') : t('create.workspace'),
+)
 
 let unlistenResize: (() => void) | undefined
 let unbindOutside: (() => void) | undefined
@@ -243,18 +320,67 @@ async function onPickWorkspace(id: number) {
 
 function openCreateWorkspace(event: MouseEvent) {
   wsOpen.value = false
+  wsDialogMode.value = 'create'
+  wsDialogInitial.value = ''
+  wsEditTarget.value = null
   wsDialogAnchor.value = anchorFromEvent(event)
   wsDialogOpen.value = true
 }
 
-async function confirmCreateWorkspace(name: string) {
+function openEditWorkspace(workspace: WorkspaceRow, event: MouseEvent) {
+  wsOpen.value = false
+  wsDialogMode.value = 'edit'
+  wsDialogInitial.value = workspace.name
+  wsEditTarget.value = workspace
+  wsDialogAnchor.value = anchorFromEvent(event)
+  wsDialogOpen.value = true
+}
+
+function openDeleteWorkspace(workspace: WorkspaceRow, event: MouseEvent) {
+  wsOpen.value = false
+  wsDeleteTarget.value = workspace
+  wsDialogAnchor.value = anchorFromEvent(event)
+  wsDeleteOpen.value = true
+}
+
+function openDictionary(workspace: WorkspaceRow) {
+  wsOpen.value = false
+  dictWorkspaceId.value = workspace.id
+  dictWorkspaceName.value = workspace.name
+  dictOpen.value = true
+}
+
+async function confirmWorkspaceName(name: string) {
   try {
+    if (wsDialogMode.value === 'edit' && wsEditTarget.value) {
+      await invoke('update_local_workspace', {
+        args: { id: wsEditTarget.value.id, name },
+      })
+      wsDialogOpen.value = false
+      await loadWorkspaces()
+      showToast(t('workspace.updateSuccess'), 1500, 'success')
+      return
+    }
     const row = await invoke<{ id: number }>('create_local_workspace', { args: { name } })
     wsDialogOpen.value = false
     await loadWorkspaces()
     await selectWorkspace(row.id)
   } catch (e) {
-    alert(String(e))
+    showToast(String(e), 2200, 'error')
+  }
+}
+
+async function confirmDeleteWorkspace() {
+  const target = wsDeleteTarget.value
+  if (!target) return
+  try {
+    await invoke('delete_local_workspace', { workspaceId: target.id })
+    wsDeleteOpen.value = false
+    wsDeleteTarget.value = null
+    await refreshAfterSync()
+    showToast(t('workspace.deleteSuccess'), 1500, 'success')
+  } catch (e) {
+    showToast(String(e), 2200, 'error')
   }
 }
 
@@ -399,13 +525,16 @@ async function close() {
   top: calc(100% + 6px);
   left: 0;
   z-index: 50;
-  width: 260px;
+  width: 300px;
+  max-height: min(420px, calc(100vh - 60px));
   padding: 8px;
   border-radius: 10px;
   background: var(--color-menu);
   border: 1px solid var(--color-border);
   box-shadow: var(--shadow-menu);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .ws-search {
@@ -416,10 +545,29 @@ async function close() {
   padding: 7px 10px;
   background: var(--color-surface);
   outline: none;
+  flex-shrink: 0;
 }
 
 .ws-search:focus {
   border-color: var(--color-primary);
+}
+
+.ws-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.ws-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border-radius: 6px;
+}
+
+.ws-row:hover,
+.ws-row.active {
+  background: var(--color-menu-hover);
 }
 
 .ws-item {
@@ -436,9 +584,60 @@ async function close() {
   font-size: 14px;
 }
 
-.ws-item:hover,
-.ws-item.active {
-  background: var(--color-menu-hover);
+.ws-item-main {
+  flex: 1;
+  min-width: 0;
+  padding-right: 4px;
+}
+
+.ws-row:hover .ws-item-main,
+.ws-row.active .ws-item-main,
+.ws-item-main:hover {
+  background: transparent;
+}
+
+.ws-item-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ws-item-actions {
+  display: none;
+  align-items: center;
+  gap: 1px;
+  padding-right: 4px;
+  flex-shrink: 0;
+}
+
+.ws-row:hover .ws-item-actions,
+.ws-row.active .ws-item-actions {
+  display: inline-flex;
+}
+
+.ws-action {
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.ws-action:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.ws-action.danger:hover {
+  background: var(--color-danger-hover);
+  color: var(--color-danger);
 }
 
 .ws-empty {
@@ -447,16 +646,33 @@ async function close() {
   font-size: 13px;
 }
 
-.ws-create {
+.ws-footer {
   margin-top: 4px;
+  padding-top: 8px;
   border-top: 1px solid var(--color-border);
-  border-radius: 6px;
-  color: var(--color-primary);
-  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.ws-create {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 38px;
+  border: 1px dashed var(--color-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-primary-light);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .ws-create:hover {
-  background: var(--color-menu-hover);
+  background: var(--color-active);
+  border-color: var(--color-primary);
 }
 
 .titlebar-right {

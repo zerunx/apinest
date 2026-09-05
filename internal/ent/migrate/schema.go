@@ -16,7 +16,7 @@ var (
 		{Name: "method", Type: field.TypeString, Size: 10, Default: ""},
 		{Name: "protocol", Type: field.TypeString, Size: 10, Default: ""},
 		{Name: "url", Type: field.TypeString, Size: 500, Default: ""},
-		{Name: "status", Type: field.TypeUint8, Default: 2},
+		{Name: "status", Type: field.TypeUint8, Default: 3},
 		{Name: "request_body_format", Type: field.TypeString, Size: 20, Default: "json"},
 		{Name: "request_body_data_type", Type: field.TypeString, Size: 20, Default: "Object"},
 		{Name: "request_body_raw", Type: field.TypeString, Size: 2147483647, Default: ""},
@@ -387,6 +387,53 @@ var (
 			},
 		},
 	}
+	// ProjectMembersColumns holds the columns for the "project_members" table.
+	ProjectMembersColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt64, Increment: true},
+		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamp(0) without time zone"}},
+		{Name: "updated_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamp(0) without time zone"}},
+		{Name: "project_id", Type: field.TypeInt64, Default: 0},
+		{Name: "user_id", Type: field.TypeInt64, Default: 0},
+		{Name: "workspace_id", Type: field.TypeInt64, Default: 0},
+	}
+	// ProjectMembersTable holds the schema information for the "project_members" table.
+	ProjectMembersTable = &schema.Table{
+		Name:       "project_members",
+		Columns:    ProjectMembersColumns,
+		PrimaryKey: []*schema.Column{ProjectMembersColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "project_members_projects_members",
+				Columns:    []*schema.Column{ProjectMembersColumns[3]},
+				RefColumns: []*schema.Column{ProjectsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "project_members_users_project_memberships",
+				Columns:    []*schema.Column{ProjectMembersColumns[4]},
+				RefColumns: []*schema.Column{UsersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "project_members_workspaces_project_members",
+				Columns:    []*schema.Column{ProjectMembersColumns[5]},
+				RefColumns: []*schema.Column{WorkspacesColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "projectmember_project_id_user_id",
+				Unique:  true,
+				Columns: []*schema.Column{ProjectMembersColumns[3], ProjectMembersColumns[4]},
+			},
+			{
+				Name:    "projectmember_workspace_id_user_id",
+				Unique:  false,
+				Columns: []*schema.Column{ProjectMembersColumns[5], ProjectMembersColumns[4]},
+			},
+		},
+	}
 	// ProjectSharesColumns holds the columns for the "project_shares" table.
 	ProjectSharesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt64, Increment: true},
@@ -460,7 +507,7 @@ var (
 	UsersColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt64, Increment: true},
 		{Name: "name", Type: field.TypeString, Size: 50, Default: ""},
-		{Name: "account", Type: field.TypeString, Unique: true, Size: 50},
+		{Name: "account", Type: field.TypeString, Size: 50},
 		{Name: "email", Type: field.TypeString, Size: 100, Default: ""},
 		{Name: "avatar", Type: field.TypeString, Size: 500, Default: ""},
 		{Name: "mobile", Type: field.TypeString, Size: 20, Default: ""},
@@ -476,6 +523,16 @@ var (
 		Name:       "users",
 		Columns:    UsersColumns,
 		PrimaryKey: []*schema.Column{UsersColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "user_account",
+				Unique:  true,
+				Columns: []*schema.Column{UsersColumns[2]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "deleted_at IS NULL",
+				},
+			},
+		},
 	}
 	// WorkspacesColumns holds the columns for the "workspaces" table.
 	WorkspacesColumns = []*schema.Column{
@@ -498,6 +555,45 @@ var (
 				Columns:    []*schema.Column{WorkspacesColumns[6]},
 				RefColumns: []*schema.Column{UsersColumns[0]},
 				OnDelete:   schema.NoAction,
+			},
+		},
+	}
+	// WorkspaceInvitesColumns holds the columns for the "workspace_invites" table.
+	WorkspaceInvitesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt64, Increment: true},
+		{Name: "invite_code", Type: field.TypeString, Unique: true, Size: 32},
+		{Name: "role", Type: field.TypeUint8, Default: 4},
+		{Name: "expires_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamp(0) without time zone"}},
+		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamp(0) without time zone"}},
+		{Name: "updated_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamp(0) without time zone"}},
+		{Name: "deleted_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamp(0) without time zone"}},
+		{Name: "created_by", Type: field.TypeInt64, Default: 0},
+		{Name: "workspace_id", Type: field.TypeInt64, Default: 0},
+	}
+	// WorkspaceInvitesTable holds the schema information for the "workspace_invites" table.
+	WorkspaceInvitesTable = &schema.Table{
+		Name:       "workspace_invites",
+		Columns:    WorkspaceInvitesColumns,
+		PrimaryKey: []*schema.Column{WorkspaceInvitesColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "workspace_invites_users_created_workspace_invites",
+				Columns:    []*schema.Column{WorkspaceInvitesColumns[7]},
+				RefColumns: []*schema.Column{UsersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "workspace_invites_workspaces_invites",
+				Columns:    []*schema.Column{WorkspaceInvitesColumns[8]},
+				RefColumns: []*schema.Column{WorkspacesColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "workspaceinvite_workspace_id_role",
+				Unique:  false,
+				Columns: []*schema.Column{WorkspaceInvitesColumns[8], WorkspaceInvitesColumns[2]},
 			},
 		},
 	}
@@ -545,10 +641,12 @@ var (
 		InterfaceRequestHeadersTable,
 		InterfaceResultsTable,
 		ProjectsTable,
+		ProjectMembersTable,
 		ProjectSharesTable,
 		ProjectShareInterfacesTable,
 		UsersTable,
 		WorkspacesTable,
+		WorkspaceInvitesTable,
 		WorkspaceMembersTable,
 	}
 )
@@ -606,11 +704,16 @@ func init() {
 	}
 	ProjectsTable.ForeignKeys[0].RefTable = UsersTable
 	ProjectsTable.ForeignKeys[1].RefTable = WorkspacesTable
+	ProjectMembersTable.ForeignKeys[0].RefTable = ProjectsTable
+	ProjectMembersTable.ForeignKeys[1].RefTable = UsersTable
+	ProjectMembersTable.ForeignKeys[2].RefTable = WorkspacesTable
 	ProjectSharesTable.ForeignKeys[0].RefTable = ProjectsTable
 	ProjectSharesTable.ForeignKeys[1].RefTable = UsersTable
 	ProjectShareInterfacesTable.ForeignKeys[0].RefTable = InterfacesTable
 	ProjectShareInterfacesTable.ForeignKeys[1].RefTable = ProjectSharesTable
 	WorkspacesTable.ForeignKeys[0].RefTable = UsersTable
+	WorkspaceInvitesTable.ForeignKeys[0].RefTable = UsersTable
+	WorkspaceInvitesTable.ForeignKeys[1].RefTable = WorkspacesTable
 	WorkspaceMembersTable.ForeignKeys[0].RefTable = UsersTable
 	WorkspaceMembersTable.ForeignKeys[1].RefTable = WorkspacesTable
 }

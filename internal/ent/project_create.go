@@ -10,6 +10,7 @@ import (
 	"nest-api/internal/ent/environment"
 	"nest-api/internal/ent/folder"
 	"nest-api/internal/ent/project"
+	"nest-api/internal/ent/projectmember"
 	"nest-api/internal/ent/projectshare"
 	"nest-api/internal/ent/user"
 	"nest-api/internal/ent/workspace"
@@ -190,6 +191,21 @@ func (_c *ProjectCreate) AddShares(v ...*ProjectShare) *ProjectCreate {
 		ids[i] = v[i].ID
 	}
 	return _c.AddShareIDs(ids...)
+}
+
+// AddMemberIDs adds the "members" edge to the ProjectMember entity by IDs.
+func (_c *ProjectCreate) AddMemberIDs(ids ...int64) *ProjectCreate {
+	_c.mutation.AddMemberIDs(ids...)
+	return _c
+}
+
+// AddMembers adds the "members" edges to the ProjectMember entity.
+func (_c *ProjectCreate) AddMembers(v ...*ProjectMember) *ProjectCreate {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddMemberIDs(ids...)
 }
 
 // Mutation returns the ProjectMutation object of the builder.
@@ -430,6 +446,22 @@ func (_c *ProjectCreate) createSpec() (*Project, *sqlgraph.CreateSpec) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(projectshare.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.MembersIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   project.MembersTable,
+			Columns: []string{project.MembersColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(projectmember.FieldID, field.TypeInt64),
 			},
 		}
 		for _, k := range nodes {

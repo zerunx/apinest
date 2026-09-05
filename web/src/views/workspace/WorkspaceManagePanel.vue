@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { Delete, Edit } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { deleteWorkspace, updateWorkspace } from '@/api/workspace'
 import { useLocale } from '@/composables/useLocale'
 import { useWorkspaceContext } from '@/composables/useWorkspaceContext'
+import type { WorkspaceItem } from '@/types/workspace'
 
 const { t } = useLocale()
 const {
@@ -15,6 +17,11 @@ const {
 
 const editingId = ref<number | null>(null)
 const deletingId = ref<number | null>(null)
+
+/** Only workspace Owner can rename/delete (creator becomes Owner on create). */
+function canManageWorkspace(row: WorkspaceItem) {
+  return row.role === 1
+}
 
 async function handleRename(workspaceId: number, currentName: string) {
   try {
@@ -69,39 +76,49 @@ async function handleDelete(workspaceId: number, name: string) {
 <template>
   <div class="workspace-manage workspace-panel">
     <div class="workspace-manage__toolbar workspace-panel__toolbar">
-      <div>
-        <h2>{{ t('workspace.workspaceManage') }}</h2>
-        <p>{{ t('workspace.workspaceManageDesc') }}</p>
-      </div>
       <el-button type="primary" class="workspace-action-btn" @click="openCreateWorkspace">
-        <span class="workspace-action-btn__plus">+</span>
         <span>{{ t('workspace.createWorkspace') }}</span>
       </el-button>
     </div>
 
-    <el-table v-loading="loadingWorkspaces" :data="workspaces" class="workspace-data-table">
-      <el-table-column prop="id" label="ID" width="80" />
-      <el-table-column prop="name" :label="t('workspace.columns.name')" min-width="160" />
-      <el-table-column prop="owner_name" :label="t('workspace.columns.owner')" min-width="120" />
+    <el-table
+      v-loading="loadingWorkspaces"
+      :data="workspaces"
+      class="workspace-data-table"
+      :header-cell-style="{ borderBottom: 'none' }"
+    >
+      <el-table-column prop="id" label="ID" width="88" />
+      <el-table-column prop="name" :label="t('workspace.columns.name')" min-width="180" show-overflow-tooltip />
+      <el-table-column prop="owner_name" :label="t('workspace.columns.owner')" min-width="120" show-overflow-tooltip />
       <el-table-column prop="created_at" :label="t('workspace.columns.createdAt')" min-width="180" />
-      <el-table-column :label="t('member.columns.actions')" width="160" fixed="right">
+      <el-table-column
+        :label="t('member.columns.actions')"
+        width="108"
+        class-name="workspace-table-actions-col"
+        label-class-name="workspace-table-actions-col"
+      >
         <template #default="{ row }">
-          <el-button
-            type="primary"
-            link
-            :loading="editingId === row.id"
-            @click="handleRename(row.id, row.name)"
-          >
-            {{ t('common.rename') }}
-          </el-button>
-          <el-button
-            type="danger"
-            link
-            :loading="deletingId === row.id"
-            @click="handleDelete(row.id, row.name)"
-          >
-            {{ t('common.delete') }}
-          </el-button>
+          <div v-if="canManageWorkspace(row)" class="workspace-table-actions">
+            <button
+              type="button"
+              class="workspace-table-action-btn"
+              :title="t('common.rename')"
+              :disabled="editingId === row.id"
+              @click="handleRename(row.id, row.name)"
+            >
+              <el-icon :size="14"><Edit /></el-icon>
+            </button>
+            <button
+              type="button"
+              class="workspace-table-action-btn workspace-table-action-btn--danger"
+              :title="t('common.delete')"
+              :disabled="deletingId === row.id"
+              @click="handleDelete(row.id, row.name)"
+            >
+              <el-icon :size="14"><Delete /></el-icon>
+            </button>
+          </div>
+          <span v-else class="workspace-manage__muted">—</span>
         </template>
       </el-table-column>
     </el-table>
@@ -109,7 +126,8 @@ async function handleDelete(workspaceId: number, name: string) {
 </template>
 
 <style scoped>
-.workspace-manage__toolbar {
-  padding: 10px 10px 10px 8px;
+.workspace-manage__muted {
+  color: var(--color-text-secondary);
+  opacity: 0.55;
 }
 </style>

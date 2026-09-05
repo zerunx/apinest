@@ -16,10 +16,12 @@ import (
 	"nest-api/internal/ent/interfacerequestheader"
 	"nest-api/internal/ent/interfaceresult"
 	"nest-api/internal/ent/project"
+	"nest-api/internal/ent/projectmember"
 	"nest-api/internal/ent/projectshare"
 	"nest-api/internal/ent/projectshareinterface"
 	"nest-api/internal/ent/user"
 	"nest-api/internal/ent/workspace"
+	"nest-api/internal/ent/workspaceinvite"
 	"nest-api/internal/ent/workspacemember"
 	"nest-api/internal/utils"
 )
@@ -690,6 +692,34 @@ func init() {
 	projectDescID := projectFields[0].Descriptor()
 	// project.IDValidator is a validator for the "id" field. It is called by the builders before save.
 	project.IDValidator = projectDescID.Validators[0].(func(int64) error)
+	projectmemberFields := schema.ProjectMember{}.Fields()
+	_ = projectmemberFields
+	// projectmemberDescWorkspaceID is the schema descriptor for workspace_id field.
+	projectmemberDescWorkspaceID := projectmemberFields[1].Descriptor()
+	// projectmember.DefaultWorkspaceID holds the default value on creation for the workspace_id field.
+	projectmember.DefaultWorkspaceID = projectmemberDescWorkspaceID.Default.(int64)
+	// projectmemberDescProjectID is the schema descriptor for project_id field.
+	projectmemberDescProjectID := projectmemberFields[2].Descriptor()
+	// projectmember.DefaultProjectID holds the default value on creation for the project_id field.
+	projectmember.DefaultProjectID = projectmemberDescProjectID.Default.(int64)
+	// projectmemberDescUserID is the schema descriptor for user_id field.
+	projectmemberDescUserID := projectmemberFields[3].Descriptor()
+	// projectmember.DefaultUserID holds the default value on creation for the user_id field.
+	projectmember.DefaultUserID = projectmemberDescUserID.Default.(int64)
+	// projectmemberDescCreatedAt is the schema descriptor for created_at field.
+	projectmemberDescCreatedAt := projectmemberFields[4].Descriptor()
+	// projectmember.DefaultCreatedAt holds the default value on creation for the created_at field.
+	projectmember.DefaultCreatedAt = projectmemberDescCreatedAt.Default.(func() utils.DateTime)
+	// projectmemberDescUpdatedAt is the schema descriptor for updated_at field.
+	projectmemberDescUpdatedAt := projectmemberFields[5].Descriptor()
+	// projectmember.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	projectmember.DefaultUpdatedAt = projectmemberDescUpdatedAt.Default.(func() utils.DateTime)
+	// projectmember.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	projectmember.UpdateDefaultUpdatedAt = projectmemberDescUpdatedAt.UpdateDefault.(func() utils.DateTime)
+	// projectmemberDescID is the schema descriptor for id field.
+	projectmemberDescID := projectmemberFields[0].Descriptor()
+	// projectmember.IDValidator is a validator for the "id" field. It is called by the builders before save.
+	projectmember.IDValidator = projectmemberDescID.Validators[0].(func(int64) error)
 	projectshareMixin := schema.ProjectShare{}.Mixin()
 	projectshareMixinHooks0 := projectshareMixin[0].Hooks()
 	projectshare.Hooks[0] = projectshareMixinHooks0[0]
@@ -863,6 +893,43 @@ func init() {
 	workspaceDescID := workspaceFields[0].Descriptor()
 	// workspace.IDValidator is a validator for the "id" field. It is called by the builders before save.
 	workspace.IDValidator = workspaceDescID.Validators[0].(func(int64) error)
+	workspaceinviteMixin := schema.WorkspaceInvite{}.Mixin()
+	workspaceinviteMixinHooks0 := workspaceinviteMixin[0].Hooks()
+	workspaceinvite.Hooks[0] = workspaceinviteMixinHooks0[0]
+	workspaceinviteMixinInters0 := workspaceinviteMixin[0].Interceptors()
+	workspaceinvite.Interceptors[0] = workspaceinviteMixinInters0[0]
+	workspaceinviteFields := schema.WorkspaceInvite{}.Fields()
+	_ = workspaceinviteFields
+	// workspaceinviteDescWorkspaceID is the schema descriptor for workspace_id field.
+	workspaceinviteDescWorkspaceID := workspaceinviteFields[1].Descriptor()
+	// workspaceinvite.DefaultWorkspaceID holds the default value on creation for the workspace_id field.
+	workspaceinvite.DefaultWorkspaceID = workspaceinviteDescWorkspaceID.Default.(int64)
+	// workspaceinviteDescInviteCode is the schema descriptor for invite_code field.
+	workspaceinviteDescInviteCode := workspaceinviteFields[2].Descriptor()
+	// workspaceinvite.InviteCodeValidator is a validator for the "invite_code" field. It is called by the builders before save.
+	workspaceinvite.InviteCodeValidator = workspaceinviteDescInviteCode.Validators[0].(func(string) error)
+	// workspaceinviteDescRole is the schema descriptor for role field.
+	workspaceinviteDescRole := workspaceinviteFields[3].Descriptor()
+	// workspaceinvite.DefaultRole holds the default value on creation for the role field.
+	workspaceinvite.DefaultRole = workspaceinviteDescRole.Default.(uint8)
+	// workspaceinviteDescCreatedBy is the schema descriptor for created_by field.
+	workspaceinviteDescCreatedBy := workspaceinviteFields[4].Descriptor()
+	// workspaceinvite.DefaultCreatedBy holds the default value on creation for the created_by field.
+	workspaceinvite.DefaultCreatedBy = workspaceinviteDescCreatedBy.Default.(int64)
+	// workspaceinviteDescCreatedAt is the schema descriptor for created_at field.
+	workspaceinviteDescCreatedAt := workspaceinviteFields[6].Descriptor()
+	// workspaceinvite.DefaultCreatedAt holds the default value on creation for the created_at field.
+	workspaceinvite.DefaultCreatedAt = workspaceinviteDescCreatedAt.Default.(func() utils.DateTime)
+	// workspaceinviteDescUpdatedAt is the schema descriptor for updated_at field.
+	workspaceinviteDescUpdatedAt := workspaceinviteFields[7].Descriptor()
+	// workspaceinvite.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	workspaceinvite.DefaultUpdatedAt = workspaceinviteDescUpdatedAt.Default.(func() utils.DateTime)
+	// workspaceinvite.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	workspaceinvite.UpdateDefaultUpdatedAt = workspaceinviteDescUpdatedAt.UpdateDefault.(func() utils.DateTime)
+	// workspaceinviteDescID is the schema descriptor for id field.
+	workspaceinviteDescID := workspaceinviteFields[0].Descriptor()
+	// workspaceinvite.IDValidator is a validator for the "id" field. It is called by the builders before save.
+	workspaceinvite.IDValidator = workspaceinviteDescID.Validators[0].(func(int64) error)
 	workspacememberMixin := schema.WorkspaceMember{}.Mixin()
 	workspacememberMixinHooks0 := workspacememberMixin[0].Hooks()
 	workspacemember.Hooks[0] = workspacememberMixinHooks0[0]

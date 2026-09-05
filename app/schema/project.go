@@ -84,5 +84,6 @@ func (Project) Edges() []ent.Edge {
 		edge.To("interfaces", API.Type),
 		edge.To("environments", Environment.Type),
 		edge.To("shares", ProjectShare.Type),
+		edge.To("members", ProjectMember.Type),
 	}
 }

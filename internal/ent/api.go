@@ -33,7 +33,7 @@ type API struct {
 	Protocol string `json:"protocol,omitempty"`
 	// 接口路径
 	URL string `json:"url,omitempty"`
-	// 状态：1: 已发布, 2: 测试中, 3: 开发中, 4: 异常, 5: 维护, 6: 废弃
+	// 状态：1: 已发布, 2: 联调中, 3: 开发中, 6: 已废弃
 	Status uint8 `json:"status,omitempty"`
 	// 请求体格式：form-data, json, xml, raw, binary
 	RequestBodyFormat string `json:"request_body_format,omitempty"`

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, useTemplateRef } from 'vue'
-import { ArrowDown, Folder, Plus, Search, Setting, User } from '@element-plus/icons-vue'
+import { ArrowDown, Collection, Folder, FolderOpened, Plus, Search, Setting, User, UserFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useLocale } from '@/composables/useLocale'
 import { useWorkspaceContext } from '@/composables/useWorkspaceContext'
@@ -31,6 +31,7 @@ const {
   selectProject,
   selectFolder,
   selectApi,
+  openNextApiInEdit,
   toggleNode,
   isNodeExpanded,
   openCreateProject,
@@ -45,6 +46,7 @@ const {
   parseFolderId,
   parseApiId,
   refreshApiData,
+  activeWorkspace,
   activeWorkspaceId,
   activeProjectId,
   activeProject,
@@ -171,15 +173,28 @@ function renderNodes(
 
 const flatApiNodes = computed(() => renderNodes(filteredApiTree.value))
 
-const spaceNavItems = computed(() => [
-  { id: 'workspace-list', label: t('workspace.workspaceManage'), icon: Folder },
-  { id: 'project-list', label: t('workspace.projectManage'), icon: Setting },
-  { id: 'member-list', label: t('member.title'), icon: User },
-])
+const spaceNavItems = computed(() => {
+  const role = activeWorkspace.value?.role
+  const isAdmin = role === 1 || role === 2
+  const isEditor = role === 3
+  const items: { id: string; label: string; icon: typeof Folder }[] = []
+  // Editors can open the list to manage workspaces they own (create → Owner).
+  if (isAdmin || isEditor) {
+    items.push({ id: 'workspace-list', label: t('workspace.workspaceManage'), icon: FolderOpened })
+  }
+  if (isAdmin || isEditor) {
+    items.push({ id: 'project-list', label: t('workspace.projectManage'), icon: Collection })
+  }
+  if (isAdmin) {
+    items.push({ id: 'member-list', label: t('member.title'), icon: User })
+    items.push({ id: 'project-member-list', label: t('workspace.projectMembers'), icon: UserFilled })
+  }
+  return items
+})
 
 const environmentNavItems = computed(() => [
   { id: 'env-list', label: t('workspace.modules.environment'), icon: Setting },
-  { id: 'env-variables', label: t('environment.variables'), icon: Folder },
+  { id: 'env-variables', label: t('environment.variables'), icon: Collection },
 ])
 
 const searchPlaceholder = computed(() => {
@@ -194,6 +209,8 @@ const showModuleNav = computed(
   () => activeModule.value === 'project' || activeModule.value === 'environment',
 )
 
+const showQuickTestPanel = computed(() => activeModule.value === 'quick-test')
+
 function handleSpaceNavClick(id: string) {
   if (id === 'workspace-list') {
     openSpaceSectionTab('workspaces')
@@ -201,6 +218,10 @@ function handleSpaceNavClick(id: string) {
   }
   if (id === 'project-list') {
     openSpaceSectionTab('projects')
+    return
+  }
+  if (id === 'project-member-list') {
+    openSpaceSectionTab('project-members')
     return
   }
   openSpaceSectionTab('members')
@@ -211,6 +232,7 @@ function isModuleNavActive(id: string) {
   if (!tab) return false
   if (id === 'workspace-list') return tab.kind === 'workspace-list'
   if (id === 'project-list') return tab.kind === 'project-list'
+  if (id === 'project-member-list') return tab.kind === 'project-member-list'
   if (id === 'member-list') return tab.kind === 'member-list'
   if (id === 'env-list') return tab.kind === 'env-list'
   if (id === 'env-variables') return tab.kind === 'env-variables'
@@ -331,6 +353,7 @@ async function submitDeleteDialog() {
 function handleApiAction(command: string, node: ApiTreeNode) {
   switch (command) {
     case 'edit':
+      openNextApiInEdit.value = true
       selectApi(node.id)
       break
     case 'delete':
@@ -583,7 +606,7 @@ onBeforeUnmount(() => {
     :style="{ width: `${panelWidth}px` }"
   >
     <div class="context-panel__header">
-      <div v-if="!showModuleNav" class="context-panel__search">
+      <div v-if="!showModuleNav && !showQuickTestPanel" class="context-panel__search">
         <el-icon :size="16"><Search /></el-icon>
         <input
           v-model="searchQuery"
@@ -612,40 +635,53 @@ onBeforeUnmount(() => {
       />
     </div>
 
-    <div v-if="activeModule === 'project'" class="context-panel__body">
-      <ul class="context-panel__tree">
+    <div v-if="activeModule === 'project'" class="context-panel__body context-panel__body--module-nav">
+      <ul class="context-panel__module-nav">
         <li
           v-for="item in spaceNavItems"
           :key="item.id"
-          class="context-panel__tree-item context-panel__tree-item--folder"
-          :class="{ 'context-panel__tree-item--selected': isModuleNavActive(item.id) }"
-          @click="handleSpaceNavClick(item.id)"
         >
-          <span class="context-panel__expand context-panel__expand--leaf" />
-          <el-icon :size="14" class="context-panel__folder-icon">
-            <component :is="item.icon" />
-          </el-icon>
-          <span class="context-panel__tree-name">{{ item.label }}</span>
+          <button
+            type="button"
+            class="context-panel__module-nav-item"
+            :class="{ 'context-panel__module-nav-item--active': isModuleNavActive(item.id) }"
+            @click="handleSpaceNavClick(item.id)"
+          >
+            <el-icon :size="16" class="context-panel__module-nav-icon">
+              <component :is="item.icon" />
+            </el-icon>
+            <span class="context-panel__module-nav-label">{{ item.label }}</span>
+          </button>
         </li>
       </ul>
     </div>
 
-    <div v-else-if="activeModule === 'environment'" class="context-panel__body">
-      <ul class="context-panel__tree">
+    <div
+      v-else-if="activeModule === 'environment'"
+      class="context-panel__body context-panel__body--module-nav"
+    >
+      <ul class="context-panel__module-nav">
         <li
           v-for="item in environmentNavItems"
           :key="item.id"
-          class="context-panel__tree-item context-panel__tree-item--folder"
-          :class="{ 'context-panel__tree-item--selected': isModuleNavActive(item.id) }"
-          @click="handleEnvironmentNavClick(item.id)"
         >
-          <span class="context-panel__expand context-panel__expand--leaf" />
-          <el-icon :size="14" class="context-panel__folder-icon">
-            <component :is="item.icon" />
-          </el-icon>
-          <span class="context-panel__tree-name">{{ item.label }}</span>
+          <button
+            type="button"
+            class="context-panel__module-nav-item"
+            :class="{ 'context-panel__module-nav-item--active': isModuleNavActive(item.id) }"
+            @click="handleEnvironmentNavClick(item.id)"
+          >
+            <el-icon :size="16" class="context-panel__module-nav-icon">
+              <component :is="item.icon" />
+            </el-icon>
+            <span class="context-panel__module-nav-label">{{ item.label }}</span>
+          </button>
         </li>
       </ul>
+    </div>
+
+    <div v-else-if="showQuickTestPanel" class="context-panel__body">
+      <div class="context-panel__empty">{{ t('workspace.comingSoon') }}</div>
     </div>
 
     <!-- Project list (workspace mode) -->
@@ -983,6 +1019,75 @@ onBeforeUnmount(() => {
   list-style: none;
   margin: 0;
   padding: 0;
+}
+
+.context-panel__body--module-nav {
+  padding: 10px 8px;
+}
+
+.context-panel__module-nav {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.context-panel__module-nav-item {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 36px;
+  margin: 0;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.context-panel__module-nav-item:hover {
+  background: var(--color-workspace-item-hover);
+  color: var(--color-text);
+}
+
+.context-panel__module-nav-item--active {
+  background: var(--color-workspace-item-selected);
+  color: var(--color-primary-light);
+  box-shadow: inset 3px 0 0 var(--color-primary);
+}
+
+.context-panel__module-nav-item--active:hover {
+  background: var(--color-workspace-item-selected);
+  color: var(--color-primary-light);
+}
+
+.context-panel__module-nav-icon {
+  flex-shrink: 0;
+  color: inherit;
+}
+
+.context-panel__module-nav-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  line-height: 1.3;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.context-panel__module-nav-item--active .context-panel__module-nav-label {
+  font-weight: 600;
 }
 
 .context-panel__project-item {

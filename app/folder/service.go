@@ -31,10 +31,7 @@ func (Service) Tree(ctx context.Context, userID int64, params ProjectScopeReques
 }
 
 func (Service) Create(ctx context.Context, userID int64, params CreateRequest) (int64, error) {
-	if _, err := workspace.Require(ctx, userID, params.WorkspaceID, workspace.ActionProjectCreate); err != nil {
-		return 0, err
-	}
-	if err := project.EnsureExists(ctx, params.WorkspaceID, params.ProjectID); err != nil {
+	if _, err := project.RequireAccess(ctx, userID, params.WorkspaceID, params.ProjectID, workspace.ActionProjectCreate); err != nil {
 		return 0, err
 	}
 	if params.ParentID > 0 {
@@ -51,10 +48,7 @@ func (Service) Create(ctx context.Context, userID int64, params CreateRequest) (
 }
 
 func (Service) Update(ctx context.Context, userID int64, params UpdateRequest) error {
-	if _, err := workspace.Require(ctx, userID, params.WorkspaceID, workspace.ActionProjectUpdate); err != nil {
-		return err
-	}
-	if err := project.EnsureExists(ctx, params.WorkspaceID, params.ProjectID); err != nil {
+	if _, err := project.RequireAccess(ctx, userID, params.WorkspaceID, params.ProjectID, workspace.ActionProjectUpdate); err != nil {
 		return err
 	}
 	if err := EnsureExists(ctx, params.ProjectID, params.FolderID); err != nil {
@@ -65,10 +59,7 @@ func (Service) Update(ctx context.Context, userID int64, params UpdateRequest) e
 }
 
 func (Service) Delete(ctx context.Context, userID int64, params DeleteRequest) error {
-	if _, err := workspace.Require(ctx, userID, params.WorkspaceID, workspace.ActionProjectDelete); err != nil {
-		return err
-	}
-	if err := project.EnsureExists(ctx, params.WorkspaceID, params.ProjectID); err != nil {
+	if _, err := project.RequireAccess(ctx, userID, params.WorkspaceID, params.ProjectID, workspace.ActionProjectDelete); err != nil {
 		return err
 	}
 	if err := EnsureExists(ctx, params.ProjectID, params.FolderID); err != nil {
@@ -109,10 +100,8 @@ func (Service) Delete(ctx context.Context, userID int64, params DeleteRequest) e
 }
 
 func requireProject(ctx context.Context, userID int64, params ProjectScopeRequest) error {
-	if _, err := workspace.Require(ctx, userID, params.WorkspaceID, workspace.ActionProjectRead); err != nil {
-		return err
-	}
-	return project.EnsureExists(ctx, params.WorkspaceID, params.ProjectID)
+	_, err := project.RequireAccess(ctx, userID, params.WorkspaceID, params.ProjectID, workspace.ActionProjectRead)
+	return err
 }
 
 func buildTree(folders []*ent.Folder, ifaces []*ent.API) []TreeNode {

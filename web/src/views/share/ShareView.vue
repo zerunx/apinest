@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ArrowDown, Folder } from '@element-plus/icons-vue'
@@ -15,19 +15,15 @@ import {
 import { useLocale } from '@/composables/useLocale'
 import { useSharePageMeta } from '@/composables/useSharePageMeta'
 import { methodTone, shortMethodLabel } from '@/utils/http-method'
-import InterfaceRequestBodyRaw from '@/interface/InterfaceRequestBodyRaw.vue'
-import { toEditorLanguage } from '@/codemirror'
-import {
-  enrichResponseExample,
-  exampleFormatToHighlightType,
-} from '@/utils/response-example-format'
+import InterfaceEditorPanels from '@/interface/InterfaceEditorPanels.vue'
+import { fieldTreeFromApi, responseFieldTreeFromApi } from '@/utils/interface-field-tree'
+import { enrichResponseExample } from '@/utils/response-example-format'
+import type { ParamRow } from '@/utils/interface-params'
 import type {
-  InterfaceBodyField,
   InterfaceDetail,
   InterfaceParamItem,
   InterfaceRequestBody,
   InterfaceResponseExample,
-  InterfaceResponseField,
   InterfaceResponseResult,
 } from '@/types/workspace'
 
@@ -51,15 +47,6 @@ const selectedId = ref<number | null>(null)
 const detail = ref<InterfaceDetail | null>(null)
 const collapsedFolders = ref<Set<number>>(new Set())
 
-interface FlatParamRow {
-  name: string
-  type: string
-  required?: boolean
-  description?: string
-  example?: string
-  depth: number
-}
-
 interface FlatTreeRow {
   node: ShareTreeNode
   depth: number
@@ -79,19 +66,43 @@ const flatTreeRows = computed<FlatTreeRow[]>(() => flattenVisibleTree(treeNodes.
 
 const hasTree = computed(() => flatTreeRows.value.length > 0)
 
-const hasRequestHeaders = computed(() => Boolean(detail.value?.request_headers?.length))
-const hasQueryParams = computed(() => Boolean(detail.value?.query_params?.length))
-const hasRequestBody = computed(() => {
+function toParamRows(items: InterfaceParamItem[] | undefined): ParamRow[] {
+  return (items ?? []).map((item) => ({
+    name: item.name || '',
+    type: item.type || 'string',
+    required: !!item.required,
+    enabled: item.enabled !== false,
+    description: item.description || '',
+    example: item.example || '',
+  }))
+}
+
+const docRequestHeaders = computed(() => toParamRows(detail.value?.request_headers))
+const docQueryParams = computed(() => toParamRows(detail.value?.query_params))
+const docResponseHeaders = computed(() => toParamRows(detail.value?.response_headers))
+
+const docRequestBody = computed((): InterfaceRequestBody => {
   const body = detail.value?.request_body
-  if (!body) return false
-  return Boolean(body.raw?.trim()) || Boolean(body.fields?.length)
+  if (!body) {
+    return { format: 'json', data_type: 'Object', raw: '', fields: [] }
+  }
+  return {
+    format: body.format || 'json',
+    data_type: body.data_type || 'Object',
+    raw: body.raw ?? '',
+    fields: fieldTreeFromApi(body.fields ?? []),
+  }
 })
-const hasResponseHeaders = computed(() => Boolean(detail.value?.response_headers?.length))
-const hasResponseResults = computed(() =>
-  Boolean(detail.value?.response_results?.some((r) => r.fields?.length)),
+
+const docResponseResults = computed((): InterfaceResponseResult[] =>
+  (detail.value?.response_results ?? []).map((item) => ({
+    ...item,
+    fields: responseFieldTreeFromApi(item.fields ?? []),
+  })),
 )
-const hasResponseExamples = computed(() =>
-  Boolean(detail.value?.response_examples?.some((e) => e.raw?.trim())),
+
+const docResponseExamples = computed((): InterfaceResponseExample[] =>
+  (detail.value?.response_examples ?? []).map((item) => enrichResponseExample({ ...item })),
 )
 
 function buildTreeFromFolders(
@@ -231,89 +242,9 @@ function toggleFolder(id: number) {
   collapsedFolders.value = next
 }
 
-function flattenParamRows(rows: InterfaceParamItem[] | undefined): FlatParamRow[] {
-  return (rows || []).map((row) => ({
-    name: row.name,
-    type: row.type,
-    required: row.required,
-    description: row.description,
-    example: row.example,
-    depth: 0,
-  }))
-}
-
-function flattenBodyFields(
-  fields: InterfaceBodyField[] | undefined,
-  depth = 0,
-): FlatParamRow[] {
-  const result: FlatParamRow[] = []
-  for (const field of fields || []) {
-    result.push({
-      name: field.name,
-      type: field.type,
-      required: field.required,
-      description: field.description,
-      example: field.example,
-      depth,
-    })
-    if (field.children?.length) {
-      result.push(...flattenBodyFields(field.children, depth + 1))
-    }
-  }
-  return result
-}
-
-function flattenResponseFields(
-  fields: InterfaceResponseField[] | undefined,
-  depth = 0,
-): FlatParamRow[] {
-  const result: FlatParamRow[] = []
-  for (const field of fields || []) {
-    result.push({
-      name: field.name,
-      type: field.type,
-      required: field.required,
-      description: field.description,
-      example: field.example || field.mock,
-      depth,
-    })
-    if (field.children?.length) {
-      result.push(...flattenResponseFields(field.children, depth + 1))
-    }
-  }
-  return result
-}
-
-function responseResultRows(result: InterfaceResponseResult): FlatParamRow[] {
-  return flattenResponseFields(result.fields)
-}
-
-function requiredLabel(required?: boolean) {
-  return required ? t('share.public.required') : t('share.public.optional')
-}
-
-function requestRawBody(body: InterfaceRequestBody): InterfaceRequestBody {
-  return {
-    format: 'raw',
-    data_type: toEditorLanguage(body.data_type),
-    raw: body.raw || '',
-    fields: [],
-  }
-}
-
-function exampleRawBody(example: InterfaceResponseExample): InterfaceRequestBody {
-  const enriched = enrichResponseExample(example)
-  return {
-    format: 'raw',
-    data_type: exampleFormatToHighlightType(enriched.format ?? 'JSON', enriched.data_type ?? 'Object'),
-    raw: example.raw || '',
-    fields: [],
-  }
-}
-
 async function copyText(text: string) {
   const value = text?.trim()
-  if (!value || value === '—') return
+  if (!value) return
   try {
     await navigator.clipboard.writeText(value)
     ElMessage.success(t('share.public.copySuccess'))
@@ -380,7 +311,7 @@ function findFirstApi(nodes: ShareTreeNode[]): SharedInterfaceItem | null {
         name: node.name,
         method: node.method || 'GET',
         url: node.url || '',
-        status: node.status || 1,
+        status: node.status || 3,
       }
     }
     if (node.children?.length) {
@@ -512,205 +443,17 @@ onUnmounted(() => {
             >
               {{ detail.url }}
             </button>
-            <p v-else class="share-view__url">—</p>
 
-            <div v-if="hasRequestHeaders" class="share-view__block">
-              <h4>{{ t('share.public.requestHeaders') }}</h4>
-              <div class="share-view__table">
-                <div class="share-view__row share-view__row--head">
-                  <span>{{ t('workspace.interfaceForm.paramName') }}</span>
-                  <span>{{ t('workspace.interfaceForm.paramType') }}</span>
-                  <span>{{ t('share.public.required') }}</span>
-                  <span>{{ t('workspace.interfaceForm.example') }}</span>
-                </div>
-                <div
-                  v-for="(row, index) in flattenParamRows(detail.request_headers)"
-                  :key="`h-${index}`"
-                  class="share-view__row"
-                >
-                  <span
-                    class="share-view__copyable share-view__copyable--cell"
-                    :title="t('share.public.copyHint')"
-                    @click="copyText(row.name)"
-                  >{{ row.name }}</span>
-                  <span>{{ row.type }}</span>
-                  <span :class="{ 'is-required': row.required }">{{ requiredLabel(row.required) }}</span>
-                  <span
-                    class="share-view__copyable share-view__copyable--cell"
-                    :title="t('share.public.copyHint')"
-                    @click="copyText(row.example || '')"
-                  >{{ row.example || '—' }}</span>
-                </div>
-              </div>
-            </div>
-
-            <div v-if="hasQueryParams" class="share-view__block">
-              <h4>{{ t('share.public.queryParams') }}</h4>
-              <div class="share-view__table">
-                <div class="share-view__row share-view__row--head">
-                  <span>{{ t('workspace.interfaceForm.paramName') }}</span>
-                  <span>{{ t('workspace.interfaceForm.paramType') }}</span>
-                  <span>{{ t('share.public.required') }}</span>
-                  <span>{{ t('workspace.interfaceForm.example') }}</span>
-                </div>
-                <div
-                  v-for="(row, index) in flattenParamRows(detail.query_params)"
-                  :key="`q-${index}`"
-                  class="share-view__row"
-                >
-                  <span
-                    class="share-view__copyable share-view__copyable--cell"
-                    :title="t('share.public.copyHint')"
-                    @click="copyText(row.name)"
-                  >{{ row.name }}</span>
-                  <span>{{ row.type }}</span>
-                  <span :class="{ 'is-required': row.required }">{{ requiredLabel(row.required) }}</span>
-                  <span
-                    class="share-view__copyable share-view__copyable--cell"
-                    :title="t('share.public.copyHint')"
-                    @click="copyText(row.example || '')"
-                  >{{ row.example || '—' }}</span>
-                </div>
-              </div>
-            </div>
-
-            <div v-if="hasRequestBody" class="share-view__block">
-              <h4>{{ t('share.public.requestBody') }}</h4>
-              <div
-                v-if="detail.request_body?.raw"
-                class="share-view__example-raw"
-              >
-                <InterfaceRequestBodyRaw
-                  :model-value="requestRawBody(detail.request_body)"
-                  readonly
-                  hide-content-type
-                />
-              </div>
-              <div
-                v-else-if="detail.request_body?.fields?.length"
-                class="share-view__table"
-              >
-                <div class="share-view__row share-view__row--head">
-                  <span>{{ t('workspace.interfaceForm.paramName') }}</span>
-                  <span>{{ t('workspace.interfaceForm.paramType') }}</span>
-                  <span>{{ t('share.public.required') }}</span>
-                  <span>{{ t('workspace.interfaceForm.example') }}</span>
-                </div>
-                <div
-                  v-for="(row, index) in flattenBodyFields(detail.request_body.fields)"
-                  :key="`b-${index}`"
-                  class="share-view__row"
-                >
-                  <span
-                    class="share-view__copyable share-view__copyable--cell"
-                    :style="{ paddingLeft: `${8 + row.depth * 14}px` }"
-                    :title="t('share.public.copyHint')"
-                    @click="copyText(row.name)"
-                  >{{ row.name }}</span>
-                  <span>{{ row.type }}</span>
-                  <span :class="{ 'is-required': row.required }">{{ requiredLabel(row.required) }}</span>
-                  <span
-                    class="share-view__copyable share-view__copyable--cell"
-                    :title="t('share.public.copyHint')"
-                    @click="copyText(row.example || '')"
-                  >{{ row.example || '—' }}</span>
-                </div>
-              </div>
-            </div>
-
-            <div v-if="hasResponseHeaders" class="share-view__block">
-              <h4>{{ t('share.public.responseHeaders') }}</h4>
-              <div class="share-view__table">
-                <div class="share-view__row share-view__row--head share-view__row--3">
-                  <span>{{ t('workspace.interfaceForm.paramName') }}</span>
-                  <span>{{ t('workspace.interfaceForm.paramType') }}</span>
-                  <span>{{ t('workspace.interfaceForm.example') }}</span>
-                </div>
-                <div
-                  v-for="(row, index) in flattenParamRows(detail.response_headers)"
-                  :key="`rh-${index}`"
-                  class="share-view__row share-view__row--3"
-                >
-                  <span
-                    class="share-view__copyable share-view__copyable--cell"
-                    :title="t('share.public.copyHint')"
-                    @click="copyText(row.name)"
-                  >{{ row.name }}</span>
-                  <span>{{ row.type }}</span>
-                  <span
-                    class="share-view__copyable share-view__copyable--cell"
-                    :title="t('share.public.copyHint')"
-                    @click="copyText(row.example || '')"
-                  >{{ row.example || '—' }}</span>
-                </div>
-              </div>
-            </div>
-
-            <template v-if="hasResponseResults">
-              <div
-                v-for="(result, rIndex) in detail.response_results.filter((r) => r.fields?.length)"
-                :key="`rr-${rIndex}`"
-                class="share-view__block"
-              >
-                <h4>
-                  {{ t('share.public.responseResult') }}
-                  <span v-if="result.name" class="share-view__block-meta">
-                    {{ result.name }}
-                    <template v-if="result.status_code"> · {{ result.status_code }}</template>
-                  </span>
-                </h4>
-                <div class="share-view__table">
-                  <div class="share-view__row share-view__row--head">
-                    <span>{{ t('workspace.interfaceForm.paramName') }}</span>
-                    <span>{{ t('workspace.interfaceForm.paramType') }}</span>
-                    <span>{{ t('share.public.required') }}</span>
-                    <span>{{ t('workspace.interfaceForm.example') }}</span>
-                  </div>
-                  <div
-                    v-for="(row, index) in responseResultRows(result)"
-                    :key="`rr-${rIndex}-${index}`"
-                    class="share-view__row"
-                  >
-                    <span
-                      class="share-view__copyable share-view__copyable--cell"
-                      :style="{ paddingLeft: `${8 + row.depth * 14}px` }"
-                      :title="t('share.public.copyHint')"
-                      @click="copyText(row.name)"
-                    >{{ row.name }}</span>
-                    <span>{{ row.type }}</span>
-                    <span :class="{ 'is-required': row.required }">{{ requiredLabel(row.required) }}</span>
-                    <span
-                      class="share-view__copyable share-view__copyable--cell"
-                      :title="t('share.public.copyHint')"
-                      @click="copyText(row.example || '')"
-                    >{{ row.example || '—' }}</span>
-                  </div>
-                </div>
-              </div>
-            </template>
-
-            <template v-if="hasResponseExamples">
-              <div
-                v-for="(example, eIndex) in detail.response_examples.filter((e) => e.raw?.trim())"
-                :key="`re-${eIndex}`"
-                class="share-view__block"
-              >
-                <h4>
-                  {{ t('share.public.responseExample') }}
-                  <span v-if="example.name" class="share-view__block-meta">
-                    {{ example.name }}
-                    <template v-if="example.status_code"> · {{ example.status_code }}</template>
-                  </span>
-                </h4>
-                <div class="share-view__example-raw">
-                  <InterfaceRequestBodyRaw
-                    :model-value="exampleRawBody(example)"
-                    readonly
-                    hide-content-type
-                  />
-                </div>
-              </div>
-            </template>
+            <InterfaceEditorPanels
+              :panel-state-key="detail.id"
+              :request-headers="docRequestHeaders"
+              :query-params="docQueryParams"
+              :request-body="docRequestBody"
+              :response-headers="docResponseHeaders"
+              :response-results="docResponseResults"
+              :response-examples="docResponseExamples"
+              readonly
+            />
           </template>
           <div v-else class="share-view__empty">{{ t('share.public.selectInterface') }}</div>
         </section>
@@ -908,7 +651,7 @@ onUnmounted(() => {
 
 .share-view__url {
   display: inline-block;
-  margin: 0 0 22px;
+  margin: 0 0 16px;
   padding: 2px 4px;
   border: none;
   background: transparent;
@@ -925,18 +668,6 @@ onUnmounted(() => {
   transition: background 0.15s ease;
 }
 
-.share-view__copyable--cell {
-  display: block;
-  width: 100%;
-  min-width: 0;
-  padding: 8px 10px;
-  margin: -8px -10px;
-  box-sizing: border-box;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .share-view__copyable:hover {
   color: inherit;
   background: var(--color-workspace-item-hover);
@@ -944,86 +675,6 @@ onUnmounted(() => {
 
 .share-view__url.share-view__copyable:hover {
   color: var(--color-text);
-}
-
-.share-view__example-raw {
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  overflow: hidden;
-  background: var(--color-workspace-inset, var(--color-bg));
-}
-
-.share-view__example-raw :deep(.interface-body-raw) {
-  gap: 0;
-  padding: 0;
-}
-
-.share-view__example-raw :deep(.interface-body-raw__toolbar) {
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--color-border);
-  background: transparent;
-}
-
-.share-view__example-raw :deep(.interface-body-raw__editor) {
-  --raw-editor-box-height: 160px;
-  max-height: 360px;
-}
-
-.share-view__block {
-  margin-bottom: 22px;
-}
-
-.share-view__block h4 {
-  margin: 0 0 10px;
-  font-size: 15px;
-  color: var(--color-text);
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.share-view__block-meta {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--color-text-secondary);
-}
-
-.share-view__table {
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.share-view__row {
-  display: grid;
-  grid-template-columns: 1.3fr 0.7fr 0.6fr 1.4fr;
-  gap: 8px;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--color-border);
-  font-size: 14px;
-  color: var(--color-text);
-  align-items: center;
-}
-
-.share-view__row--3 {
-  grid-template-columns: 1.2fr 0.8fr 1.4fr;
-}
-
-.share-view__row--head {
-  background: var(--color-workspace-inset, var(--color-bg));
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-text-secondary);
-}
-
-.share-view__row:last-child {
-  border-bottom: none;
-}
-
-.share-view__row .is-required {
-  color: #ef4444;
-  font-weight: 600;
 }
 
 .share-view__empty {

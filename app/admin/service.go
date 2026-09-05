@@ -2,16 +2,21 @@ package admin
 
 import (
 	"context"
+	"regexp"
+	"strings"
 
 	"nest-api/app/workspace"
 	"nest-api/internal/database"
 	"nest-api/internal/ent"
+	"nest-api/internal/ent/projectmember"
 	"nest-api/internal/ent/user"
 	entworkspace "nest-api/internal/ent/workspace"
 	"nest-api/internal/ent/workspacemember"
 	"nest-api/internal/utils"
 	bizerr "nest-api/pkg/errors"
 )
+
+var accountPattern = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
 
 type Service struct{}
 
@@ -114,6 +119,153 @@ func (Service) TransferWorkspace(ctx context.Context, workspaceID, ownerID int64
 		return err
 	}
 
+	return tx.Commit()
+}
+
+func (Service) UpdateUser(ctx context.Context, operatorID, targetID int64, params UpdateUserRequest) error {
+	target, err := database.DB.User.
+		Query().
+		Where(user.IDEQ(targetID)).
+		Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return bizerr.New("用户不存在")
+		}
+		return err
+	}
+
+	account := strings.TrimSpace(params.Account)
+	if !accountPattern.MatchString(account) {
+		return bizerr.New("账号仅支持字母、数字和下划线")
+	}
+
+	name := strings.TrimSpace(params.Name)
+	email := strings.TrimSpace(strings.ToLower(params.Email))
+	status := params.Status
+
+	if account != target.Account {
+		exists, err := database.DB.User.
+			Query().
+			Where(user.AccountEQ(account), user.IDNEQ(targetID)).
+			Exist(ctx)
+		if err != nil {
+			return err
+		}
+		if exists {
+			return bizerr.New("账号已存在")
+		}
+	}
+
+	if email != "" && email != target.Email {
+		exists, err := database.DB.User.
+			Query().
+			Where(user.EmailEQ(email), user.IDNEQ(targetID)).
+			Exist(ctx)
+		if err != nil {
+			return err
+		}
+		if exists {
+			return bizerr.New("邮箱已被使用")
+		}
+	}
+
+	if target.IsAdmin && !params.IsAdmin {
+		if operatorID == targetID {
+			return bizerr.New("不能取消自己的管理员权限")
+		}
+		count, err := database.DB.User.
+			Query().
+			Where(user.IsAdminEQ(true), user.IDNEQ(targetID)).
+			Count(ctx)
+		if err != nil {
+			return err
+		}
+		if count == 0 {
+			return bizerr.New("至少保留一名管理员")
+		}
+	}
+
+	if target.Status == 1 && status == 0 && operatorID == targetID {
+		return bizerr.New("不能禁用自己的账号")
+	}
+
+	upd := database.DB.User.
+		UpdateOneID(targetID).
+		SetName(name).
+		SetAccount(account).
+		SetEmail(email).
+		SetIsAdmin(params.IsAdmin).
+		SetStatus(status)
+
+	if pwd := strings.TrimSpace(params.Password); pwd != "" {
+		hash, err := utils.Hash(pwd)
+		if err != nil {
+			return err
+		}
+		upd = upd.SetPassword(hash)
+	}
+
+	_, err = upd.Save(ctx)
+	return err
+}
+
+func (Service) DeleteUser(ctx context.Context, operatorID, targetID int64) error {
+	if operatorID == targetID {
+		return bizerr.New("不能删除自己的账号")
+	}
+
+	target, err := database.DB.User.
+		Query().
+		Where(user.IDEQ(targetID)).
+		Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return bizerr.New("用户不存在")
+		}
+		return err
+	}
+
+	if target.IsAdmin {
+		count, err := database.DB.User.
+			Query().
+			Where(user.IsAdminEQ(true), user.IDNEQ(targetID)).
+			Count(ctx)
+		if err != nil {
+			return err
+		}
+		if count == 0 {
+			return bizerr.New("至少保留一名管理员")
+		}
+	}
+
+	owned, err := database.DB.Workspace.
+		Query().
+		Where(entworkspace.OwnerIDEQ(targetID)).
+		Exist(ctx)
+	if err != nil {
+		return err
+	}
+	if owned {
+		return bizerr.New("该用户仍拥有工作空间，请先转移后再删除")
+	}
+
+	tx, err := database.DB.Tx(ctx)
+	if err != nil {
+		return err
+	}
+
+	if _, err = tx.ProjectMember.Delete().Where(projectmember.UserIDEQ(targetID)).Exec(ctx); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	if _, err = tx.WorkspaceMember.Delete().Where(workspacemember.UserIDEQ(targetID)).Exec(ctx); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	if err = tx.User.DeleteOneID(targetID).Exec(ctx); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
 	return tx.Commit()
 }
 

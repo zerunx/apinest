@@ -7,8 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"nest-api/internal/ent/project"
+	"nest-api/internal/ent/projectmember"
 	"nest-api/internal/ent/user"
 	"nest-api/internal/ent/workspace"
+	"nest-api/internal/ent/workspaceinvite"
 	"nest-api/internal/ent/workspacemember"
 	"nest-api/internal/utils"
 
@@ -146,6 +148,36 @@ func (_c *WorkspaceCreate) AddProjects(v ...*Project) *WorkspaceCreate {
 		ids[i] = v[i].ID
 	}
 	return _c.AddProjectIDs(ids...)
+}
+
+// AddInviteIDs adds the "invites" edge to the WorkspaceInvite entity by IDs.
+func (_c *WorkspaceCreate) AddInviteIDs(ids ...int64) *WorkspaceCreate {
+	_c.mutation.AddInviteIDs(ids...)
+	return _c
+}
+
+// AddInvites adds the "invites" edges to the WorkspaceInvite entity.
+func (_c *WorkspaceCreate) AddInvites(v ...*WorkspaceInvite) *WorkspaceCreate {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddInviteIDs(ids...)
+}
+
+// AddProjectMemberIDs adds the "project_members" edge to the ProjectMember entity by IDs.
+func (_c *WorkspaceCreate) AddProjectMemberIDs(ids ...int64) *WorkspaceCreate {
+	_c.mutation.AddProjectMemberIDs(ids...)
+	return _c
+}
+
+// AddProjectMembers adds the "project_members" edges to the ProjectMember entity.
+func (_c *WorkspaceCreate) AddProjectMembers(v ...*ProjectMember) *WorkspaceCreate {
+	ids := make([]int64, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddProjectMemberIDs(ids...)
 }
 
 // Mutation returns the WorkspaceMutation object of the builder.
@@ -336,6 +368,38 @@ func (_c *WorkspaceCreate) createSpec() (*Workspace, *sqlgraph.CreateSpec) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(project.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.InvitesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   workspace.InvitesTable,
+			Columns: []string{workspace.InvitesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(workspaceinvite.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.ProjectMembersIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   workspace.ProjectMembersTable,
+			Columns: []string{workspace.ProjectMembersColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(projectmember.FieldID, field.TypeInt64),
 			},
 		}
 		for _, k := range nodes {

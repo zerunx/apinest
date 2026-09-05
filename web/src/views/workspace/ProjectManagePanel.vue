@@ -1,13 +1,18 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
+import { Delete, Edit } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { deleteProject, updateProject } from '@/api/project'
 import MemberManagePanel from '@/views/workspace/MemberManagePanel.vue'
+import ProjectMemberManagePanel from '@/views/workspace/ProjectMemberManagePanel.vue'
 import WorkspaceManagePanel from '@/views/workspace/WorkspaceManagePanel.vue'
+import { useAuth } from '@/composables/useAuth'
 import { useLocale } from '@/composables/useLocale'
 import { useWorkspaceContext } from '@/composables/useWorkspaceContext'
+import type { ProjectItem } from '@/types/workspace'
 
 const { t } = useLocale()
+const { user } = useAuth()
 const {
   activeModuleTab,
   projects,
@@ -20,6 +25,21 @@ const {
 
 const editingId = ref<number | null>(null)
 const deletingId = ref<number | null>(null)
+
+const isWorkspaceAdmin = computed(() => {
+  const role = activeWorkspace.value?.role
+  return role === 1 || role === 2
+})
+
+const canCreateProject = computed(() => {
+  const role = activeWorkspace.value?.role
+  return role === 1 || role === 2 || role === 3
+})
+
+function canManageProject(row: ProjectItem) {
+  if (isWorkspaceAdmin.value) return true
+  return row.created_by === user.value?.id
+}
 
 async function handleRename(projectId: number, currentName: string) {
   try {
@@ -79,43 +99,61 @@ async function handleDelete(projectId: number, name: string) {
 
     <MemberManagePanel v-else-if="activeModuleTab?.kind === 'member-list'" />
 
+    <ProjectMemberManagePanel v-else-if="activeModuleTab?.kind === 'project-member-list'" />
+
     <template v-else>
       <div class="space-manage__toolbar workspace-panel__toolbar">
-        <div>
-          <h2>{{ t('workspace.projectManage') }}</h2>
-          <p v-if="activeWorkspace">
-            {{ t('workspace.projectManageDesc', { name: activeWorkspace.name }) }}
-          </p>
-        </div>
-        <el-button type="primary" class="workspace-action-btn" @click="openCreateProject">
-          <span class="workspace-action-btn__plus">+</span>
+        <el-button
+          v-if="canCreateProject"
+          type="primary"
+          class="workspace-action-btn"
+          @click="openCreateProject"
+        >
           <span>{{ t('workspace.createProject') }}</span>
         </el-button>
+        <p v-if="activeWorkspace" class="workspace-panel__toolbar-desc">
+          {{ t('workspace.projectManageDesc', { name: activeWorkspace.name }) }}
+        </p>
       </div>
 
-      <el-table v-loading="loadingProjects" :data="projects" class="workspace-data-table">
-        <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="name" :label="t('workspace.columns.name')" min-width="160" />
-        <el-table-column prop="creator_name" :label="t('workspace.columns.creator')" min-width="120" />
+      <el-table
+        v-loading="loadingProjects"
+        :data="projects"
+        class="workspace-data-table"
+        :header-cell-style="{ borderBottom: 'none' }"
+      >
+        <el-table-column prop="id" label="ID" width="88" />
+        <el-table-column prop="name" :label="t('workspace.columns.name')" min-width="180" show-overflow-tooltip />
+        <el-table-column prop="creator_name" :label="t('workspace.columns.creator')" min-width="120" show-overflow-tooltip />
         <el-table-column prop="created_at" :label="t('workspace.columns.createdAt')" min-width="180" />
-        <el-table-column :label="t('member.columns.actions')" width="160" fixed="right">
+        <el-table-column
+          :label="t('member.columns.actions')"
+          width="108"
+          class-name="workspace-table-actions-col"
+          label-class-name="workspace-table-actions-col"
+        >
           <template #default="{ row }">
-            <el-button
-              type="primary"
-              link
-              :loading="editingId === row.id"
-              @click="handleRename(row.id, row.name)"
-            >
-              {{ t('common.rename') }}
-            </el-button>
-            <el-button
-              type="danger"
-              link
-              :loading="deletingId === row.id"
-              @click="handleDelete(row.id, row.name)"
-            >
-              {{ t('common.delete') }}
-            </el-button>
+            <div v-if="canManageProject(row)" class="workspace-table-actions">
+              <button
+                type="button"
+                class="workspace-table-action-btn"
+                :title="t('common.rename')"
+                :disabled="editingId === row.id"
+                @click="handleRename(row.id, row.name)"
+              >
+                <el-icon :size="14"><Edit /></el-icon>
+              </button>
+              <button
+                type="button"
+                class="workspace-table-action-btn workspace-table-action-btn--danger"
+                :title="t('common.delete')"
+                :disabled="deletingId === row.id"
+                @click="handleDelete(row.id, row.name)"
+              >
+                <el-icon :size="14"><Delete /></el-icon>
+              </button>
+            </div>
+            <span v-else class="space-manage__muted">—</span>
           </template>
         </el-table-column>
       </el-table>
@@ -124,7 +162,8 @@ async function handleDelete(projectId: number, name: string) {
 </template>
 
 <style scoped>
-.space-manage__toolbar {
-  padding: 10px 10px 10px 8px;
+.space-manage__muted {
+  color: var(--color-text-secondary);
+  opacity: 0.55;
 }
 </style>

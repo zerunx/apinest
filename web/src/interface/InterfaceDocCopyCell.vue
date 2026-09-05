@@ -11,7 +11,7 @@ const props = withDefaults(
   }>(),
   {
     value: '',
-    empty: '—',
+    empty: '',
   },
 )
 
@@ -36,6 +36,7 @@ async function copy(event?: Event) {
 
 <template>
   <div
+    v-if="copyable || empty"
     class="interface-doc-copyable"
     :class="{ 'interface-doc-copyable--empty': !copyable }"
   >

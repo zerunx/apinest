@@ -11,6 +11,7 @@ func Register(r *gin.Engine) {
 	Workspace(api)
 	Member(api)
 	Project(api)
+	ProjectMember(api)
 	Share(api)
 	Folder(api)
 	Interface(api)

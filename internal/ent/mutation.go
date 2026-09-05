@@ -19,10 +19,12 @@ import (
 	"nest-api/internal/ent/interfaceresult"
 	"nest-api/internal/ent/predicate"
 	"nest-api/internal/ent/project"
+	"nest-api/internal/ent/projectmember"
 	"nest-api/internal/ent/projectshare"
 	"nest-api/internal/ent/projectshareinterface"
 	"nest-api/internal/ent/user"
 	"nest-api/internal/ent/workspace"
+	"nest-api/internal/ent/workspaceinvite"
 	"nest-api/internal/ent/workspacemember"
 	"nest-api/internal/utils"
 	"sync"
@@ -52,10 +54,12 @@ const (
 	TypeInterfaceRequestHeader = "InterfaceRequestHeader"
 	TypeInterfaceResult        = "InterfaceResult"
 	TypeProject                = "Project"
+	TypeProjectMember          = "ProjectMember"
 	TypeProjectShare           = "ProjectShare"
 	TypeProjectShareInterface  = "ProjectShareInterface"
 	TypeUser                   = "User"
 	TypeWorkspace              = "Workspace"
+	TypeWorkspaceInvite        = "WorkspaceInvite"
 	TypeWorkspaceMember        = "WorkspaceMember"
 )
 
@@ -11843,6 +11847,9 @@ type ProjectMutation struct {
 	shares              map[int64]struct{}
 	removedshares       map[int64]struct{}
 	clearedshares       bool
+	members             map[int64]struct{}
+	removedmembers      map[int64]struct{}
+	clearedmembers      bool
 	done                bool
 	oldValue            func(context.Context) (*Project, error)
 	predicates          []predicate.Project
@@ -12464,6 +12471,60 @@ func (m *ProjectMutation) ResetShares() {
 	m.removedshares = nil
 }
 
+// AddMemberIDs adds the "members" edge to the ProjectMember entity by ids.
+func (m *ProjectMutation) AddMemberIDs(ids ...int64) {
+	if m.members == nil {
+		m.members = make(map[int64]struct{})
+	}
+	for i := range ids {
+		m.members[ids[i]] = struct{}{}
+	}
+}
+
+// ClearMembers clears the "members" edge to the ProjectMember entity.
+func (m *ProjectMutation) ClearMembers() {
+	m.clearedmembers = true
+}
+
+// MembersCleared reports if the "members" edge to the ProjectMember entity was cleared.
+func (m *ProjectMutation) MembersCleared() bool {
+	return m.clearedmembers
+}
+
+// RemoveMemberIDs removes the "members" edge to the ProjectMember entity by IDs.
+func (m *ProjectMutation) RemoveMemberIDs(ids ...int64) {
+	if m.removedmembers == nil {
+		m.removedmembers = make(map[int64]struct{})
+	}
+	for i := range ids {
+		delete(m.members, ids[i])
+		m.removedmembers[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedMembers returns the removed IDs of the "members" edge to the ProjectMember entity.
+func (m *ProjectMutation) RemovedMembersIDs() (ids []int64) {
+	for id := range m.removedmembers {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// MembersIDs returns the "members" edge IDs in the mutation.
+func (m *ProjectMutation) MembersIDs() (ids []int64) {
+	for id := range m.members {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetMembers resets all changes to the "members" edge.
+func (m *ProjectMutation) ResetMembers() {
+	m.members = nil
+	m.clearedmembers = false
+	m.removedmembers = nil
+}
+
 // Where appends a list predicates to the ProjectMutation builder.
 func (m *ProjectMutation) Where(ps ...predicate.Project) {
 	m.predicates = append(m.predicates, ps...)
@@ -12694,7 +12755,7 @@ func (m *ProjectMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *ProjectMutation) AddedEdges() []string {
-	edges := make([]string, 0, 6)
+	edges := make([]string, 0, 7)
 	if m.workspace != nil {
 		edges = append(edges, project.EdgeWorkspace)
 	}
@@ -12712,6 +12773,9 @@ func (m *ProjectMutation) AddedEdges() []string {
 	}
 	if m.shares != nil {
 		edges = append(edges, project.EdgeShares)
+	}
+	if m.members != nil {
+		edges = append(edges, project.EdgeMembers)
 	}
 	return edges
 }
@@ -12752,13 +12816,19 @@ func (m *ProjectMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case project.EdgeMembers:
+		ids := make([]ent.Value, 0, len(m.members))
+		for id := range m.members {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *ProjectMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 6)
+	edges := make([]string, 0, 7)
 	if m.removedfolders != nil {
 		edges = append(edges, project.EdgeFolders)
 	}
@@ -12770,6 +12840,9 @@ func (m *ProjectMutation) RemovedEdges() []string {
 	}
 	if m.removedshares != nil {
 		edges = append(edges, project.EdgeShares)
+	}
+	if m.removedmembers != nil {
+		edges = append(edges, project.EdgeMembers)
 	}
 	return edges
 }
@@ -12802,13 +12875,19 @@ func (m *ProjectMutation) RemovedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case project.EdgeMembers:
+		ids := make([]ent.Value, 0, len(m.removedmembers))
+		for id := range m.removedmembers {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *ProjectMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 6)
+	edges := make([]string, 0, 7)
 	if m.clearedworkspace {
 		edges = append(edges, project.EdgeWorkspace)
 	}
@@ -12826,6 +12905,9 @@ func (m *ProjectMutation) ClearedEdges() []string {
 	}
 	if m.clearedshares {
 		edges = append(edges, project.EdgeShares)
+	}
+	if m.clearedmembers {
+		edges = append(edges, project.EdgeMembers)
 	}
 	return edges
 }
@@ -12846,6 +12928,8 @@ func (m *ProjectMutation) EdgeCleared(name string) bool {
 		return m.clearedenvironments
 	case project.EdgeShares:
 		return m.clearedshares
+	case project.EdgeMembers:
+		return m.clearedmembers
 	}
 	return false
 }
@@ -12886,8 +12970,708 @@ func (m *ProjectMutation) ResetEdge(name string) error {
 	case project.EdgeShares:
 		m.ResetShares()
 		return nil
+	case project.EdgeMembers:
+		m.ResetMembers()
+		return nil
 	}
 	return fmt.Errorf("unknown Project edge %s", name)
+}
+
+// ProjectMemberMutation represents an operation that mutates the ProjectMember nodes in the graph.
+type ProjectMemberMutation struct {
+	config
+	op               Op
+	typ              string
+	id               *int64
+	created_at       *utils.DateTime
+	updated_at       *utils.DateTime
+	clearedFields    map[string]struct{}
+	workspace        *int64
+	clearedworkspace bool
+	project          *int64
+	clearedproject   bool
+	user             *int64
+	cleareduser      bool
+	done             bool
+	oldValue         func(context.Context) (*ProjectMember, error)
+	predicates       []predicate.ProjectMember
+}
+
+var _ ent.Mutation = (*ProjectMemberMutation)(nil)
+
+// projectmemberOption allows management of the mutation configuration using functional options.
+type projectmemberOption func(*ProjectMemberMutation)
+
+// newProjectMemberMutation creates new mutation for the ProjectMember entity.
+func newProjectMemberMutation(c config, op Op, opts ...projectmemberOption) *ProjectMemberMutation {
+	m := &ProjectMemberMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeProjectMember,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withProjectMemberID sets the ID field of the mutation.
+func withProjectMemberID(id int64) projectmemberOption {
+	return func(m *ProjectMemberMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *ProjectMember
+		)
+		m.oldValue = func(ctx context.Context) (*ProjectMember, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().ProjectMember.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withProjectMember sets the old ProjectMember of the mutation.
+func withProjectMember(node *ProjectMember) projectmemberOption {
+	return func(m *ProjectMemberMutation) {
+		m.oldValue = func(context.Context) (*ProjectMember, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m ProjectMemberMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m ProjectMemberMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of ProjectMember entities.
+func (m *ProjectMemberMutation) SetID(id int64) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *ProjectMemberMutation) ID() (id int64, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *ProjectMemberMutation) IDs(ctx context.Context) ([]int64, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int64{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().ProjectMember.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetWorkspaceID sets the "workspace_id" field.
+func (m *ProjectMemberMutation) SetWorkspaceID(i int64) {
+	m.workspace = &i
+}
+
+// WorkspaceID returns the value of the "workspace_id" field in the mutation.
+func (m *ProjectMemberMutation) WorkspaceID() (r int64, exists bool) {
+	v := m.workspace
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldWorkspaceID returns the old "workspace_id" field's value of the ProjectMember entity.
+// If the ProjectMember object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProjectMemberMutation) OldWorkspaceID(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldWorkspaceID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldWorkspaceID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldWorkspaceID: %w", err)
+	}
+	return oldValue.WorkspaceID, nil
+}
+
+// ResetWorkspaceID resets all changes to the "workspace_id" field.
+func (m *ProjectMemberMutation) ResetWorkspaceID() {
+	m.workspace = nil
+}
+
+// SetProjectID sets the "project_id" field.
+func (m *ProjectMemberMutation) SetProjectID(i int64) {
+	m.project = &i
+}
+
+// ProjectID returns the value of the "project_id" field in the mutation.
+func (m *ProjectMemberMutation) ProjectID() (r int64, exists bool) {
+	v := m.project
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProjectID returns the old "project_id" field's value of the ProjectMember entity.
+// If the ProjectMember object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProjectMemberMutation) OldProjectID(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProjectID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProjectID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProjectID: %w", err)
+	}
+	return oldValue.ProjectID, nil
+}
+
+// ResetProjectID resets all changes to the "project_id" field.
+func (m *ProjectMemberMutation) ResetProjectID() {
+	m.project = nil
+}
+
+// SetUserID sets the "user_id" field.
+func (m *ProjectMemberMutation) SetUserID(i int64) {
+	m.user = &i
+}
+
+// UserID returns the value of the "user_id" field in the mutation.
+func (m *ProjectMemberMutation) UserID() (r int64, exists bool) {
+	v := m.user
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUserID returns the old "user_id" field's value of the ProjectMember entity.
+// If the ProjectMember object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProjectMemberMutation) OldUserID(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUserID: %w", err)
+	}
+	return oldValue.UserID, nil
+}
+
+// ResetUserID resets all changes to the "user_id" field.
+func (m *ProjectMemberMutation) ResetUserID() {
+	m.user = nil
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *ProjectMemberMutation) SetCreatedAt(ut utils.DateTime) {
+	m.created_at = &ut
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *ProjectMemberMutation) CreatedAt() (r utils.DateTime, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the ProjectMember entity.
+// If the ProjectMember object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProjectMemberMutation) OldCreatedAt(ctx context.Context) (v utils.DateTime, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *ProjectMemberMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *ProjectMemberMutation) SetUpdatedAt(ut utils.DateTime) {
+	m.updated_at = &ut
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *ProjectMemberMutation) UpdatedAt() (r utils.DateTime, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the ProjectMember entity.
+// If the ProjectMember object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProjectMemberMutation) OldUpdatedAt(ctx context.Context) (v utils.DateTime, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *ProjectMemberMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// ClearWorkspace clears the "workspace" edge to the Workspace entity.
+func (m *ProjectMemberMutation) ClearWorkspace() {
+	m.clearedworkspace = true
+	m.clearedFields[projectmember.FieldWorkspaceID] = struct{}{}
+}
+
+// WorkspaceCleared reports if the "workspace" edge to the Workspace entity was cleared.
+func (m *ProjectMemberMutation) WorkspaceCleared() bool {
+	return m.clearedworkspace
+}
+
+// WorkspaceIDs returns the "workspace" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// WorkspaceID instead. It exists only for internal usage by the builders.
+func (m *ProjectMemberMutation) WorkspaceIDs() (ids []int64) {
+	if id := m.workspace; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetWorkspace resets all changes to the "workspace" edge.
+func (m *ProjectMemberMutation) ResetWorkspace() {
+	m.workspace = nil
+	m.clearedworkspace = false
+}
+
+// ClearProject clears the "project" edge to the Project entity.
+func (m *ProjectMemberMutation) ClearProject() {
+	m.clearedproject = true
+	m.clearedFields[projectmember.FieldProjectID] = struct{}{}
+}
+
+// ProjectCleared reports if the "project" edge to the Project entity was cleared.
+func (m *ProjectMemberMutation) ProjectCleared() bool {
+	return m.clearedproject
+}
+
+// ProjectIDs returns the "project" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// ProjectID instead. It exists only for internal usage by the builders.
+func (m *ProjectMemberMutation) ProjectIDs() (ids []int64) {
+	if id := m.project; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetProject resets all changes to the "project" edge.
+func (m *ProjectMemberMutation) ResetProject() {
+	m.project = nil
+	m.clearedproject = false
+}
+
+// ClearUser clears the "user" edge to the User entity.
+func (m *ProjectMemberMutation) ClearUser() {
+	m.cleareduser = true
+	m.clearedFields[projectmember.FieldUserID] = struct{}{}
+}
+
+// UserCleared reports if the "user" edge to the User entity was cleared.
+func (m *ProjectMemberMutation) UserCleared() bool {
+	return m.cleareduser
+}
+
+// UserIDs returns the "user" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// UserID instead. It exists only for internal usage by the builders.
+func (m *ProjectMemberMutation) UserIDs() (ids []int64) {
+	if id := m.user; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetUser resets all changes to the "user" edge.
+func (m *ProjectMemberMutation) ResetUser() {
+	m.user = nil
+	m.cleareduser = false
+}
+
+// Where appends a list predicates to the ProjectMemberMutation builder.
+func (m *ProjectMemberMutation) Where(ps ...predicate.ProjectMember) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the ProjectMemberMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *ProjectMemberMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.ProjectMember, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *ProjectMemberMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *ProjectMemberMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (ProjectMember).
+func (m *ProjectMemberMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *ProjectMemberMutation) Fields() []string {
+	fields := make([]string, 0, 5)
+	if m.workspace != nil {
+		fields = append(fields, projectmember.FieldWorkspaceID)
+	}
+	if m.project != nil {
+		fields = append(fields, projectmember.FieldProjectID)
+	}
+	if m.user != nil {
+		fields = append(fields, projectmember.FieldUserID)
+	}
+	if m.created_at != nil {
+		fields = append(fields, projectmember.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, projectmember.FieldUpdatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *ProjectMemberMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case projectmember.FieldWorkspaceID:
+		return m.WorkspaceID()
+	case projectmember.FieldProjectID:
+		return m.ProjectID()
+	case projectmember.FieldUserID:
+		return m.UserID()
+	case projectmember.FieldCreatedAt:
+		return m.CreatedAt()
+	case projectmember.FieldUpdatedAt:
+		return m.UpdatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *ProjectMemberMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case projectmember.FieldWorkspaceID:
+		return m.OldWorkspaceID(ctx)
+	case projectmember.FieldProjectID:
+		return m.OldProjectID(ctx)
+	case projectmember.FieldUserID:
+		return m.OldUserID(ctx)
+	case projectmember.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case projectmember.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown ProjectMember field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *ProjectMemberMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case projectmember.FieldWorkspaceID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetWorkspaceID(v)
+		return nil
+	case projectmember.FieldProjectID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProjectID(v)
+		return nil
+	case projectmember.FieldUserID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUserID(v)
+		return nil
+	case projectmember.FieldCreatedAt:
+		v, ok := value.(utils.DateTime)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case projectmember.FieldUpdatedAt:
+		v, ok := value.(utils.DateTime)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown ProjectMember field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *ProjectMemberMutation) AddedFields() []string {
+	var fields []string
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *ProjectMemberMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *ProjectMemberMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown ProjectMember numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *ProjectMemberMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *ProjectMemberMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *ProjectMemberMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown ProjectMember nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *ProjectMemberMutation) ResetField(name string) error {
+	switch name {
+	case projectmember.FieldWorkspaceID:
+		m.ResetWorkspaceID()
+		return nil
+	case projectmember.FieldProjectID:
+		m.ResetProjectID()
+		return nil
+	case projectmember.FieldUserID:
+		m.ResetUserID()
+		return nil
+	case projectmember.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case projectmember.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown ProjectMember field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *ProjectMemberMutation) AddedEdges() []string {
+	edges := make([]string, 0, 3)
+	if m.workspace != nil {
+		edges = append(edges, projectmember.EdgeWorkspace)
+	}
+	if m.project != nil {
+		edges = append(edges, projectmember.EdgeProject)
+	}
+	if m.user != nil {
+		edges = append(edges, projectmember.EdgeUser)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *ProjectMemberMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case projectmember.EdgeWorkspace:
+		if id := m.workspace; id != nil {
+			return []ent.Value{*id}
+		}
+	case projectmember.EdgeProject:
+		if id := m.project; id != nil {
+			return []ent.Value{*id}
+		}
+	case projectmember.EdgeUser:
+		if id := m.user; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *ProjectMemberMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 3)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *ProjectMemberMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *ProjectMemberMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 3)
+	if m.clearedworkspace {
+		edges = append(edges, projectmember.EdgeWorkspace)
+	}
+	if m.clearedproject {
+		edges = append(edges, projectmember.EdgeProject)
+	}
+	if m.cleareduser {
+		edges = append(edges, projectmember.EdgeUser)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *ProjectMemberMutation) EdgeCleared(name string) bool {
+	switch name {
+	case projectmember.EdgeWorkspace:
+		return m.clearedworkspace
+	case projectmember.EdgeProject:
+		return m.clearedproject
+	case projectmember.EdgeUser:
+		return m.cleareduser
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *ProjectMemberMutation) ClearEdge(name string) error {
+	switch name {
+	case projectmember.EdgeWorkspace:
+		m.ClearWorkspace()
+		return nil
+	case projectmember.EdgeProject:
+		m.ClearProject()
+		return nil
+	case projectmember.EdgeUser:
+		m.ClearUser()
+		return nil
+	}
+	return fmt.Errorf("unknown ProjectMember unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *ProjectMemberMutation) ResetEdge(name string) error {
+	switch name {
+	case projectmember.EdgeWorkspace:
+		m.ResetWorkspace()
+		return nil
+	case projectmember.EdgeProject:
+		m.ResetProject()
+		return nil
+	case projectmember.EdgeUser:
+		m.ResetUser()
+		return nil
+	}
+	return fmt.Errorf("unknown ProjectMember edge %s", name)
 }
 
 // ProjectShareMutation represents an operation that mutates the ProjectShare nodes in the graph.
@@ -14640,6 +15424,12 @@ type UserMutation struct {
 	created_project_shares               map[int64]struct{}
 	removedcreated_project_shares        map[int64]struct{}
 	clearedcreated_project_shares        bool
+	created_workspace_invites            map[int64]struct{}
+	removedcreated_workspace_invites     map[int64]struct{}
+	clearedcreated_workspace_invites     bool
+	project_memberships                  map[int64]struct{}
+	removedproject_memberships           map[int64]struct{}
+	clearedproject_memberships           bool
 	done                                 bool
 	oldValue                             func(context.Context) (*User, error)
 	predicates                           []predicate.User
@@ -15664,6 +16454,114 @@ func (m *UserMutation) ResetCreatedProjectShares() {
 	m.removedcreated_project_shares = nil
 }
 
+// AddCreatedWorkspaceInviteIDs adds the "created_workspace_invites" edge to the WorkspaceInvite entity by ids.
+func (m *UserMutation) AddCreatedWorkspaceInviteIDs(ids ...int64) {
+	if m.created_workspace_invites == nil {
+		m.created_workspace_invites = make(map[int64]struct{})
+	}
+	for i := range ids {
+		m.created_workspace_invites[ids[i]] = struct{}{}
+	}
+}
+
+// ClearCreatedWorkspaceInvites clears the "created_workspace_invites" edge to the WorkspaceInvite entity.
+func (m *UserMutation) ClearCreatedWorkspaceInvites() {
+	m.clearedcreated_workspace_invites = true
+}
+
+// CreatedWorkspaceInvitesCleared reports if the "created_workspace_invites" edge to the WorkspaceInvite entity was cleared.
+func (m *UserMutation) CreatedWorkspaceInvitesCleared() bool {
+	return m.clearedcreated_workspace_invites
+}
+
+// RemoveCreatedWorkspaceInviteIDs removes the "created_workspace_invites" edge to the WorkspaceInvite entity by IDs.
+func (m *UserMutation) RemoveCreatedWorkspaceInviteIDs(ids ...int64) {
+	if m.removedcreated_workspace_invites == nil {
+		m.removedcreated_workspace_invites = make(map[int64]struct{})
+	}
+	for i := range ids {
+		delete(m.created_workspace_invites, ids[i])
+		m.removedcreated_workspace_invites[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedCreatedWorkspaceInvites returns the removed IDs of the "created_workspace_invites" edge to the WorkspaceInvite entity.
+func (m *UserMutation) RemovedCreatedWorkspaceInvitesIDs() (ids []int64) {
+	for id := range m.removedcreated_workspace_invites {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// CreatedWorkspaceInvitesIDs returns the "created_workspace_invites" edge IDs in the mutation.
+func (m *UserMutation) CreatedWorkspaceInvitesIDs() (ids []int64) {
+	for id := range m.created_workspace_invites {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetCreatedWorkspaceInvites resets all changes to the "created_workspace_invites" edge.
+func (m *UserMutation) ResetCreatedWorkspaceInvites() {
+	m.created_workspace_invites = nil
+	m.clearedcreated_workspace_invites = false
+	m.removedcreated_workspace_invites = nil
+}
+
+// AddProjectMembershipIDs adds the "project_memberships" edge to the ProjectMember entity by ids.
+func (m *UserMutation) AddProjectMembershipIDs(ids ...int64) {
+	if m.project_memberships == nil {
+		m.project_memberships = make(map[int64]struct{})
+	}
+	for i := range ids {
+		m.project_memberships[ids[i]] = struct{}{}
+	}
+}
+
+// ClearProjectMemberships clears the "project_memberships" edge to the ProjectMember entity.
+func (m *UserMutation) ClearProjectMemberships() {
+	m.clearedproject_memberships = true
+}
+
+// ProjectMembershipsCleared reports if the "project_memberships" edge to the ProjectMember entity was cleared.
+func (m *UserMutation) ProjectMembershipsCleared() bool {
+	return m.clearedproject_memberships
+}
+
+// RemoveProjectMembershipIDs removes the "project_memberships" edge to the ProjectMember entity by IDs.
+func (m *UserMutation) RemoveProjectMembershipIDs(ids ...int64) {
+	if m.removedproject_memberships == nil {
+		m.removedproject_memberships = make(map[int64]struct{})
+	}
+	for i := range ids {
+		delete(m.project_memberships, ids[i])
+		m.removedproject_memberships[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedProjectMemberships returns the removed IDs of the "project_memberships" edge to the ProjectMember entity.
+func (m *UserMutation) RemovedProjectMembershipsIDs() (ids []int64) {
+	for id := range m.removedproject_memberships {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ProjectMembershipsIDs returns the "project_memberships" edge IDs in the mutation.
+func (m *UserMutation) ProjectMembershipsIDs() (ids []int64) {
+	for id := range m.project_memberships {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetProjectMemberships resets all changes to the "project_memberships" edge.
+func (m *UserMutation) ResetProjectMemberships() {
+	m.project_memberships = nil
+	m.clearedproject_memberships = false
+	m.removedproject_memberships = nil
+}
+
 // Where appends a list predicates to the UserMutation builder.
 func (m *UserMutation) Where(ps ...predicate.User) {
 	m.predicates = append(m.predicates, ps...)
@@ -15991,7 +16889,7 @@ func (m *UserMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *UserMutation) AddedEdges() []string {
-	edges := make([]string, 0, 9)
+	edges := make([]string, 0, 11)
 	if m.owned_workspaces != nil {
 		edges = append(edges, user.EdgeOwnedWorkspaces)
 	}
@@ -16018,6 +16916,12 @@ func (m *UserMutation) AddedEdges() []string {
 	}
 	if m.created_project_shares != nil {
 		edges = append(edges, user.EdgeCreatedProjectShares)
+	}
+	if m.created_workspace_invites != nil {
+		edges = append(edges, user.EdgeCreatedWorkspaceInvites)
+	}
+	if m.project_memberships != nil {
+		edges = append(edges, user.EdgeProjectMemberships)
 	}
 	return edges
 }
@@ -16080,13 +16984,25 @@ func (m *UserMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case user.EdgeCreatedWorkspaceInvites:
+		ids := make([]ent.Value, 0, len(m.created_workspace_invites))
+		for id := range m.created_workspace_invites {
+			ids = append(ids, id)
+		}
+		return ids
+	case user.EdgeProjectMemberships:
+		ids := make([]ent.Value, 0, len(m.project_memberships))
+		for id := range m.project_memberships {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *UserMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 9)
+	edges := make([]string, 0, 11)
 	if m.removedowned_workspaces != nil {
 		edges = append(edges, user.EdgeOwnedWorkspaces)
 	}
@@ -16113,6 +17029,12 @@ func (m *UserMutation) RemovedEdges() []string {
 	}
 	if m.removedcreated_project_shares != nil {
 		edges = append(edges, user.EdgeCreatedProjectShares)
+	}
+	if m.removedcreated_workspace_invites != nil {
+		edges = append(edges, user.EdgeCreatedWorkspaceInvites)
+	}
+	if m.removedproject_memberships != nil {
+		edges = append(edges, user.EdgeProjectMemberships)
 	}
 	return edges
 }
@@ -16175,13 +17097,25 @@ func (m *UserMutation) RemovedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case user.EdgeCreatedWorkspaceInvites:
+		ids := make([]ent.Value, 0, len(m.removedcreated_workspace_invites))
+		for id := range m.removedcreated_workspace_invites {
+			ids = append(ids, id)
+		}
+		return ids
+	case user.EdgeProjectMemberships:
+		ids := make([]ent.Value, 0, len(m.removedproject_memberships))
+		for id := range m.removedproject_memberships {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *UserMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 9)
+	edges := make([]string, 0, 11)
 	if m.clearedowned_workspaces {
 		edges = append(edges, user.EdgeOwnedWorkspaces)
 	}
@@ -16209,6 +17143,12 @@ func (m *UserMutation) ClearedEdges() []string {
 	if m.clearedcreated_project_shares {
 		edges = append(edges, user.EdgeCreatedProjectShares)
 	}
+	if m.clearedcreated_workspace_invites {
+		edges = append(edges, user.EdgeCreatedWorkspaceInvites)
+	}
+	if m.clearedproject_memberships {
+		edges = append(edges, user.EdgeProjectMemberships)
+	}
 	return edges
 }
 
@@ -16234,6 +17174,10 @@ func (m *UserMutation) EdgeCleared(name string) bool {
 		return m.clearedcreated_environment_variables
 	case user.EdgeCreatedProjectShares:
 		return m.clearedcreated_project_shares
+	case user.EdgeCreatedWorkspaceInvites:
+		return m.clearedcreated_workspace_invites
+	case user.EdgeProjectMemberships:
+		return m.clearedproject_memberships
 	}
 	return false
 }
@@ -16277,6 +17221,12 @@ func (m *UserMutation) ResetEdge(name string) error {
 	case user.EdgeCreatedProjectShares:
 		m.ResetCreatedProjectShares()
 		return nil
+	case user.EdgeCreatedWorkspaceInvites:
+		m.ResetCreatedWorkspaceInvites()
+		return nil
+	case user.EdgeProjectMemberships:
+		m.ResetProjectMemberships()
+		return nil
 	}
 	return fmt.Errorf("unknown User edge %s", name)
 }
@@ -16284,26 +17234,32 @@ func (m *UserMutation) ResetEdge(name string) error {
 // WorkspaceMutation represents an operation that mutates the Workspace nodes in the graph.
 type WorkspaceMutation struct {
 	config
-	op              Op
-	typ             string
-	id              *int64
-	name            *string
-	invite_code     *string
-	created_at      *utils.DateTime
-	updated_at      *utils.DateTime
-	deleted_at      *utils.DateTime
-	clearedFields   map[string]struct{}
-	owner           *int64
-	clearedowner    bool
-	members         map[int64]struct{}
-	removedmembers  map[int64]struct{}
-	clearedmembers  bool
-	projects        map[int64]struct{}
-	removedprojects map[int64]struct{}
-	clearedprojects bool
-	done            bool
-	oldValue        func(context.Context) (*Workspace, error)
-	predicates      []predicate.Workspace
+	op                     Op
+	typ                    string
+	id                     *int64
+	name                   *string
+	invite_code            *string
+	created_at             *utils.DateTime
+	updated_at             *utils.DateTime
+	deleted_at             *utils.DateTime
+	clearedFields          map[string]struct{}
+	owner                  *int64
+	clearedowner           bool
+	members                map[int64]struct{}
+	removedmembers         map[int64]struct{}
+	clearedmembers         bool
+	projects               map[int64]struct{}
+	removedprojects        map[int64]struct{}
+	clearedprojects        bool
+	invites                map[int64]struct{}
+	removedinvites         map[int64]struct{}
+	clearedinvites         bool
+	project_members        map[int64]struct{}
+	removedproject_members map[int64]struct{}
+	clearedproject_members bool
+	done                   bool
+	oldValue               func(context.Context) (*Workspace, error)
+	predicates             []predicate.Workspace
 }
 
 var _ ent.Mutation = (*WorkspaceMutation)(nil)
@@ -16787,6 +17743,114 @@ func (m *WorkspaceMutation) ResetProjects() {
 	m.removedprojects = nil
 }
 
+// AddInviteIDs adds the "invites" edge to the WorkspaceInvite entity by ids.
+func (m *WorkspaceMutation) AddInviteIDs(ids ...int64) {
+	if m.invites == nil {
+		m.invites = make(map[int64]struct{})
+	}
+	for i := range ids {
+		m.invites[ids[i]] = struct{}{}
+	}
+}
+
+// ClearInvites clears the "invites" edge to the WorkspaceInvite entity.
+func (m *WorkspaceMutation) ClearInvites() {
+	m.clearedinvites = true
+}
+
+// InvitesCleared reports if the "invites" edge to the WorkspaceInvite entity was cleared.
+func (m *WorkspaceMutation) InvitesCleared() bool {
+	return m.clearedinvites
+}
+
+// RemoveInviteIDs removes the "invites" edge to the WorkspaceInvite entity by IDs.
+func (m *WorkspaceMutation) RemoveInviteIDs(ids ...int64) {
+	if m.removedinvites == nil {
+		m.removedinvites = make(map[int64]struct{})
+	}
+	for i := range ids {
+		delete(m.invites, ids[i])
+		m.removedinvites[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedInvites returns the removed IDs of the "invites" edge to the WorkspaceInvite entity.
+func (m *WorkspaceMutation) RemovedInvitesIDs() (ids []int64) {
+	for id := range m.removedinvites {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// InvitesIDs returns the "invites" edge IDs in the mutation.
+func (m *WorkspaceMutation) InvitesIDs() (ids []int64) {
+	for id := range m.invites {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetInvites resets all changes to the "invites" edge.
+func (m *WorkspaceMutation) ResetInvites() {
+	m.invites = nil
+	m.clearedinvites = false
+	m.removedinvites = nil
+}
+
+// AddProjectMemberIDs adds the "project_members" edge to the ProjectMember entity by ids.
+func (m *WorkspaceMutation) AddProjectMemberIDs(ids ...int64) {
+	if m.project_members == nil {
+		m.project_members = make(map[int64]struct{})
+	}
+	for i := range ids {
+		m.project_members[ids[i]] = struct{}{}
+	}
+}
+
+// ClearProjectMembers clears the "project_members" edge to the ProjectMember entity.
+func (m *WorkspaceMutation) ClearProjectMembers() {
+	m.clearedproject_members = true
+}
+
+// ProjectMembersCleared reports if the "project_members" edge to the ProjectMember entity was cleared.
+func (m *WorkspaceMutation) ProjectMembersCleared() bool {
+	return m.clearedproject_members
+}
+
+// RemoveProjectMemberIDs removes the "project_members" edge to the ProjectMember entity by IDs.
+func (m *WorkspaceMutation) RemoveProjectMemberIDs(ids ...int64) {
+	if m.removedproject_members == nil {
+		m.removedproject_members = make(map[int64]struct{})
+	}
+	for i := range ids {
+		delete(m.project_members, ids[i])
+		m.removedproject_members[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedProjectMembers returns the removed IDs of the "project_members" edge to the ProjectMember entity.
+func (m *WorkspaceMutation) RemovedProjectMembersIDs() (ids []int64) {
+	for id := range m.removedproject_members {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ProjectMembersIDs returns the "project_members" edge IDs in the mutation.
+func (m *WorkspaceMutation) ProjectMembersIDs() (ids []int64) {
+	for id := range m.project_members {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetProjectMembers resets all changes to the "project_members" edge.
+func (m *WorkspaceMutation) ResetProjectMembers() {
+	m.project_members = nil
+	m.clearedproject_members = false
+	m.removedproject_members = nil
+}
+
 // Where appends a list predicates to the WorkspaceMutation builder.
 func (m *WorkspaceMutation) Where(ps ...predicate.Workspace) {
 	m.predicates = append(m.predicates, ps...)
@@ -17023,7 +18087,7 @@ func (m *WorkspaceMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *WorkspaceMutation) AddedEdges() []string {
-	edges := make([]string, 0, 3)
+	edges := make([]string, 0, 5)
 	if m.owner != nil {
 		edges = append(edges, workspace.EdgeOwner)
 	}
@@ -17032,6 +18096,12 @@ func (m *WorkspaceMutation) AddedEdges() []string {
 	}
 	if m.projects != nil {
 		edges = append(edges, workspace.EdgeProjects)
+	}
+	if m.invites != nil {
+		edges = append(edges, workspace.EdgeInvites)
+	}
+	if m.project_members != nil {
+		edges = append(edges, workspace.EdgeProjectMembers)
 	}
 	return edges
 }
@@ -17056,18 +18126,36 @@ func (m *WorkspaceMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case workspace.EdgeInvites:
+		ids := make([]ent.Value, 0, len(m.invites))
+		for id := range m.invites {
+			ids = append(ids, id)
+		}
+		return ids
+	case workspace.EdgeProjectMembers:
+		ids := make([]ent.Value, 0, len(m.project_members))
+		for id := range m.project_members {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *WorkspaceMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 3)
+	edges := make([]string, 0, 5)
 	if m.removedmembers != nil {
 		edges = append(edges, workspace.EdgeMembers)
 	}
 	if m.removedprojects != nil {
 		edges = append(edges, workspace.EdgeProjects)
+	}
+	if m.removedinvites != nil {
+		edges = append(edges, workspace.EdgeInvites)
+	}
+	if m.removedproject_members != nil {
+		edges = append(edges, workspace.EdgeProjectMembers)
 	}
 	return edges
 }
@@ -17088,13 +18176,25 @@ func (m *WorkspaceMutation) RemovedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case workspace.EdgeInvites:
+		ids := make([]ent.Value, 0, len(m.removedinvites))
+		for id := range m.removedinvites {
+			ids = append(ids, id)
+		}
+		return ids
+	case workspace.EdgeProjectMembers:
+		ids := make([]ent.Value, 0, len(m.removedproject_members))
+		for id := range m.removedproject_members {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *WorkspaceMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 3)
+	edges := make([]string, 0, 5)
 	if m.clearedowner {
 		edges = append(edges, workspace.EdgeOwner)
 	}
@@ -17103,6 +18203,12 @@ func (m *WorkspaceMutation) ClearedEdges() []string {
 	}
 	if m.clearedprojects {
 		edges = append(edges, workspace.EdgeProjects)
+	}
+	if m.clearedinvites {
+		edges = append(edges, workspace.EdgeInvites)
+	}
+	if m.clearedproject_members {
+		edges = append(edges, workspace.EdgeProjectMembers)
 	}
 	return edges
 }
@@ -17117,6 +18223,10 @@ func (m *WorkspaceMutation) EdgeCleared(name string) bool {
 		return m.clearedmembers
 	case workspace.EdgeProjects:
 		return m.clearedprojects
+	case workspace.EdgeInvites:
+		return m.clearedinvites
+	case workspace.EdgeProjectMembers:
+		return m.clearedproject_members
 	}
 	return false
 }
@@ -17145,8 +18255,895 @@ func (m *WorkspaceMutation) ResetEdge(name string) error {
 	case workspace.EdgeProjects:
 		m.ResetProjects()
 		return nil
+	case workspace.EdgeInvites:
+		m.ResetInvites()
+		return nil
+	case workspace.EdgeProjectMembers:
+		m.ResetProjectMembers()
+		return nil
 	}
 	return fmt.Errorf("unknown Workspace edge %s", name)
+}
+
+// WorkspaceInviteMutation represents an operation that mutates the WorkspaceInvite nodes in the graph.
+type WorkspaceInviteMutation struct {
+	config
+	op               Op
+	typ              string
+	id               *int64
+	invite_code      *string
+	role             *uint8
+	addrole          *int8
+	expires_at       *utils.DateTime
+	created_at       *utils.DateTime
+	updated_at       *utils.DateTime
+	deleted_at       *utils.DateTime
+	clearedFields    map[string]struct{}
+	workspace        *int64
+	clearedworkspace bool
+	creator          *int64
+	clearedcreator   bool
+	done             bool
+	oldValue         func(context.Context) (*WorkspaceInvite, error)
+	predicates       []predicate.WorkspaceInvite
+}
+
+var _ ent.Mutation = (*WorkspaceInviteMutation)(nil)
+
+// workspaceinviteOption allows management of the mutation configuration using functional options.
+type workspaceinviteOption func(*WorkspaceInviteMutation)
+
+// newWorkspaceInviteMutation creates new mutation for the WorkspaceInvite entity.
+func newWorkspaceInviteMutation(c config, op Op, opts ...workspaceinviteOption) *WorkspaceInviteMutation {
+	m := &WorkspaceInviteMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeWorkspaceInvite,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withWorkspaceInviteID sets the ID field of the mutation.
+func withWorkspaceInviteID(id int64) workspaceinviteOption {
+	return func(m *WorkspaceInviteMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *WorkspaceInvite
+		)
+		m.oldValue = func(ctx context.Context) (*WorkspaceInvite, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().WorkspaceInvite.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withWorkspaceInvite sets the old WorkspaceInvite of the mutation.
+func withWorkspaceInvite(node *WorkspaceInvite) workspaceinviteOption {
+	return func(m *WorkspaceInviteMutation) {
+		m.oldValue = func(context.Context) (*WorkspaceInvite, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m WorkspaceInviteMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m WorkspaceInviteMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of WorkspaceInvite entities.
+func (m *WorkspaceInviteMutation) SetID(id int64) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *WorkspaceInviteMutation) ID() (id int64, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *WorkspaceInviteMutation) IDs(ctx context.Context) ([]int64, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int64{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().WorkspaceInvite.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetWorkspaceID sets the "workspace_id" field.
+func (m *WorkspaceInviteMutation) SetWorkspaceID(i int64) {
+	m.workspace = &i
+}
+
+// WorkspaceID returns the value of the "workspace_id" field in the mutation.
+func (m *WorkspaceInviteMutation) WorkspaceID() (r int64, exists bool) {
+	v := m.workspace
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldWorkspaceID returns the old "workspace_id" field's value of the WorkspaceInvite entity.
+// If the WorkspaceInvite object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceInviteMutation) OldWorkspaceID(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldWorkspaceID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldWorkspaceID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldWorkspaceID: %w", err)
+	}
+	return oldValue.WorkspaceID, nil
+}
+
+// ResetWorkspaceID resets all changes to the "workspace_id" field.
+func (m *WorkspaceInviteMutation) ResetWorkspaceID() {
+	m.workspace = nil
+}
+
+// SetInviteCode sets the "invite_code" field.
+func (m *WorkspaceInviteMutation) SetInviteCode(s string) {
+	m.invite_code = &s
+}
+
+// InviteCode returns the value of the "invite_code" field in the mutation.
+func (m *WorkspaceInviteMutation) InviteCode() (r string, exists bool) {
+	v := m.invite_code
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldInviteCode returns the old "invite_code" field's value of the WorkspaceInvite entity.
+// If the WorkspaceInvite object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceInviteMutation) OldInviteCode(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldInviteCode is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldInviteCode requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldInviteCode: %w", err)
+	}
+	return oldValue.InviteCode, nil
+}
+
+// ResetInviteCode resets all changes to the "invite_code" field.
+func (m *WorkspaceInviteMutation) ResetInviteCode() {
+	m.invite_code = nil
+}
+
+// SetRole sets the "role" field.
+func (m *WorkspaceInviteMutation) SetRole(u uint8) {
+	m.role = &u
+	m.addrole = nil
+}
+
+// Role returns the value of the "role" field in the mutation.
+func (m *WorkspaceInviteMutation) Role() (r uint8, exists bool) {
+	v := m.role
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRole returns the old "role" field's value of the WorkspaceInvite entity.
+// If the WorkspaceInvite object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceInviteMutation) OldRole(ctx context.Context) (v uint8, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRole is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRole requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRole: %w", err)
+	}
+	return oldValue.Role, nil
+}
+
+// AddRole adds u to the "role" field.
+func (m *WorkspaceInviteMutation) AddRole(u int8) {
+	if m.addrole != nil {
+		*m.addrole += u
+	} else {
+		m.addrole = &u
+	}
+}
+
+// AddedRole returns the value that was added to the "role" field in this mutation.
+func (m *WorkspaceInviteMutation) AddedRole() (r int8, exists bool) {
+	v := m.addrole
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetRole resets all changes to the "role" field.
+func (m *WorkspaceInviteMutation) ResetRole() {
+	m.role = nil
+	m.addrole = nil
+}
+
+// SetCreatedBy sets the "created_by" field.
+func (m *WorkspaceInviteMutation) SetCreatedBy(i int64) {
+	m.creator = &i
+}
+
+// CreatedBy returns the value of the "created_by" field in the mutation.
+func (m *WorkspaceInviteMutation) CreatedBy() (r int64, exists bool) {
+	v := m.creator
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedBy returns the old "created_by" field's value of the WorkspaceInvite entity.
+// If the WorkspaceInvite object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceInviteMutation) OldCreatedBy(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedBy is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedBy requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedBy: %w", err)
+	}
+	return oldValue.CreatedBy, nil
+}
+
+// ResetCreatedBy resets all changes to the "created_by" field.
+func (m *WorkspaceInviteMutation) ResetCreatedBy() {
+	m.creator = nil
+}
+
+// SetExpiresAt sets the "expires_at" field.
+func (m *WorkspaceInviteMutation) SetExpiresAt(ut utils.DateTime) {
+	m.expires_at = &ut
+}
+
+// ExpiresAt returns the value of the "expires_at" field in the mutation.
+func (m *WorkspaceInviteMutation) ExpiresAt() (r utils.DateTime, exists bool) {
+	v := m.expires_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldExpiresAt returns the old "expires_at" field's value of the WorkspaceInvite entity.
+// If the WorkspaceInvite object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceInviteMutation) OldExpiresAt(ctx context.Context) (v utils.DateTime, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldExpiresAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldExpiresAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldExpiresAt: %w", err)
+	}
+	return oldValue.ExpiresAt, nil
+}
+
+// ResetExpiresAt resets all changes to the "expires_at" field.
+func (m *WorkspaceInviteMutation) ResetExpiresAt() {
+	m.expires_at = nil
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *WorkspaceInviteMutation) SetCreatedAt(ut utils.DateTime) {
+	m.created_at = &ut
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *WorkspaceInviteMutation) CreatedAt() (r utils.DateTime, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the WorkspaceInvite entity.
+// If the WorkspaceInvite object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceInviteMutation) OldCreatedAt(ctx context.Context) (v utils.DateTime, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *WorkspaceInviteMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *WorkspaceInviteMutation) SetUpdatedAt(ut utils.DateTime) {
+	m.updated_at = &ut
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *WorkspaceInviteMutation) UpdatedAt() (r utils.DateTime, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the WorkspaceInvite entity.
+// If the WorkspaceInvite object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceInviteMutation) OldUpdatedAt(ctx context.Context) (v utils.DateTime, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *WorkspaceInviteMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetDeletedAt sets the "deleted_at" field.
+func (m *WorkspaceInviteMutation) SetDeletedAt(ut utils.DateTime) {
+	m.deleted_at = &ut
+}
+
+// DeletedAt returns the value of the "deleted_at" field in the mutation.
+func (m *WorkspaceInviteMutation) DeletedAt() (r utils.DateTime, exists bool) {
+	v := m.deleted_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDeletedAt returns the old "deleted_at" field's value of the WorkspaceInvite entity.
+// If the WorkspaceInvite object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkspaceInviteMutation) OldDeletedAt(ctx context.Context) (v *utils.DateTime, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDeletedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDeletedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDeletedAt: %w", err)
+	}
+	return oldValue.DeletedAt, nil
+}
+
+// ClearDeletedAt clears the value of the "deleted_at" field.
+func (m *WorkspaceInviteMutation) ClearDeletedAt() {
+	m.deleted_at = nil
+	m.clearedFields[workspaceinvite.FieldDeletedAt] = struct{}{}
+}
+
+// DeletedAtCleared returns if the "deleted_at" field was cleared in this mutation.
+func (m *WorkspaceInviteMutation) DeletedAtCleared() bool {
+	_, ok := m.clearedFields[workspaceinvite.FieldDeletedAt]
+	return ok
+}
+
+// ResetDeletedAt resets all changes to the "deleted_at" field.
+func (m *WorkspaceInviteMutation) ResetDeletedAt() {
+	m.deleted_at = nil
+	delete(m.clearedFields, workspaceinvite.FieldDeletedAt)
+}
+
+// ClearWorkspace clears the "workspace" edge to the Workspace entity.
+func (m *WorkspaceInviteMutation) ClearWorkspace() {
+	m.clearedworkspace = true
+	m.clearedFields[workspaceinvite.FieldWorkspaceID] = struct{}{}
+}
+
+// WorkspaceCleared reports if the "workspace" edge to the Workspace entity was cleared.
+func (m *WorkspaceInviteMutation) WorkspaceCleared() bool {
+	return m.clearedworkspace
+}
+
+// WorkspaceIDs returns the "workspace" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// WorkspaceID instead. It exists only for internal usage by the builders.
+func (m *WorkspaceInviteMutation) WorkspaceIDs() (ids []int64) {
+	if id := m.workspace; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetWorkspace resets all changes to the "workspace" edge.
+func (m *WorkspaceInviteMutation) ResetWorkspace() {
+	m.workspace = nil
+	m.clearedworkspace = false
+}
+
+// SetCreatorID sets the "creator" edge to the User entity by id.
+func (m *WorkspaceInviteMutation) SetCreatorID(id int64) {
+	m.creator = &id
+}
+
+// ClearCreator clears the "creator" edge to the User entity.
+func (m *WorkspaceInviteMutation) ClearCreator() {
+	m.clearedcreator = true
+	m.clearedFields[workspaceinvite.FieldCreatedBy] = struct{}{}
+}
+
+// CreatorCleared reports if the "creator" edge to the User entity was cleared.
+func (m *WorkspaceInviteMutation) CreatorCleared() bool {
+	return m.clearedcreator
+}
+
+// CreatorID returns the "creator" edge ID in the mutation.
+func (m *WorkspaceInviteMutation) CreatorID() (id int64, exists bool) {
+	if m.creator != nil {
+		return *m.creator, true
+	}
+	return
+}
+
+// CreatorIDs returns the "creator" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// CreatorID instead. It exists only for internal usage by the builders.
+func (m *WorkspaceInviteMutation) CreatorIDs() (ids []int64) {
+	if id := m.creator; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetCreator resets all changes to the "creator" edge.
+func (m *WorkspaceInviteMutation) ResetCreator() {
+	m.creator = nil
+	m.clearedcreator = false
+}
+
+// Where appends a list predicates to the WorkspaceInviteMutation builder.
+func (m *WorkspaceInviteMutation) Where(ps ...predicate.WorkspaceInvite) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the WorkspaceInviteMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *WorkspaceInviteMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.WorkspaceInvite, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *WorkspaceInviteMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *WorkspaceInviteMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (WorkspaceInvite).
+func (m *WorkspaceInviteMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *WorkspaceInviteMutation) Fields() []string {
+	fields := make([]string, 0, 8)
+	if m.workspace != nil {
+		fields = append(fields, workspaceinvite.FieldWorkspaceID)
+	}
+	if m.invite_code != nil {
+		fields = append(fields, workspaceinvite.FieldInviteCode)
+	}
+	if m.role != nil {
+		fields = append(fields, workspaceinvite.FieldRole)
+	}
+	if m.creator != nil {
+		fields = append(fields, workspaceinvite.FieldCreatedBy)
+	}
+	if m.expires_at != nil {
+		fields = append(fields, workspaceinvite.FieldExpiresAt)
+	}
+	if m.created_at != nil {
+		fields = append(fields, workspaceinvite.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, workspaceinvite.FieldUpdatedAt)
+	}
+	if m.deleted_at != nil {
+		fields = append(fields, workspaceinvite.FieldDeletedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *WorkspaceInviteMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case workspaceinvite.FieldWorkspaceID:
+		return m.WorkspaceID()
+	case workspaceinvite.FieldInviteCode:
+		return m.InviteCode()
+	case workspaceinvite.FieldRole:
+		return m.Role()
+	case workspaceinvite.FieldCreatedBy:
+		return m.CreatedBy()
+	case workspaceinvite.FieldExpiresAt:
+		return m.ExpiresAt()
+	case workspaceinvite.FieldCreatedAt:
+		return m.CreatedAt()
+	case workspaceinvite.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case workspaceinvite.FieldDeletedAt:
+		return m.DeletedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *WorkspaceInviteMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case workspaceinvite.FieldWorkspaceID:
+		return m.OldWorkspaceID(ctx)
+	case workspaceinvite.FieldInviteCode:
+		return m.OldInviteCode(ctx)
+	case workspaceinvite.FieldRole:
+		return m.OldRole(ctx)
+	case workspaceinvite.FieldCreatedBy:
+		return m.OldCreatedBy(ctx)
+	case workspaceinvite.FieldExpiresAt:
+		return m.OldExpiresAt(ctx)
+	case workspaceinvite.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case workspaceinvite.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case workspaceinvite.FieldDeletedAt:
+		return m.OldDeletedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown WorkspaceInvite field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *WorkspaceInviteMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case workspaceinvite.FieldWorkspaceID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetWorkspaceID(v)
+		return nil
+	case workspaceinvite.FieldInviteCode:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetInviteCode(v)
+		return nil
+	case workspaceinvite.FieldRole:
+		v, ok := value.(uint8)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRole(v)
+		return nil
+	case workspaceinvite.FieldCreatedBy:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedBy(v)
+		return nil
+	case workspaceinvite.FieldExpiresAt:
+		v, ok := value.(utils.DateTime)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetExpiresAt(v)
+		return nil
+	case workspaceinvite.FieldCreatedAt:
+		v, ok := value.(utils.DateTime)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case workspaceinvite.FieldUpdatedAt:
+		v, ok := value.(utils.DateTime)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case workspaceinvite.FieldDeletedAt:
+		v, ok := value.(utils.DateTime)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDeletedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown WorkspaceInvite field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *WorkspaceInviteMutation) AddedFields() []string {
+	var fields []string
+	if m.addrole != nil {
+		fields = append(fields, workspaceinvite.FieldRole)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *WorkspaceInviteMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case workspaceinvite.FieldRole:
+		return m.AddedRole()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *WorkspaceInviteMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case workspaceinvite.FieldRole:
+		v, ok := value.(int8)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddRole(v)
+		return nil
+	}
+	return fmt.Errorf("unknown WorkspaceInvite numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *WorkspaceInviteMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(workspaceinvite.FieldDeletedAt) {
+		fields = append(fields, workspaceinvite.FieldDeletedAt)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *WorkspaceInviteMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *WorkspaceInviteMutation) ClearField(name string) error {
+	switch name {
+	case workspaceinvite.FieldDeletedAt:
+		m.ClearDeletedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown WorkspaceInvite nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *WorkspaceInviteMutation) ResetField(name string) error {
+	switch name {
+	case workspaceinvite.FieldWorkspaceID:
+		m.ResetWorkspaceID()
+		return nil
+	case workspaceinvite.FieldInviteCode:
+		m.ResetInviteCode()
+		return nil
+	case workspaceinvite.FieldRole:
+		m.ResetRole()
+		return nil
+	case workspaceinvite.FieldCreatedBy:
+		m.ResetCreatedBy()
+		return nil
+	case workspaceinvite.FieldExpiresAt:
+		m.ResetExpiresAt()
+		return nil
+	case workspaceinvite.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case workspaceinvite.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case workspaceinvite.FieldDeletedAt:
+		m.ResetDeletedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown WorkspaceInvite field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *WorkspaceInviteMutation) AddedEdges() []string {
+	edges := make([]string, 0, 2)
+	if m.workspace != nil {
+		edges = append(edges, workspaceinvite.EdgeWorkspace)
+	}
+	if m.creator != nil {
+		edges = append(edges, workspaceinvite.EdgeCreator)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *WorkspaceInviteMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case workspaceinvite.EdgeWorkspace:
+		if id := m.workspace; id != nil {
+			return []ent.Value{*id}
+		}
+	case workspaceinvite.EdgeCreator:
+		if id := m.creator; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *WorkspaceInviteMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 2)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *WorkspaceInviteMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *WorkspaceInviteMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 2)
+	if m.clearedworkspace {
+		edges = append(edges, workspaceinvite.EdgeWorkspace)
+	}
+	if m.clearedcreator {
+		edges = append(edges, workspaceinvite.EdgeCreator)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *WorkspaceInviteMutation) EdgeCleared(name string) bool {
+	switch name {
+	case workspaceinvite.EdgeWorkspace:
+		return m.clearedworkspace
+	case workspaceinvite.EdgeCreator:
+		return m.clearedcreator
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *WorkspaceInviteMutation) ClearEdge(name string) error {
+	switch name {
+	case workspaceinvite.EdgeWorkspace:
+		m.ClearWorkspace()
+		return nil
+	case workspaceinvite.EdgeCreator:
+		m.ClearCreator()
+		return nil
+	}
+	return fmt.Errorf("unknown WorkspaceInvite unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *WorkspaceInviteMutation) ResetEdge(name string) error {
+	switch name {
+	case workspaceinvite.EdgeWorkspace:
+		m.ResetWorkspace()
+		return nil
+	case workspaceinvite.EdgeCreator:
+		m.ResetCreator()
+		return nil
+	}
+	return fmt.Errorf("unknown WorkspaceInvite edge %s", name)
 }
 
 // WorkspaceMemberMutation represents an operation that mutates the WorkspaceMember nodes in the graph.

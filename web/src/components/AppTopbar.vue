@@ -16,7 +16,7 @@ const router = useRouter()
 const { user, logout } = useAuth()
 const { theme, toggleTheme } = useTheme()
 const { t } = useLocale()
-const { activeWorkspace, activeProject } = useWorkspaceContext()
+const { activeWorkspace, activeProject, resetSession } = useWorkspaceContext()
 
 const inviteDialogVisible = ref(false)
 const shareDialogVisible = ref(false)
@@ -49,6 +49,7 @@ function goSettings() {
 }
 
 function handleLogout() {
+  resetSession()
   logout()
   ElMessage.success(t('auth.logoutSuccess'))
   router.push('/login')

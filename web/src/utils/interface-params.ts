@@ -23,12 +23,10 @@ export function hasParamContent(row: ParamRow): boolean {
 }
 
 export function ensureTrailingEmptyRow(rows: ParamRow[]): ParamRow[] {
-  const result = rows.length ? rows.map((row) => ({ ...row })) : [emptyParamRow()]
-  const last = result[result.length - 1]
-  if (hasParamContent(last)) {
-    result.push(emptyParamRow())
-  }
-  return result
+  if (!rows.length) return [emptyParamRow()]
+  const last = rows[rows.length - 1]
+  if (!hasParamContent(last)) return rows
+  return [...rows, emptyParamRow()]
 }
 
 export function compactParamRows(rows: ParamRow[]): ParamRow[] {

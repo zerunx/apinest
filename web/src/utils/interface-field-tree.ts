@@ -71,13 +71,10 @@ function resolveParentArray(root: FieldTreeNode[], path: number[]): FieldTreeNod
 }
 
 export function ensureTrailingEmptyRoot(nodes: FieldTreeNode[]): FieldTreeNode[] {
-  const tree = deepCloneTree(nodes)
-  if (!tree.length) return [emptyFieldNode()]
-  const last = tree[tree.length - 1]
-  if (hasFieldContent(last)) {
-    tree.push(emptyFieldNode())
-  }
-  return tree
+  if (!nodes.length) return [emptyFieldNode()]
+  const last = nodes[nodes.length - 1]
+  if (!hasFieldContent(last)) return nodes
+  return [...nodes, emptyFieldNode()]
 }
 
 export function flattenFieldTree(

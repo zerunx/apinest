@@ -97,3 +97,15 @@ export function writeWorkspaceLayout(partial: Partial<WorkspaceLayoutState>) {
 
   localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
 }
+
+/** Clear per-user navigation when logging out / switching accounts. Keeps panel width. */
+export function clearWorkspaceLayoutSession() {
+  const current = readWorkspaceLayout()
+  localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify({
+      ...defaultState,
+      panelWidth: current.panelWidth,
+    } satisfies WorkspaceLayoutState),
+  )
+}

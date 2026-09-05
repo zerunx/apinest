@@ -22,8 +22,15 @@ const joining = ref(false)
 const loggingIn = ref(false)
 const previewError = ref('')
 const workspaceName = ref('')
+const inviteRole = ref(4)
+const expiresAt = ref('')
 
 const isLoggedIn = computed(() => Boolean(getAccessToken() && user.value))
+
+const roleLabel = computed(() => {
+  if (inviteRole.value === 3) return t('member.roles.editor')
+  return t('member.roles.viewer')
+})
 
 const loginFormRef = ref<FormInstance>()
 const loginForm = reactive({
@@ -48,6 +55,8 @@ async function loadPreview() {
   try {
     const data = await fetchInvitePreview(inviteCode.value)
     workspaceName.value = data.workspace_name
+    inviteRole.value = data.role
+    expiresAt.value = data.expires_at
   } catch (error) {
     previewError.value = error instanceof Error ? error.message : t('invite.invalidLink')
   } finally {
@@ -143,7 +152,8 @@ onMounted(async () => {
       <div class="invite-accept-view__card">
         <span class="invite-accept-view__label">{{ t('invite.workspaceName') }}</span>
         <strong class="invite-accept-view__workspace">{{ workspaceName }}</strong>
-        <span class="invite-accept-view__role">{{ t('invite.defaultRole') }}</span>
+        <span class="invite-accept-view__role">{{ t('invite.joinRole', { role: roleLabel }) }}</span>
+        <span v-if="expiresAt" class="invite-accept-view__role">{{ t('invite.expiresAt', { time: expiresAt }) }}</span>
       </div>
 
       <template v-if="isLoggedIn">

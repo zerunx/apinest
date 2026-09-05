@@ -4,6 +4,7 @@ import { Delete, Plus } from '@element-plus/icons-vue'
 import { useTableRowDrag } from '@/composables/useTableRowDrag'
 import { useLocale } from '@/composables/useLocale'
 import InterfaceDocCopyCell from '@/interface/InterfaceDocCopyCell.vue'
+import InterfaceTypeSelect from '@/interface/InterfaceTypeSelect.vue'
 import {
   addChildAtPath,
   addSiblingAtPath,
@@ -163,11 +164,11 @@ watch(
   (tree) => {
     if (props.readonly || !tree.length) return
     const last = tree[tree.length - 1]
-    if (hasFieldContent(last)) {
-      syncTree(tree)
-    }
+    if (!hasFieldContent(last)) return
+    const next = ensureTrailingEmptyRoot(tree)
+    if (next === tree || next.length === tree.length) return
+    emit('update:modelValue', next)
   },
-  { deep: true },
 )
 
 defineExpose({ compact: () => compactFieldTree(props.modelValue) })
@@ -278,14 +279,12 @@ defineExpose({ compact: () => compactFieldTree(props.modelValue) })
         </td>
         <td class="interface-param-table__col-type">
           <span v-if="readonly" class="interface-param-table__text">{{ typeLabel(row.node.type) }}</span>
-          <select
+          <InterfaceTypeSelect
             v-else
-            class="interface-param-table__native-select"
-            :value="row.node.type"
-            @change="updateRow(row.path, { type: nativeValue($event) })"
-          >
-            <option v-for="type in fieldTypeOptions" :key="type" :value="type">{{ type }}</option>
-          </select>
+            :model-value="row.node.type || 'string'"
+            :options="fieldTypeOptions"
+            @update:model-value="updateRow(row.path, { type: $event })"
+          />
         </td>
         <td class="interface-param-table__center">
           <span v-if="readonly" class="interface-param-table__text">{{ requiredLabel(row.node.required) }}</span>
