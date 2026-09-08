@@ -5,8 +5,8 @@
       <span class="menu-select__chevron" :class="{ open }" aria-hidden="true">
         <svg
           viewBox="0 0 24 24"
-          width="15"
-          height="15"
+          width="12"
+          height="12"
           fill="none"
           stroke="currentColor"
           stroke-width="2.4"
@@ -181,7 +181,7 @@ onUnmounted(() => {
   width: 100%;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   border: 0;
   background: transparent;
   color: var(--color-interface-field-text, var(--color-text));

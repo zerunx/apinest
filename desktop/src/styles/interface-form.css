@@ -546,12 +546,14 @@
 .interface-url-bar__selects {
   display: flex;
   align-items: stretch;
+  /* Keep aligned with .interface-meta-row__folder below. */
   width: 200px;
   flex-shrink: 0;
 }
 
 .interface-url-bar__protocol-wrap {
-  width: 78px;
+  /* Steal a bit from method so "HTTPS" fits on Mac fonts without widening the bar. */
+  width: 90px;
   flex-shrink: 0;
   border-right: 1px solid var(--color-interface-bar-border);
 }
