@@ -155,7 +155,8 @@ export function createCodeMirror(options: CreateCodeMirrorOptions): CodeMirrorHa
         lint.of(lintExtension(currentLanguage)),
         editable.of(editableExtension(options.readonly ?? false)),
         gutters.of(gutterExtension(showLineNumbers, currentLanguage)),
-        keymap.of([wrapSelectionQuotes, ...defaultKeymap, ...historyKeymap, ...foldKeymap, indentWithTab]),
+        wrapSelectionQuotes,
+        keymap.of([...defaultKeymap, ...historyKeymap, ...foldKeymap, indentWithTab]),
         clickAnywhereCursor(),
         EditorView.contentAttributes.of({ spellcheck: 'false' }),
         EditorView.updateListener.of((update) => {

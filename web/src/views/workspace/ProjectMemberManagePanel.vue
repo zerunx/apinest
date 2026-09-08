@@ -15,7 +15,6 @@ import type { MemberItem } from '@/types/workspace'
 
 const { t } = useLocale()
 const {
-  activeWorkspace,
   activeWorkspaceId,
   projects,
   loadingProjects,

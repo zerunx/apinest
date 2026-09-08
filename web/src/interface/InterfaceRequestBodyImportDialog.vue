@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { CopyDocument, InfoFilled, MagicStick } from '@element-plus/icons-vue'
+import { CopyDocument, MagicStick } from '@element-plus/icons-vue'
 import { useLocale } from '@/composables/useLocale'
 import { CodeMirrorEditor } from '@/codemirror'
 import type { BodyImportMode } from '@/utils/json-body-import'
