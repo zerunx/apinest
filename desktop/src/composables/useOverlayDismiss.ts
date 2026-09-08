@@ -1,10 +1,19 @@
 import { onMounted, onUnmounted, type Ref } from 'vue'
 
+type OverlayDismissOptions = {
+  /** When true, Escape dismisses. When a function, Escape dismisses only if it returns true. */
+  escape?: boolean | (() => boolean)
+}
+
 /**
  * Close overlay only when both pointerdown and pointerup land on the overlay itself.
  * Prevents closing when the user selects text inside and releases outside.
  */
-export function useOverlayDismiss(open: Ref<boolean>, onDismiss: () => void) {
+export function useOverlayDismiss(
+  open: Ref<boolean>,
+  onDismiss: () => void,
+  options?: OverlayDismissOptions,
+) {
   let downOnOverlay = false
 
   function onOverlayMouseDown(event: MouseEvent) {
@@ -23,12 +32,26 @@ export function useOverlayDismiss(open: Ref<boolean>, onDismiss: () => void) {
     downOnOverlay = false
   }
 
+  function onKeydown(event: KeyboardEvent) {
+    if (!options?.escape) return
+    if (!open.value || event.key !== 'Escape') return
+    if (typeof options.escape === 'function' && !options.escape()) return
+    event.preventDefault()
+    onDismiss()
+  }
+
   onMounted(() => {
     window.addEventListener('mouseup', onWindowMouseUp)
+    if (options?.escape) {
+      window.addEventListener('keydown', onKeydown)
+    }
   })
 
   onUnmounted(() => {
     window.removeEventListener('mouseup', onWindowMouseUp)
+    if (options?.escape) {
+      window.removeEventListener('keydown', onKeydown)
+    }
   })
 
   return { onOverlayMouseDown, onOverlayMouseUp }

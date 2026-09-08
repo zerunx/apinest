@@ -1,10 +1,10 @@
 use std::collections::HashMap;
-use std::time::{Duration, Instant};
+use std::error::Error as StdError;
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use base64::Engine;
 use reqwest::blocking::Client;
-use reqwest::blocking::multipart;
-use reqwest::header::{HeaderMap, HeaderName, HeaderValue, CONTENT_TYPE};
+use reqwest::header::{HeaderMap, HeaderName, HeaderValue, CONTENT_LENGTH, CONTENT_TYPE};
 use reqwest::Method;
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
@@ -16,6 +16,23 @@ use crate::error::{AppError, AppResult};
 
 pub(crate) const DEFAULT_TIMEOUT_SECS: u64 = 30;
 pub(crate) const CONNECT_TIMEOUT_SECS: u64 = 10;
+
+fn error_chain(err: &dyn StdError) -> String {
+    let mut out = err.to_string();
+    let mut source = err.source();
+    while let Some(inner) = source {
+        out.push_str(": ");
+        out.push_str(&inner.to_string());
+        source = inner.source();
+    }
+    out
+}
+
+fn is_multipart_managed_header(name: &str) -> bool {
+    name.eq_ignore_ascii_case("content-type")
+        || name.eq_ignore_ascii_case("content-length")
+        || name.eq_ignore_ascii_case("transfer-encoding")
+}
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct FormDataField {
@@ -63,8 +80,10 @@ struct PreparedRequest {
     method: Method,
     url: String,
     stored_headers: Vec<HeaderPair>,
-    body: Option<String>,
-    multipart: Option<multipart::Form>,
+    /// Raw text body for history (non-multipart only).
+    body_text: Option<String>,
+    /// Exact bytes to send (raw UTF-8 or multipart).
+    body_bytes: Option<Vec<u8>>,
     header_map: HeaderMap,
     timeout_secs: u64,
 }
@@ -93,54 +112,99 @@ fn validate_request_url(raw: &str) -> AppResult<()> {
     Ok(())
 }
 
-fn build_multipart_form(
+fn gen_multipart_boundary() -> String {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    // Browser / Postman style boundary (no spaces).
+    format!("----WebKitFormBoundary{nanos:x}")
+}
+
+fn escape_disposition_value(value: &str) -> String {
+    value
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace('\r', "_")
+        .replace('\n', "_")
+}
+
+/// Build multipart/form-data like browsers/Postman.
+/// File fields are always appended last (required by OSS PostObject).
+fn build_multipart_body(
     fields: &[FormDataField],
     vars: &HashMap<String, String>,
-) -> AppResult<multipart::Form> {
-    let mut form = multipart::Form::new();
-    let mut added = 0usize;
+) -> AppResult<(String, Vec<u8>)> {
+    let boundary = gen_multipart_boundary();
+    let mut text_fields = Vec::new();
+    let mut file_fields = Vec::new();
 
     for field in fields {
         let name = apply_vars(field.name.trim(), vars);
         if name.is_empty() {
             continue;
         }
-
         if field.field_type == "file" {
-            let encoded = field
-                .file_data
-                .as_ref()
-                .map(|s| s.trim())
-                .filter(|s| !s.is_empty())
-                .ok_or_else(|| {
-                    AppError::msg(format!("missing file content for form field `{name}`"))
-                })?;
-            let bytes = base64::engine::general_purpose::STANDARD
-                .decode(encoded)
-                .map_err(|e| AppError::msg(format!("invalid file data for `{name}`: {e}")))?;
-            let file_name = field
-                .file_name
-                .as_deref()
-                .map(|s| apply_vars(s, vars))
-                .filter(|s| !s.is_empty())
-                .unwrap_or_else(|| "file".to_string());
-            let part = multipart::Part::bytes(bytes)
-                .file_name(file_name)
-                .mime_str("application/octet-stream")
-                .map_err(|e| AppError::msg(format!("invalid file part for `{name}`: {e}")))?;
-            form = form.part(name, part);
+            file_fields.push((name, field));
         } else {
-            let value = apply_vars(&field.value, vars);
-            form = form.text(name, value);
+            text_fields.push((name, field));
         }
-        added += 1;
     }
 
-    if added == 0 {
+    if text_fields.is_empty() && file_fields.is_empty() {
         return Err(AppError::msg("form-data request has no fields"));
     }
 
-    Ok(form)
+    let mut body = Vec::new();
+    let write_boundary = |buf: &mut Vec<u8>| {
+        buf.extend_from_slice(b"--");
+        buf.extend_from_slice(boundary.as_bytes());
+        buf.extend_from_slice(b"\r\n");
+    };
+
+    for (name, field) in text_fields {
+        write_boundary(&mut body);
+        body.extend_from_slice(b"Content-Disposition: form-data; name=\"");
+        body.extend_from_slice(escape_disposition_value(&name).as_bytes());
+        body.extend_from_slice(b"\"\r\n\r\n");
+        body.extend_from_slice(apply_vars(&field.value, vars).as_bytes());
+        body.extend_from_slice(b"\r\n");
+    }
+
+    for (name, field) in file_fields {
+        let encoded = field
+            .file_data
+            .as_ref()
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| AppError::msg(format!("missing file content for form field `{name}`")))?;
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(encoded)
+            .map_err(|e| AppError::msg(format!("invalid file data for `{name}`: {e}")))?;
+        let file_name = field
+            .file_name
+            .as_deref()
+            .map(|s| apply_vars(s, vars))
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| "file".to_string());
+
+        write_boundary(&mut body);
+        body.extend_from_slice(b"Content-Disposition: form-data; name=\"");
+        body.extend_from_slice(escape_disposition_value(&name).as_bytes());
+        body.extend_from_slice(b"\"; filename=\"");
+        body.extend_from_slice(escape_disposition_value(&file_name).as_bytes());
+        body.extend_from_slice(b"\"\r\n");
+        body.extend_from_slice(b"Content-Type: application/octet-stream\r\n\r\n");
+        body.extend_from_slice(&bytes);
+        body.extend_from_slice(b"\r\n");
+    }
+
+    body.extend_from_slice(b"--");
+    body.extend_from_slice(boundary.as_bytes());
+    body.extend_from_slice(b"--\r\n");
+
+    let content_type = format!("multipart/form-data; boundary={boundary}");
+    Ok((content_type, body))
 }
 
 fn prepare_request(args: &SendRequestArgs, timeout_secs: u64) -> AppResult<PreparedRequest> {
@@ -148,12 +212,12 @@ fn prepare_request(args: &SendRequestArgs, timeout_secs: u64) -> AppResult<Prepa
     let url = apply_vars(&args.url, &vars);
     validate_request_url(&url)?;
 
-    let body = args.body.as_ref().map(|b| apply_vars(b, &vars));
-    let multipart_form = match args.form_data.as_ref() {
-        Some(fields) if !fields.is_empty() => Some(build_multipart_form(fields, &vars)?),
+    let body_text = args.body.as_ref().map(|b| apply_vars(b, &vars));
+    let multipart = match args.form_data.as_ref() {
+        Some(fields) if !fields.is_empty() => Some(build_multipart_body(fields, &vars)?),
         _ => None,
     };
-    if multipart_form.is_some() && body.is_some() {
+    if multipart.is_some() && body_text.is_some() {
         return Err(AppError::msg("request cannot include both body and form_data"));
     }
 
@@ -168,7 +232,7 @@ fn prepare_request(args: &SendRequestArgs, timeout_secs: u64) -> AppResult<Prepa
         }
         let key = apply_vars(&h.key, &vars);
         let value = apply_vars(&h.value, &vars);
-        if multipart_form.is_some() && key.eq_ignore_ascii_case("content-type") {
+        if multipart.is_some() && is_multipart_managed_header(&key) {
             continue;
         }
         stored_headers.push(HeaderPair {
@@ -183,22 +247,35 @@ fn prepare_request(args: &SendRequestArgs, timeout_secs: u64) -> AppResult<Prepa
         header_map.insert(name, val);
     }
 
-    if multipart_form.is_some() {
+    let body_bytes = if let Some((content_type, bytes)) = multipart {
         header_map.remove(CONTENT_TYPE);
-    }
+        header_map.remove(CONTENT_LENGTH);
+        header_map.remove(HeaderName::from_static("transfer-encoding"));
+        header_map.insert(
+            CONTENT_TYPE,
+            HeaderValue::from_str(&content_type)
+                .map_err(|_| AppError::msg("invalid multipart content-type"))?,
+        );
+        Some(bytes)
+    } else {
+        body_text.as_ref().map(|s| s.as_bytes().to_vec())
+    };
 
     Ok(PreparedRequest {
         method,
         url,
         stored_headers,
-        body,
-        multipart: multipart_form,
+        body_text,
+        body_bytes,
         header_map,
         timeout_secs,
     })
 }
 
-fn execute_http_request(prepared: PreparedRequest) -> AppResult<(u16, String, Vec<HeaderPair>, String, u128)> {
+fn execute_http_request(
+    prepared: PreparedRequest,
+) -> AppResult<(u16, String, Vec<HeaderPair>, String, u128)> {
+    // native-tls (SChannel on Windows) matches Postman/browser TLS more closely than rustls.
     let client = Client::builder()
         .timeout(Duration::from_secs(prepared.timeout_secs))
         .connect_timeout(Duration::from_secs(CONNECT_TIMEOUT_SECS))
@@ -208,23 +285,26 @@ fn execute_http_request(prepared: PreparedRequest) -> AppResult<(u16, String, Ve
     let mut req = client
         .request(prepared.method, &prepared.url)
         .headers(prepared.header_map);
-    if let Some(form) = prepared.multipart {
-        req = req.multipart(form);
-    } else if let Some(body) = &prepared.body {
-        req = req.body(body.clone());
+    if let Some(body) = prepared.body_bytes {
+        req = req.body(body);
     }
 
     let started = Instant::now();
     let resp = req.send().map_err(|e| {
+        let detail = error_chain(&e);
         if e.is_timeout() {
             AppError::msg(format!(
-                "request timed out after {}s (connect limit {}s)",
+                "request timed out after {}s (connect limit {}s): {detail}",
                 prepared.timeout_secs, CONNECT_TIMEOUT_SECS
             ))
         } else if e.is_connect() {
-            AppError::msg(format!("connection failed: {e}"))
+            AppError::msg(format!("connection failed: {detail}"))
+        } else if e.is_body() {
+            AppError::msg(format!(
+                "request failed: {detail} (peer closed the connection while the body was being sent)"
+            ))
         } else {
-            AppError::msg(format!("request failed: {e}"))
+            AppError::msg(format!("request failed: {detail}"))
         }
     })?;
     let duration_ms = started.elapsed().as_millis();
@@ -281,14 +361,13 @@ pub async fn send_http_request(db: State<'_, Db>, args: SendRequestArgs) -> AppR
     let interface_id = args.interface_id;
     let url = prepared.url.clone();
     let stored_headers = prepared.stored_headers.clone();
-    let request_body = prepared.body.clone();
+    let request_body = prepared.body_text.clone();
     let form_data = args.form_data.clone();
 
     let (status_code, status_text, resp_headers, resp_body, duration_ms) =
         tauri::async_runtime::spawn_blocking(move || execute_http_request(prepared))
             .await
-            .map_err(|e| AppError::msg(format!("request task failed: {e}")))??
-            ;
+            .map_err(|e| AppError::msg(format!("request task failed: {e}")))??;
 
     let request_json = if let Some(ref fields) = form_data {
         serde_json::to_string(&serde_json::json!({

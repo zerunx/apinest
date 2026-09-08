@@ -43,11 +43,15 @@ defineEmits<{
   'update:modelValue': [string]
 }>()
 
-const editorRef = ref<{ formatContent: () => boolean } | null>(null)
+const editorRef = ref<{ formatContent: () => boolean; focus: () => void } | null>(null)
 
 function formatContent() {
   return editorRef.value?.formatContent() ?? false
 }
 
-defineExpose({ formatContent })
+function focus() {
+  editorRef.value?.focus()
+}
+
+defineExpose({ formatContent, focus })
 </script>

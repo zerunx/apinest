@@ -54,6 +54,7 @@ function chromeTheme(dark: boolean): Extension {
         // Stable CJK/Latin mixed metrics while selection overlays update.
         fontKerning: 'none',
         fontVariantLigatures: 'none',
+        cursor: 'text',
       },
       // Prefer filling the first visual row (key + value) instead of wrapping
       // at the space after `: `, which parked the string on the next line.
@@ -66,6 +67,8 @@ function chromeTheme(dark: boolean): Extension {
         lineHeight: '20px',
         fontKerning: 'none',
         fontVariantLigatures: 'none',
+        minHeight: '100%',
+        cursor: 'text',
       },
       '.cm-line': {
         lineHeight: '20px',
@@ -108,6 +111,7 @@ function chromeTheme(dark: boolean): Extension {
         color: 'var(--raw-editor-gutter-fg)',
         border: 'none',
         borderRight: '1px solid var(--raw-editor-gutter-border)',
+        minHeight: '100%',
       },
       '.cm-lineNumbers .cm-gutterElement': {
         color: 'var(--raw-editor-gutter-fg)',

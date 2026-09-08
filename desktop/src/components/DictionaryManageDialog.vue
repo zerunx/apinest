@@ -314,7 +314,9 @@ function close() {
   emit('update:open', false)
 }
 
-const { onOverlayMouseDown, onOverlayMouseUp } = useOverlayDismiss(openRef, close)
+const { onOverlayMouseDown, onOverlayMouseUp } = useOverlayDismiss(openRef, close, {
+  escape: () => !formOpen.value,
+})
 
 let formPointerDownOnOverlay = false
 function onFormOverlayDown(e: MouseEvent) {
@@ -633,12 +635,25 @@ async function importAllSystem() {
 }
 
 .table-wrap {
+  --dict-table-head-height: 41px;
   flex: 1;
   min-height: 0;
   overflow: auto;
+  scrollbar-gutter: stable;
   border: 1px solid var(--color-border);
   border-radius: 10px;
-  background: var(--color-surface);
+  background-color: var(--color-surface);
+  /* Paint header strip across the full width (including scrollbar gutter). */
+  background-image:
+    linear-gradient(var(--color-border), var(--color-border)),
+    linear-gradient(var(--color-hover), var(--color-hover));
+  background-size:
+    100% 1px,
+    100% var(--dict-table-head-height);
+  background-position:
+    0 calc(var(--dict-table-head-height) - 1px),
+    0 0;
+  background-repeat: no-repeat;
 }
 
 .data-table {
@@ -656,12 +671,20 @@ async function importAllSystem() {
 }
 
 .data-table th {
+  height: var(--dict-table-head-height);
+  box-sizing: border-box;
   font-weight: 600;
   color: var(--color-text-secondary);
   background: var(--color-hover);
   position: sticky;
   top: 0;
   z-index: 1;
+  border-bottom-color: transparent;
+}
+
+.data-table th:last-child {
+  /* Cover residual gutter gap next to sticky cells. */
+  box-shadow: 24px 0 0 var(--color-hover);
 }
 
 .data-table tr:last-child td {

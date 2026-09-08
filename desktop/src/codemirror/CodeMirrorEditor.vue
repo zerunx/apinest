@@ -111,7 +111,11 @@ function onFindKeys(event: KeyboardEvent) {
   }
 }
 
-defineExpose({ formatContent })
+function focus() {
+  editor?.view.focus()
+}
+
+defineExpose({ formatContent, focus })
 </script>
 
 <style>
@@ -120,6 +124,7 @@ defineExpose({ formatContent })
   flex-direction: column;
   min-height: 0;
   height: 100%;
+  cursor: text;
 }
 
 .cm-host .cm-editor {
@@ -128,6 +133,17 @@ defineExpose({ formatContent })
   min-height: 0;
   position: relative;
   overflow: hidden;
+  cursor: text;
+}
+
+.cm-host .cm-scroller,
+.cm-host .cm-content {
+  cursor: text;
+}
+
+.cm-host .cm-content,
+.cm-host .cm-gutters {
+  min-height: 100%;
 }
 
 .cm-host .cm-panels.cm-panels-top {

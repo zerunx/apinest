@@ -893,6 +893,103 @@
   overflow: hidden;
 }
 
+.interface-body-raw--dialog {
+  padding: 0;
+}
+
+.interface-body-raw__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.interface-body-raw__toolbar-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+.interface-body-raw__tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  background: transparent;
+  appearance: none;
+  color: var(--color-text-secondary);
+  padding: 0;
+  height: 24px;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.interface-body-raw__tool-btn:hover {
+  color: var(--color-interface-field-text, var(--color-text));
+}
+
+.interface-body-import__type {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--color-interface-bar-border, var(--color-border));
+  border-radius: 4px;
+  background: var(--color-workspace-content, var(--color-surface));
+  color: var(--color-interface-field-text, var(--color-text));
+  font-size: 13px;
+  line-height: 1;
+}
+
+.interface-body-raw__editor {
+  --raw-editor-box-height: 280px;
+  display: flex;
+  flex-direction: column;
+  height: var(--raw-editor-box-height);
+  min-height: var(--raw-editor-box-height);
+  margin-top: 0;
+  background: var(--raw-editor-bg);
+  overflow: hidden;
+  cursor: text;
+}
+
+.interface-body-raw__editor .cm-host,
+.interface-body-raw__editor .interface-body-raw__host {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  cursor: text;
+}
+
+.interface-body-raw__editor .cm-editor {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.interface-body-raw__editor .cm-scroller {
+  min-height: 0;
+  height: 100%;
+  cursor: text;
+}
+
+.interface-body-raw__editor .cm-content,
+.interface-body-raw__editor .cm-gutters {
+  min-height: 100%;
+}
+
 .interface-body-raw__host {
   flex: 1;
   min-height: 160px;

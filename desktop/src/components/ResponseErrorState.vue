@@ -12,7 +12,7 @@
         />
       </svg>
       <p class="res-error__title">{{ parsed.title }}</p>
-      <p v-if="parsed.rest" class="res-error__detail" :title="parsed.rest">{{ parsed.rest }}</p>
+      <pre v-if="parsed.rest" class="res-error__detail">{{ parsed.rest }}</pre>
     </div>
   </div>
 </template>
@@ -54,22 +54,26 @@ function parseSendError(raw: string, titleOverride?: string) {
   flex: 1;
   min-height: 0;
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
   padding: 16px 24px;
+  overflow: auto;
 }
 
 .res-error__card {
   display: flex;
   flex-direction: column;
   align-items: center;
+  align-self: center;
   width: min(920px, 100%);
+  max-height: 100%;
   padding: 22px 36px;
   text-align: center;
   color: var(--color-danger);
   background: color-mix(in srgb, var(--color-danger) 8%, transparent);
   border: 1px solid color-mix(in srgb, var(--color-danger) 22%, transparent);
   border-radius: 10px;
+  overflow: auto;
 }
 
 .res-error__icon {
@@ -83,6 +87,7 @@ function parseSendError(raw: string, titleOverride?: string) {
   font-size: 15px;
   font-weight: 650;
   line-height: 1.35;
+  flex-shrink: 0;
 }
 
 .res-error__detail {
@@ -90,9 +95,13 @@ function parseSendError(raw: string, titleOverride?: string) {
   max-width: 100%;
   font-size: 13px;
   line-height: 1.55;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  text-align: left;
+  user-select: text;
+  -webkit-user-select: text;
   opacity: 0.92;
+  font-family: inherit;
 }
 </style>

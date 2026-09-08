@@ -18,11 +18,13 @@ import { useI18n } from './i18n'
 import { initTheme } from './composables/useTheme'
 import { useAppUi } from './composables/useAppUi'
 import { usePreventReload } from './composables/usePreventReload'
+import { useEscapeMinimize } from './composables/useEscapeMinimize'
 
 const { locale } = useI18n()
 const { refreshSession } = useAppUi()
 
 usePreventReload()
+useEscapeMinimize()
 
 onMounted(async () => {
   await initTheme()

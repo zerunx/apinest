@@ -174,9 +174,14 @@
               <li v-for="item in shortcutItems" :key="item.id" class="shortcut-row">
                 <span class="shortcut-desc">{{ t(item.labelKey) }}</span>
                 <span class="shortcut-keys">
-                  <template v-for="(key, idx) in item.keys" :key="`${item.id}-${idx}`">
-                    <span v-if="idx > 0" class="shortcut-plus">+</span>
-                    <kbd>{{ key }}</kbd>
+                  <template v-for="(group, gIdx) in item.keyGroups" :key="`${item.id}-g${gIdx}`">
+                    <span v-if="gIdx > 0" class="shortcut-or">/</span>
+                    <span class="shortcut-combo">
+                      <template v-for="(key, idx) in group" :key="`${item.id}-${gIdx}-${idx}`">
+                        <span v-if="idx > 0" class="shortcut-plus">+</span>
+                        <kbd>{{ key }}</kbd>
+                      </template>
+                    </span>
                   </template>
                 </span>
               </li>
@@ -252,7 +257,9 @@ type MenuId = 'general' | 'themes' | 'data' | 'shortcuts' | 'proxy' | 'update' |
 
 const { t, locale, setLocale } = useI18n()
 const { settingsOpen, closeSettings, session, refreshSession, openLogin } = useAppUi()
-const { onOverlayMouseDown, onOverlayMouseUp } = useOverlayDismiss(settingsOpen, closeSettings)
+const { onOverlayMouseDown, onOverlayMouseUp } = useOverlayDismiss(settingsOpen, closeSettings, {
+  escape: () => !clearConfirmOpen.value,
+})
 const clearConfirmOpen = ref(false)
 const { showToast } = useToast()
 const { theme, setTheme } = useTheme()
@@ -290,10 +297,19 @@ const syncStatItems = computed(() => {
 })
 
 const shortcutItems = computed(() => [
-  { id: 'save', labelKey: 'settings.shortcuts.save', keys: [modKey.value, 'S'] },
-  { id: 'closeTab', labelKey: 'settings.shortcuts.closeTab', keys: [modKey.value, 'W'] },
-  { id: 'undo', labelKey: 'settings.shortcuts.undo', keys: [modKey.value, 'Z'] },
-  { id: 'escape', labelKey: 'settings.shortcuts.escape', keys: ['Esc'] },
+  { id: 'save', labelKey: 'settings.shortcuts.save', keyGroups: [[modKey.value, 'S']] },
+  { id: 'closeTab', labelKey: 'settings.shortcuts.closeTab', keyGroups: [[modKey.value, 'W']] },
+  { id: 'undo', labelKey: 'settings.shortcuts.undo', keyGroups: [[modKey.value, 'Z']] },
+  {
+    id: 'redo',
+    labelKey: 'settings.shortcuts.redo',
+    keyGroups: [
+      ['Ctrl', 'Y'],
+      [modKey.value, 'Shift', 'Z'],
+    ],
+  },
+  { id: 'find', labelKey: 'settings.shortcuts.find', keyGroups: [[modKey.value, 'F']] },
+  { id: 'escape', labelKey: 'settings.shortcuts.escape', keyGroups: [['Esc']] },
 ])
 
 const menu: { id: MenuId; labelKey: string; icon: string }[] = [
@@ -858,8 +874,16 @@ async function confirmClearCache() {
 .shortcut-keys {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.shortcut-combo {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .shortcut-plus {
@@ -867,6 +891,14 @@ async function confirmClearCache() {
   font-size: 12px;
   line-height: 1;
   opacity: 0.7;
+}
+
+.shortcut-or {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 1;
+  opacity: 0.55;
+  padding: 0 2px;
 }
 
 .shortcut-keys kbd {

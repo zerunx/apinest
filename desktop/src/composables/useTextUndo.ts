@@ -153,13 +153,13 @@ export function createTextUndo(options: Options = {}) {
 
 export type TextUndoApi = ReturnType<typeof createTextUndo>
 
-/** True for Ctrl/Cmd+Z (undo) or Ctrl/Cmd+Shift+Z / Ctrl+Y (redo). */
+/** True for Ctrl/Cmd+Z (undo) or Ctrl/Cmd+Shift+Z / Ctrl/Cmd+Y (redo). */
 export function matchUndoRedoKey(
   event: KeyboardEvent,
 ): 'undo' | 'redo' | null {
   if (!(event.ctrlKey || event.metaKey) || event.altKey || event.isComposing) return null
   const key = event.key.toLowerCase()
-  if (key === 'y' && !event.shiftKey && !event.metaKey) return 'redo'
+  if (key === 'y' && !event.shiftKey) return 'redo'
   if (key === 'z') return event.shiftKey ? 'redo' : 'undo'
   return null
 }

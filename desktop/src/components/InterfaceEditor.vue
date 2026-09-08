@@ -423,6 +423,24 @@
                 </svg>
                 {{ t('request.rawFormat') }}
               </button>
+              <button
+                v-else-if="bodyFormat === 'form-data'"
+                type="button"
+                class="body-format-action"
+                @click="importJsonDialogOpen = true"
+              >
+                <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+                  <path
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M12 3v10m0 0-4-4m4 4 4-4M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"
+                  />
+                </svg>
+                {{ t('request.importJson') }}
+              </button>
             </div>
 
             <p v-if="bodyFormat === 'none'" class="body-none-hint muted">
@@ -511,14 +529,24 @@
                   :placeholder="t('create.param.desc')"
                   @input="onFormDataChange(idx)"
                 />
-                <button
-                  type="button"
-                  class="param-table__del"
-                  :disabled="formDataFields.length <= 1"
-                  @click="removeFormDataRow(idx)"
-                >
-                  ×
-                </button>
+                <div class="param-table__actions">
+                  <FormDataDictPicker
+                    :param-name="row.name"
+                    :entries="workspaceDictionaries"
+                    :matched="formDataRowDictMatched(row.name)"
+                    @before-open="() => refreshWorkspaceDictionaries(true)"
+                    @pick="(entry) => applyDictionaryToFormDataRow(idx, entry)"
+                    @apply-all="applyDictionaryDescriptionsToAllFormData"
+                  />
+                  <button
+                    type="button"
+                    class="param-table__del"
+                    :disabled="formDataFields.length <= 1"
+                    @click="removeFormDataRow(idx)"
+                  >
+                    ×
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -662,6 +690,7 @@
       :show-cancel="false"
       @confirm="validationDialogOpen = false"
     />
+    <ImportJsonDialog v-model:open="importJsonDialogOpen" @apply="onImportFormDataJson" />
   </div>
 </template>
 
@@ -679,8 +708,15 @@ import ParamTableColumnResizer from './ParamTableColumnResizer.vue'
 import RequestBodyRawEditor from './RequestBodyRawEditor.vue'
 import ResponseErrorState from './ResponseErrorState.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
+import ImportJsonDialog from './ImportJsonDialog.vue'
+import FormDataDictPicker from './FormDataDictPicker.vue'
 import GrpcMethodList from './GrpcMethodList.vue'
 import { formatJsonLenient, stripJsonComments } from '../utils/raw-json-utils'
+import { applyFormDataJsonImport, type FormDataImportMode } from '../utils/form-data-json-import'
+import {
+  applyDictDescriptionsToFormData,
+  paramHasDictMatch,
+} from '../utils/dictionary-match'
 import { looksLikeCurl, parseCurl, type ParsedCurl } from '../utils/parse-curl'
 import { buildAutoHeaders, isAutoHeaderEnabled, sendableAutoHeaders } from '../utils/auto-headers'
 import {
@@ -706,7 +742,7 @@ import {
 import { useToast } from '../composables/useToast'
 import { useWorkspaceContext } from '../composables/useWorkspaceContext'
 import { createTextUndo, matchUndoRedoKey } from '../composables/useTextUndo'
-import type { FormDataSendField, SendResponse } from '../types'
+import type { DictionaryEntryRow, FormDataSendField, SendResponse } from '../types'
 
 export type FolderOption = { id: number; name: string; parent_id: number; label: string }
 
@@ -1247,6 +1283,67 @@ function showValidation(message: string, title?: string) {
   validationDialogOpen.value = true
 }
 const formDataFields = ref<FormDataRow[]>([emptyParamRow()])
+const workspaceDictionaries = ref<DictionaryEntryRow[]>([])
+let workspaceDictionariesWorkspaceId: number | null = null
+
+async function refreshWorkspaceDictionaries(force = false) {
+  const wsId = props.workspaceId
+  if (!wsId) {
+    workspaceDictionaries.value = []
+    workspaceDictionariesWorkspaceId = null
+    return
+  }
+  if (!force && workspaceDictionariesWorkspaceId === wsId) {
+    return
+  }
+  try {
+    workspaceDictionaries.value = await invoke<DictionaryEntryRow[]>('list_workspace_dictionaries', {
+      workspaceId: wsId,
+    })
+    workspaceDictionariesWorkspaceId = wsId
+  } catch {
+    workspaceDictionaries.value = []
+    workspaceDictionariesWorkspaceId = null
+  }
+}
+
+function formDataRowDictMatched(name: string) {
+  return paramHasDictMatch(workspaceDictionaries.value, name)
+}
+
+function applyDictionaryToFormDataRow(idx: number, entry: DictionaryEntryRow) {
+  const row = formDataFields.value[idx]
+  if (!row) return
+  row.name = entry.name
+  row.description = entry.description ?? ''
+  // Keep type as-is. Only fill value when empty (text rows only).
+  if (row.type !== 'file' && !row.example.trim()) {
+    const fallback = (entry.default_value ?? '').trim()
+    if (fallback) row.example = fallback
+  }
+  onFormDataChange(idx)
+  emit('state-change')
+}
+
+function applyDictionaryDescriptionsToAllFormData() {
+  const count = applyDictDescriptionsToFormData(formDataFields.value, workspaceDictionaries.value)
+  if (count > 0) {
+    normalizeFormDataFields()
+    emit('state-change')
+    showToast(t('dict.applyAllFormDataSuccess', { count }), 1500, 'success')
+  } else {
+    showToast(t('dict.applyAllFormDataNone'), 1600, 'warning')
+  }
+}
+
+watch(
+  () => [props.workspaceId, bodyFormat.value] as const,
+  ([, format]) => {
+    if (format === 'form-data') void refreshWorkspaceDictionaries(true)
+  },
+  { immediate: true },
+)
+const importJsonDialogOpen = ref(false)
 const {
   widths: tableColWidths,
   start: startTableColResize,
@@ -1263,7 +1360,7 @@ const paramGridColumns = computed(
 )
 const formDataGridColumns = computed(
   () =>
-    `40px ${tableColWidths.value.key}px ${tableColWidths.value.type}px ${tableColWidths.value.value}px minmax(0, 1fr) 40px`,
+    `40px ${tableColWidths.value.key}px ${tableColWidths.value.type}px ${tableColWidths.value.value}px minmax(0, 1fr) 72px`,
 )
 
 const requestHeaders = ref<HeaderRow[]>([defaultHeaderRow()])
@@ -1487,6 +1584,32 @@ function normalizeFormDataFields() {
   }
   if (!rows.length || !isParamRowEmpty(rows[rows.length - 1])) {
     rows.push(emptyParamRow())
+  }
+}
+
+function onImportFormDataJson(payload: { mode: FormDataImportMode; jsonText: string }) {
+  try {
+    const imported = applyFormDataJsonImport(formDataFields.value, payload.jsonText, payload.mode)
+    formDataFields.value = imported.map((row) => ({
+      ...row,
+      fileData: undefined,
+      fileName: undefined,
+    }))
+    normalizeFormDataFields()
+    importJsonDialogOpen.value = false
+    showToast(t('request.importJsonSuccess'), 1500, 'success')
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.message === 'empty') {
+        showToast(t('request.importJsonEmpty'), 1600, 'warning')
+        return
+      }
+      if (error.message === 'root-object') {
+        showToast(t('request.importJsonRootInvalid'), 1600, 'warning')
+        return
+      }
+    }
+    showToast(t('request.importJsonInvalid'), 1600, 'warning')
   }
 }
 
@@ -1759,17 +1882,45 @@ function applyParsedCurl(parsed: ParsedCurl) {
 
 function onUrlPaste(e: ClipboardEvent) {
   const text = e.clipboardData?.getData('text') ?? ''
-  if (!looksLikeCurl(text)) return
-  const parsed = parseCurl(text)
-  if (!parsed) return
+  if (looksLikeCurl(text)) {
+    const parsed = parseCurl(text)
+    if (!parsed) return
+    e.preventDefault()
+    urlUndo.checkpoint(urlSnapshot())
+    applyParsedCurl(parsed)
+    void nextTick(() => urlUndo.commit(urlSnapshot()))
+    return
+  }
+
+  // Copied URLs often start with a leading CR/LF; keep it out of the input
+  // so the transparent caret overlay does not drift (looks like a trailing space).
+  const trimmed = text.replace(/^\uFEFF/, '').trim()
+  if (trimmed === text) return
   e.preventDefault()
   urlUndo.checkpoint(urlSnapshot())
-  applyParsedCurl(parsed)
-  void nextTick(() => urlUndo.commit(urlSnapshot()))
+  const el = urlInputRef.value
+  const cur = displayUrl.value
+  const start = el?.selectionStart ?? cur.length
+  const end = el?.selectionEnd ?? start
+  parseUrlInput(cur.slice(0, start) + trimmed + cur.slice(end))
+  void nextTick(() => {
+    if (el) {
+      const pos = Math.min(start + trimmed.length, el.value.length)
+      try {
+        el.setSelectionRange(pos, pos)
+      } catch {
+        /* ignore */
+      }
+    }
+    urlUndo.commit(urlSnapshot())
+  })
 }
 
 function parseUrlInput(raw: string) {
-  if (!raw.trim()) {
+  // Strip BOM / leading/trailing whitespace (CR/LF/space). A leading newline
+  // survives in <input> value and breaks caret alignment vs the highlight layer.
+  raw = raw.replace(/^\uFEFF/, '').trim()
+  if (!raw) {
     urlBase.value = ''
     clearQueryParams()
     return
@@ -1832,15 +1983,11 @@ function parseUrlInput(raw: string) {
   normalizeQueryParams()
 }
 
-/** Persist URL as typed. Never force a leading "/". */
+/** Persist URL as typed (including scheme/host). Never force a leading "/". */
 function urlForSave(): string {
-  const raw = urlBase.value.trim()
-  if (!raw) return ''
-  // Keep path-only for http(s) absolute URLs; leave ws/tcp/udp/etc. untouched.
-  if (/^https?:\/\//i.test(raw)) {
-    return raw.replace(/^https?:\/\/[^/]*/i, '') || ''
-  }
-  return raw
+  // Previously stripped `https://host` down to path-only; host-only URLs like
+  // `https://bucket.oss-accelerate.aliyuncs.com` became "" and vanished on reopen.
+  return displayUrl.value.trim()
 }
 
 function resolveRequestUrl(rawInput?: string): string | null {
@@ -1886,6 +2033,28 @@ function compactParams(rows: Array<ParamRow & { enabled?: boolean }>) {
       example: r.example,
       enabled: r.enabled !== false,
     }))
+}
+
+/** Keep selected file payload so tab switch / save / reopen can still send it. */
+function compactFormDataFields(rows: FormDataRow[]) {
+  return rows
+    .filter((r) => r.name.trim())
+    .map((r) => {
+      const base = {
+        name: r.name.trim(),
+        type: r.type,
+        required: r.required,
+        description: r.description,
+        example: r.example,
+        enabled: r.enabled !== false,
+      }
+      if (r.type !== 'file') return base
+      return {
+        ...base,
+        file_name: r.fileName || r.example || undefined,
+        file_data: r.fileData || undefined,
+      }
+    })
 }
 
 function currentGrpcCatalog(): GrpcCatalog {
@@ -2047,7 +2216,7 @@ function buildDetail() {
       format: bodyFormat.value,
       raw: bodyRaw.value,
       data_type: 'Object',
-      fields: compactParams(formDataFields.value),
+      fields: compactFormDataFields(formDataFields.value),
     },
     authorization: {
       type: authType.value,
@@ -2087,7 +2256,10 @@ function buildSendHeaders() {
     }))
 
   if (bodyFormat.value === 'form-data') {
-    headers = headers.filter((h) => h.key.toLowerCase() !== 'content-type')
+    headers = headers.filter((h) => {
+      const key = h.key.toLowerCase()
+      return key !== 'content-type' && key !== 'content-length' && key !== 'transfer-encoding'
+    })
   }
 
   if (
@@ -2211,14 +2383,27 @@ function applyInitial(resetUi = false) {
     if (body) {
       bodyRaw.value = String(body.raw ?? '')
       if (Array.isArray(body.fields) && body.fields.length) {
-        formDataFields.value = (body.fields as any[]).map((x) => ({
-          name: String(x.name ?? ''),
-          type: x.type === 'file' ? 'file' : 'string',
-          required: !!x.required,
-          description: String(x.description ?? ''),
-          example: String(x.example ?? ''),
-          enabled: x.enabled !== false,
-        }))
+        formDataFields.value = (body.fields as any[]).map((x) => {
+          const type = x.type === 'file' ? 'file' : 'string'
+          const fileName =
+            type === 'file'
+              ? String(x.file_name ?? x.fileName ?? x.example ?? '').trim() || undefined
+              : undefined
+          const fileData =
+            type === 'file'
+              ? String(x.file_data ?? x.fileData ?? '').trim() || undefined
+              : undefined
+          return {
+            name: String(x.name ?? ''),
+            type,
+            required: !!x.required,
+            description: String(x.description ?? ''),
+            example: String(x.example ?? fileName ?? ''),
+            enabled: x.enabled !== false,
+            fileName,
+            fileData,
+          }
+        })
       } else {
         formDataFields.value = [emptyParamRow()]
       }
@@ -2595,6 +2780,19 @@ watch(
   flex-direction: column;
   gap: 6px;
   overflow: hidden;
+}
+
+.body-pane > .param-table {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.body-pane > .param-table .param-table__row--head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
 }
 
 .body-format-row {
@@ -3137,6 +3335,34 @@ watch(
   opacity: 1;
 }
 
+.param-table__actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  gap: 0;
+  min-width: 0;
+}
+
+.param-table__actions .param-table__del {
+  margin: 0;
+}
+
+.param-table__row:not(.param-table__row--head):hover :deep(.param-table__dict) {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.param-table__row:not(.param-table__row--head):hover :deep(.param-table__dict--matched) {
+  color: var(--color-interface-accent, var(--color-primary));
+  background: transparent;
+}
+
+.param-table__row:not(.param-table__row--head):hover :deep(.param-table__dict--matched:hover),
+.param-table__row:not(.param-table__row--head):hover :deep(.param-table__dict--open) {
+  background: color-mix(in srgb, var(--color-interface-accent, var(--color-primary)) 16%, transparent);
+}
+
 .param-table__del {
   display: inline-flex;
   align-items: center;
@@ -3144,7 +3370,7 @@ watch(
   align-self: center;
   width: 28px;
   height: 28px;
-  margin: 0 auto;
+  margin: 0;
   padding: 0;
   border: 0;
   background: transparent;

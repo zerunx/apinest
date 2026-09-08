@@ -27,7 +27,7 @@ const canNext = computed(() => !!selectedSource.value?.enabled && !!parsed.value
 
 const { onOverlayMouseDown, onOverlayMouseUp } = useOverlayDismiss(open, () => {
   open.value = false
-})
+}, { escape: true })
 
 watch(open, (next) => {
   if (!next) return

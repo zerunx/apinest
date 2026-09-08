@@ -124,7 +124,7 @@ fn normalize_field_type(raw: &str) -> AppResult<String> {
     match t.as_str() {
         "string" | "integer" | "number" | "boolean" | "file" => Ok(t),
         "" => Ok("string".into()),
-        _ => Err(AppError::msg("不支持的字段类型")),
+        _ => Err(AppError::msg("unsupported field type")),
     }
 }
 
@@ -170,7 +170,7 @@ pub fn create_workspace_dictionary(
 ) -> AppResult<DictionaryEntryRow> {
     let name = args.name.trim().to_string();
     if name.is_empty() {
-        return Err(AppError::msg("参数名不能为空"));
+        return Err(AppError::msg("name is required"));
     }
     let field_type = normalize_field_type(&args.field_type)?;
     let description = args.description.unwrap_or_default().trim().to_string();
@@ -186,7 +186,7 @@ pub fn create_workspace_dictionary(
             )
             .unwrap_or(false);
         if dup {
-            return Err(AppError::msg("参数名已存在"));
+            return Err(AppError::msg("name already exists"));
         }
         let id = next_local_id(conn)?;
         let now = now_iso();
@@ -234,7 +234,7 @@ pub fn update_workspace_dictionary(
 ) -> AppResult<DictionaryEntryRow> {
     let name = args.name.trim().to_string();
     if name.is_empty() {
-        return Err(AppError::msg("参数名不能为空"));
+        return Err(AppError::msg("name is required"));
     }
     let field_type = normalize_field_type(&args.field_type)?;
     let description = args.description.unwrap_or_default().trim().to_string();
@@ -250,7 +250,7 @@ pub fn update_workspace_dictionary(
             )
             .unwrap_or(false);
         if dup {
-            return Err(AppError::msg("参数名已存在"));
+            return Err(AppError::msg("name already exists"));
         }
         let now = now_iso();
         let n = conn.execute(
@@ -270,7 +270,7 @@ pub fn update_workspace_dictionary(
             ],
         )?;
         if n == 0 {
-            return Err(AppError::msg("字典项不存在"));
+            return Err(AppError::msg("dictionary entry not found"));
         }
         let source_system_key: Option<String> = conn
             .query_row(
@@ -306,7 +306,7 @@ pub fn delete_workspace_dictionary(
             params![server_id, workspace_id, entry_id],
         )?;
         if n == 0 {
-            return Err(AppError::msg("字典项不存在"));
+            return Err(AppError::msg("dictionary entry not found"));
         }
         Ok(())
     })
@@ -320,7 +320,7 @@ pub fn import_system_dictionary(
     let item = system_dictionaries()
         .into_iter()
         .find(|x| x.key == args.system_key)
-        .ok_or_else(|| AppError::msg("系统字典不存在"))?;
+        .ok_or_else(|| AppError::msg("system dictionary not found"))?;
     let server_id = current_server_id(&db)?;
     db.with_conn(|conn| {
         let already: bool = conn
@@ -332,7 +332,7 @@ pub fn import_system_dictionary(
             )
             .unwrap_or(false);
         if already {
-            return Err(AppError::msg("该系统字典已导入"));
+            return Err(AppError::msg("system dictionary already imported"));
         }
         let name_dup: bool = conn
             .query_row(
@@ -343,7 +343,7 @@ pub fn import_system_dictionary(
             )
             .unwrap_or(false);
         if name_dup {
-            return Err(AppError::msg("自定义字典中已存在同名参数"));
+            return Err(AppError::msg("a custom field with the same name already exists"));
         }
         let id = next_local_id(conn)?;
         let now = now_iso();

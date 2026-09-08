@@ -7,6 +7,8 @@
         :class="`app-toast--${toast.type}`"
         role="status"
         aria-live="polite"
+        @mouseenter="pauseToast"
+        @mouseleave="resumeToast"
       >
         <span class="app-toast__mark" aria-hidden="true">
           <svg v-if="toast.type === 'success'" viewBox="0 0 16 16" width="14" height="14">
@@ -43,7 +45,7 @@
 <script setup lang="ts">
 import { useToast } from '../composables/useToast'
 
-const { toast } = useToast()
+const { toast, pauseToast, resumeToast } = useToast()
 </script>
 
 <style scoped>
@@ -64,7 +66,9 @@ const { toast } = useToast()
   box-shadow: var(--shadow-dialog, 0 10px 32px rgba(0, 0, 0, 0.18));
   font-size: 13px;
   line-height: 1.45;
-  pointer-events: none;
+  pointer-events: auto;
+  user-select: text;
+  cursor: text;
   transform: translateX(-50%);
 }
 
@@ -79,12 +83,16 @@ const { toast } = useToast()
   border-radius: 999px;
   color: var(--color-text-secondary);
   background: color-mix(in srgb, var(--color-text-secondary) 12%, transparent);
+  pointer-events: none;
+  user-select: none;
 }
 
 .app-toast__text {
   min-width: 0;
   text-align: left;
   word-break: break-word;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .app-toast--warning {

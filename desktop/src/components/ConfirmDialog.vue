@@ -67,7 +67,9 @@ function onCancel() {
   emit('update:open', false)
 }
 
-const { onOverlayMouseDown, onOverlayMouseUp } = useOverlayDismiss(openRef, onCancel)
+const { onOverlayMouseDown, onOverlayMouseUp } = useOverlayDismiss(openRef, onCancel, {
+  escape: true,
+})
 
 watch(
   () => props.open,
