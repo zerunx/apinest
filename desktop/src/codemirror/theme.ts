@@ -51,13 +51,10 @@ function chromeTheme(dark: boolean): Extension {
         fontFamily: 'var(--raw-editor-font-family)',
         fontSize: '13px',
         lineHeight: '20px',
-        // Stable CJK/Latin mixed metrics while selection overlays update.
         fontKerning: 'none',
         fontVariantLigatures: 'none',
         cursor: 'text',
       },
-      // Prefer filling the first visual row (key + value) instead of wrapping
-      // at the space after `: `, which parked the string on the next line.
       '.cm-lineWrapping': {
         wordBreak: 'break-all',
         overflowWrap: 'anywhere',
@@ -75,7 +72,6 @@ function chromeTheme(dark: boolean): Extension {
         paddingTop: '0',
         paddingBottom: '0',
       },
-      // Indent wrap rows only. Negative text-indent keeps the first row full-width.
       '.cm-wrapIndent': {
         paddingLeft: 'calc(6px + var(--cm-wrap-indent, 0ch))',
         textIndent: 'calc(-1 * var(--cm-wrap-indent, 0ch))',
@@ -198,7 +194,6 @@ export function editorTheme(dark: boolean): Extension {
   return [
     chromeTheme(dark),
     syntaxHighlighting(highlightStyle),
-    // Keep native ::selection (avoids CM block selection) but hide the native caret.
     Prec.highest(
       EditorView.theme({
         '.cm-line::selection, .cm-line ::selection, .cm-content ::selection': {

@@ -7,7 +7,6 @@ import (
 	entapi "nest-api/internal/ent/api"
 )
 
-// BackfillLegacyStatuses maps removed statuses (4 异常, 5 维护) to 开发中(3).
 func BackfillLegacyStatuses(ctx context.Context) error {
 	if database.DB == nil {
 		return nil

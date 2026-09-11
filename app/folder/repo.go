@@ -12,7 +12,6 @@ import (
 
 type Repo struct{}
 
-// EnsureExists 校验文件夹是否存在于指定项目。
 func EnsureExists(ctx context.Context, projectID, folderID int64) error {
 	return (Repo{}).EnsureExists(ctx, projectID, folderID)
 }
@@ -29,7 +28,7 @@ func (Repo) EnsureExists(ctx context.Context, projectID, folderID int64) error {
 		return err
 	}
 	if !exists {
-		return bizerr.New("文件夹不存在")
+		return bizerr.New("folder not found")
 	}
 	return nil
 }
@@ -60,7 +59,7 @@ func (Repo) Get(ctx context.Context, projectID, folderID int64) (*ent.Folder, er
 		Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			return nil, bizerr.New("文件夹不存在")
+			return nil, bizerr.New("folder not found")
 		}
 		return nil, err
 	}

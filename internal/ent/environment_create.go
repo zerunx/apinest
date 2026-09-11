@@ -16,20 +16,17 @@ import (
 	"entgo.io/ent/schema/field"
 )
 
-// EnvironmentCreate is the builder for creating a Environment entity.
 type EnvironmentCreate struct {
 	config
 	mutation *EnvironmentMutation
 	hooks    []Hook
 }
 
-// SetProjectID sets the "project_id" field.
 func (_c *EnvironmentCreate) SetProjectID(v int64) *EnvironmentCreate {
 	_c.mutation.SetProjectID(v)
 	return _c
 }
 
-// SetNillableProjectID sets the "project_id" field if the given value is not nil.
 func (_c *EnvironmentCreate) SetNillableProjectID(v *int64) *EnvironmentCreate {
 	if v != nil {
 		_c.SetProjectID(*v)
@@ -399,14 +396,12 @@ func (_c *EnvironmentCreate) createSpec() (*Environment, *sqlgraph.CreateSpec) {
 	return _node, _spec
 }
 
-// EnvironmentCreateBulk is the builder for creating many Environment entities in bulk.
 type EnvironmentCreateBulk struct {
 	config
 	err      error
 	builders []*EnvironmentCreate
 }
 
-// Save creates the Environment entities in the database.
 func (_c *EnvironmentCreateBulk) Save(ctx context.Context) ([]*Environment, error) {
 	if _c.err != nil {
 		return nil, _c.err
@@ -465,7 +460,6 @@ func (_c *EnvironmentCreateBulk) Save(ctx context.Context) ([]*Environment, erro
 	return nodes, nil
 }
 
-// SaveX is like Save, but panics if an error occurs.
 func (_c *EnvironmentCreateBulk) SaveX(ctx context.Context) []*Environment {
 	v, err := _c.Save(ctx)
 	if err != nil {
@@ -474,13 +468,11 @@ func (_c *EnvironmentCreateBulk) SaveX(ctx context.Context) []*Environment {
 	return v
 }
 
-// Exec executes the query.
 func (_c *EnvironmentCreateBulk) Exec(ctx context.Context) error {
 	_, err := _c.Save(ctx)
 	return err
 }
 
-// ExecX is like Exec, but panics if an error occurs.
 func (_c *EnvironmentCreateBulk) ExecX(ctx context.Context) {
 	if err := _c.Exec(ctx); err != nil {
 		panic(err)

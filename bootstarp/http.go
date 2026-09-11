@@ -61,7 +61,6 @@ func InitHTTP() {
 	}
 }
 
-// spaFallback serves Vite build assets and falls back to index.html for Vue Router.
 func spaFallback(webRoot string) gin.HandlerFunc {
 	fileServer := http.FileServer(http.Dir(webRoot))
 

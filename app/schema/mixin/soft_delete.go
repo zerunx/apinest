@@ -20,7 +20,6 @@ type SoftDeleteMixin struct {
 
 type softDeleteKey struct{}
 
-// use cupInfo, err := Repo{}.GetCupDaily(ctx, userID, date)
 func SkipSoftDelete(parent context.Context) context.Context {
 	return context.WithValue(parent, softDeleteKey{}, true)
 }

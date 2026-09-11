@@ -35,7 +35,7 @@ func Require(ctx context.Context, userID, workspaceID int64, action Action) (*Ac
 		return nil, err
 	}
 	if !action.Allowed(access.Role) {
-		return nil, bizerr.New("无权操作")
+		return nil, bizerr.New("permission denied")
 	}
 	return access, nil
 }
@@ -50,7 +50,7 @@ func getMembership(ctx context.Context, workspaceID, userID int64) (*ent.Workspa
 		Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			return nil, bizerr.New("无权访问该工作空间")
+			return nil, bizerr.New("no permission to access this workspace")
 		}
 		return nil, err
 	}

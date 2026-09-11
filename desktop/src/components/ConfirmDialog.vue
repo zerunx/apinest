@@ -56,6 +56,8 @@ const props = withDefaults(
 const emit = defineEmits<{
   'update:open': [boolean]
   confirm: []
+  cancel: []
+  dismiss: []
 }>()
 
 const { t } = useI18n()
@@ -64,10 +66,16 @@ const anchorRef = computed(() => props.anchor)
 const { dialogRef, dialogStyle, placeDialog, onReposition } = useAnchoredDialog(openRef, anchorRef)
 
 function onCancel() {
+  emit('cancel')
   emit('update:open', false)
 }
 
-const { onOverlayMouseDown, onOverlayMouseUp } = useOverlayDismiss(openRef, onCancel, {
+function onDismiss() {
+  emit('dismiss')
+  emit('update:open', false)
+}
+
+const { onOverlayMouseDown, onOverlayMouseUp } = useOverlayDismiss(openRef, onDismiss, {
   escape: true,
 })
 

@@ -54,7 +54,7 @@ func (Service) Create(ctx context.Context, userID int64, params CreateRequest) e
 		return err
 	}
 	if exists {
-		return bizerr.New("变量名已存在")
+		return bizerr.New("variable name already exists")
 	}
 
 	_, err = Repo{}.Create(ctx, params.EnvironmentID, userID, params.Key, params.Value, params.Description)
@@ -74,7 +74,7 @@ func (Service) Update(ctx context.Context, userID int64, params UpdateRequest) e
 		return err
 	}
 	if exists {
-		return bizerr.New("变量名已存在")
+		return bizerr.New("variable name already exists")
 	}
 
 	return (Repo{}).Update(ctx, params.VariableID, params.Key, params.Value, params.Description)
@@ -93,7 +93,7 @@ func (Service) Delete(ctx context.Context, userID int64, params DeleteRequest) e
 		return err
 	}
 	if n == 0 {
-		return bizerr.New("变量不存在")
+		return bizerr.New("variable not found")
 	}
 	return nil
 }

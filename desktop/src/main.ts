@@ -5,7 +5,6 @@ import { setupI18n } from './i18n'
 import './styles/global.css'
 import './styles/interface-form.css'
 
-// Disable WebView default context menu; custom menus use @contextmenu.prevent themselves.
 document.addEventListener('contextmenu', (e) => {
   e.preventDefault()
 })

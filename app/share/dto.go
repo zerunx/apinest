@@ -5,19 +5,19 @@ const (
 )
 
 type Item struct {
-	ID            int64  `json:"id"`
-	ProjectID     int64  `json:"project_id"`
-	WorkspaceID   int64  `json:"workspace_id"`
-	Name          string `json:"name"`
-	ShareCode     string `json:"share_code"`
-	ShareURL      string `json:"share_url"`
-	Enabled       bool   `json:"enabled"`
-	HasPassword   bool   `json:"has_password"`
-	Permission    uint8  `json:"permission"`
-	InterfaceIDs  []int64 `json:"interface_ids,omitempty"`
-	InterfaceCount int   `json:"interface_count"`
-	CreatedAt     string `json:"created_at"`
-	UpdatedAt     string `json:"updated_at"`
+	ID             int64   `json:"id"`
+	ProjectID      int64   `json:"project_id"`
+	WorkspaceID    int64   `json:"workspace_id"`
+	Name           string  `json:"name"`
+	ShareCode      string  `json:"share_code"`
+	ShareURL       string  `json:"share_url"`
+	Enabled        bool    `json:"enabled"`
+	HasPassword    bool    `json:"has_password"`
+	Permission     uint8   `json:"permission"`
+	InterfaceIDs   []int64 `json:"interface_ids,omitempty"`
+	InterfaceCount int     `json:"interface_count"`
+	CreatedAt      string  `json:"created_at"`
+	UpdatedAt      string  `json:"updated_at"`
 }
 
 type ListRequest struct {
@@ -45,7 +45,7 @@ type UpdateRequest struct {
 	ShareID      int64   `json:"share_id" binding:"required,min=1"`
 	Name         string  `json:"name" binding:"required,min=1,max=50"`
 	Enabled      *bool   `json:"enabled"`
-	Password     *string `json:"password"` // nil=keep, ""=clear, else set new
+	Password     *string `json:"password"`
 	Permission   uint8   `json:"permission" binding:"omitempty,oneof=1"`
 	InterfaceIDs []int64 `json:"interface_ids"`
 }
@@ -60,12 +60,12 @@ type PreviewRequest struct {
 }
 
 type PreviewResponse struct {
-	ShareCode    string `json:"share_code"`
-	Name         string `json:"name"`
-	ProjectName  string `json:"project_name"`
-	Enabled      bool   `json:"enabled"`
-	HasPassword  bool   `json:"has_password"`
-	Permission   uint8  `json:"permission"`
+	ShareCode   string `json:"share_code"`
+	Name        string `json:"name"`
+	ProjectName string `json:"project_name"`
+	Enabled     bool   `json:"enabled"`
+	HasPassword bool   `json:"has_password"`
+	Permission  uint8  `json:"permission"`
 }
 
 type AccessRequest struct {
@@ -99,11 +99,10 @@ type SharedInterface struct {
 	Status     uint8  `json:"status"`
 }
 
-// ShareTreeNode is a nested folder/api node for the public share sidebar.
 type ShareTreeNode struct {
 	ID       int64           `json:"id"`
 	Name     string          `json:"name"`
-	Type     string          `json:"type"` // folder | api
+	Type     string          `json:"type"`
 	Method   string          `json:"method,omitempty"`
 	URL      string          `json:"url,omitempty"`
 	Status   uint8           `json:"status,omitempty"`

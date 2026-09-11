@@ -15,6 +15,7 @@
       :line-numbers="!hideGutter"
       :placeholder="placeholder"
       @update:model-value="$emit('update:modelValue', $event)"
+      @scroll="$emit('scroll', $event)"
     />
   </div>
 </template>
@@ -41,9 +42,15 @@ withDefaults(
 
 defineEmits<{
   'update:modelValue': [string]
+  scroll: [number]
 }>()
 
-const editorRef = ref<{ formatContent: () => boolean; focus: () => void } | null>(null)
+const editorRef = ref<{
+  formatContent: () => boolean
+  focus: () => void
+  getScrollTop: () => number
+  setScrollTop: (top: number) => void
+} | null>(null)
 
 function formatContent() {
   return editorRef.value?.formatContent() ?? false
@@ -53,5 +60,13 @@ function focus() {
   editorRef.value?.focus()
 }
 
-defineExpose({ formatContent, focus })
+function getScrollTop() {
+  return editorRef.value?.getScrollTop() ?? 0
+}
+
+function setScrollTop(top: number) {
+  editorRef.value?.setScrollTop(top)
+}
+
+defineExpose({ formatContent, focus, getScrollTop, setScrollTop })
 </script>

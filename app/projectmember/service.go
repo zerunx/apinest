@@ -95,7 +95,7 @@ func (Service) Add(ctx context.Context, operatorID int64, params AddRequest) err
 		return err
 	}
 	if !exists {
-		return bizerr.New("用户不存在")
+		return bizerr.New("user not found")
 	}
 
 	isWSMember, err := database.DB.WorkspaceMember.
@@ -109,7 +109,7 @@ func (Service) Add(ctx context.Context, operatorID int64, params AddRequest) err
 		return err
 	}
 	if !isWSMember {
-		return bizerr.New("只能添加已加入该工作空间的成员")
+		return bizerr.New("can only add members who already joined this workspace")
 	}
 
 	return project.AddMember(ctx, params.WorkspaceID, params.ProjectID, params.UserID)
@@ -128,7 +128,7 @@ func (Service) Remove(ctx context.Context, operatorID int64, params RemoveReques
 		return err
 	}
 	if p.CreatedBy == params.UserID {
-		return bizerr.New("不能移除项目创建者")
+		return bizerr.New("cannot remove the project creator")
 	}
 
 	return project.RemoveMember(ctx, params.ProjectID, params.UserID)

@@ -27,6 +27,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   'update:modelValue': [string]
+  scroll: [number]
 }>()
 
 const { theme } = useTheme()
@@ -47,6 +48,9 @@ onMounted(() => {
     dark: theme.value === 'dark',
     onChange(value) {
       emit('update:modelValue', value)
+    },
+    onScroll(scrollTop) {
+      emit('scroll', scrollTop)
     },
   })
 })
@@ -115,7 +119,15 @@ function focus() {
   editor?.view.focus()
 }
 
-defineExpose({ formatContent, focus })
+function getScrollTop() {
+  return editor?.getScrollTop() ?? 0
+}
+
+function setScrollTop(top: number) {
+  editor?.setScrollTop(top)
+}
+
+defineExpose({ formatContent, focus, getScrollTop, setScrollTop })
 </script>
 
 <style>

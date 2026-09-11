@@ -6,8 +6,6 @@ const commentMark = Decoration.mark({ class: 'cm-jsonComment' })
 const commentLine = Decoration.line({ class: 'cm-jsonCommentLine' })
 
 function buildCommentDecorations(docText: string): DecorationSet {
-  // Line decorations must be added before marks that start later on the same line,
-  // and all ranges must be sorted by from position.
   type Item = { from: number; to?: number; deco: Decoration }
   const items: Item[] = []
 

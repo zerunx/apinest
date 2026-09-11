@@ -12,25 +12,21 @@ import (
 	"entgo.io/ent/schema/field"
 )
 
-// EnvironmentDelete is the builder for deleting a Environment entity.
 type EnvironmentDelete struct {
 	config
 	hooks    []Hook
 	mutation *EnvironmentMutation
 }
 
-// Where appends a list predicates to the EnvironmentDelete builder.
 func (_d *EnvironmentDelete) Where(ps ...predicate.Environment) *EnvironmentDelete {
 	_d.mutation.Where(ps...)
 	return _d
 }
 
-// Exec executes the deletion query and returns how many vertices were deleted.
 func (_d *EnvironmentDelete) Exec(ctx context.Context) (int, error) {
 	return withHooks(ctx, _d.sqlExec, _d.mutation, _d.hooks)
 }
 
-// ExecX is like Exec, but panics if an error occurs.
 func (_d *EnvironmentDelete) ExecX(ctx context.Context) int {
 	n, err := _d.Exec(ctx)
 	if err != nil {
@@ -56,18 +52,15 @@ func (_d *EnvironmentDelete) sqlExec(ctx context.Context) (int, error) {
 	return affected, err
 }
 
-// EnvironmentDeleteOne is the builder for deleting a single Environment entity.
 type EnvironmentDeleteOne struct {
 	_d *EnvironmentDelete
 }
 
-// Where appends a list predicates to the EnvironmentDelete builder.
 func (_d *EnvironmentDeleteOne) Where(ps ...predicate.Environment) *EnvironmentDeleteOne {
 	_d._d.mutation.Where(ps...)
 	return _d
 }
 
-// Exec executes the deletion query.
 func (_d *EnvironmentDeleteOne) Exec(ctx context.Context) error {
 	n, err := _d._d.Exec(ctx)
 	switch {
@@ -80,7 +73,6 @@ func (_d *EnvironmentDeleteOne) Exec(ctx context.Context) error {
 	}
 }
 
-// ExecX is like Exec, but panics if an error occurs.
 func (_d *EnvironmentDeleteOne) ExecX(ctx context.Context) {
 	if err := _d.Exec(ctx); err != nil {
 		panic(err)

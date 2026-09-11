@@ -97,7 +97,7 @@ func (Service) Delete(ctx context.Context, userID int64, params DeleteRequest) e
 		return err
 	}
 	if n == 0 {
-		return bizerr.New("项目不存在")
+		return bizerr.New("project not found")
 	}
 	_, err = database.DB.ProjectMember.
 		Delete().
@@ -115,12 +115,11 @@ func assertCanManageProject(ctx context.Context, access *workspace.Access, works
 		return err
 	}
 	if p.CreatedBy != access.UserID {
-		return bizerr.New("只能修改或删除自己创建的项目")
+		return bizerr.New("you can only modify or delete projects you created")
 	}
 	return nil
 }
 
-// BackfillMembersForExistingProjects grants creators + workspace admins access to legacy projects.
 func BackfillMembersForExistingProjects(ctx context.Context) error {
 	projects, err := database.DB.Project.Query().All(ctx)
 	if err != nil {

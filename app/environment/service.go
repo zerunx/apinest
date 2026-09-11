@@ -89,7 +89,7 @@ func (Service) Delete(ctx context.Context, userID int64, params DeleteRequest) e
 		return err
 	}
 	if n == 0 {
-		return bizerr.New("环境不存在")
+		return bizerr.New("environment not found")
 	}
 	return nil
 }

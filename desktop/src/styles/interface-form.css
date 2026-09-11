@@ -410,6 +410,81 @@
   font-size: 13px;
 }
 
+.interface-response-clear {
+  margin-left: 8px;
+  height: 26px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.ws-message-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 0 8px;
+}
+
+.ws-message {
+  border: 1px solid var(--color-border, var(--border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-bg-elevated, transparent) 80%, transparent);
+  padding: 8px 10px;
+}
+
+.ws-message--out {
+  border-color: color-mix(in srgb, var(--color-interface-accent, #3b82f6) 45%, var(--color-border, #ddd));
+}
+
+.ws-message--in {
+  border-color: color-mix(in srgb, #22c55e 40%, var(--color-border, #ddd));
+}
+
+.ws-message--system {
+  opacity: 0.92;
+}
+
+.ws-message__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+.ws-message__dir {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.ws-message--out .ws-message__dir {
+  color: var(--color-interface-accent, #3b82f6);
+}
+
+.ws-message--in .ws-message__dir {
+  color: #16a34a;
+}
+
+.ws-message__type {
+  text-transform: uppercase;
+}
+
+.ws-message__time {
+  margin-left: auto;
+}
+
+.ws-message__body {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .interface-response-loading {
   flex: 1;
   min-height: 120px;

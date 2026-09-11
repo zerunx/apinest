@@ -11,7 +11,6 @@ import (
 
 type Repo struct{}
 
-// EnsureExists 校验项目是否存在于指定工作空间。
 func EnsureExists(ctx context.Context, workspaceID, projectID int64) error {
 	return (Repo{}).EnsureExists(ctx, workspaceID, projectID)
 }
@@ -28,7 +27,7 @@ func (Repo) EnsureExists(ctx context.Context, workspaceID, projectID int64) erro
 		return err
 	}
 	if !exists {
-		return bizerr.New("项目不存在")
+		return bizerr.New("project not found")
 	}
 	return nil
 }
@@ -43,7 +42,7 @@ func (Repo) Get(ctx context.Context, workspaceID, projectID int64) (*ent.Project
 		Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			return nil, bizerr.New("项目不存在")
+			return nil, bizerr.New("project not found")
 		}
 		return nil, err
 	}

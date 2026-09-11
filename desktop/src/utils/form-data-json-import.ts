@@ -1,13 +1,25 @@
 export type FormDataImportRow = {
   name: string
-  type: 'string'
+  type: string
   example: string
   description: string
   required: boolean
   enabled: boolean
+  fileData?: string
+  fileName?: string
 }
 
 export type FormDataImportMode = 'replace' | 'append' | 'merge'
+
+type ExistingFormDataRow = {
+  name: string
+  type?: string
+  example?: string
+  description?: string
+  enabled?: boolean
+  fileData?: string
+  fileName?: string
+}
 
 function formatFormDataValue(value: unknown): string {
   if (value === null || value === undefined) return ''
@@ -36,7 +48,7 @@ export function parseJsonToFormDataRows(jsonText: string): FormDataImportRow[] {
 
   return Object.entries(parsed as Record<string, unknown>).map(([name, value]) => ({
     name,
-    type: 'string' as const,
+    type: 'string',
     example: formatFormDataValue(value),
     description: '',
     required: false,
@@ -44,22 +56,27 @@ export function parseJsonToFormDataRows(jsonText: string): FormDataImportRow[] {
   }))
 }
 
+function toImportRow(row: ExistingFormDataRow): FormDataImportRow {
+  const type = row.type?.trim() || 'string'
+  return {
+    name: row.name,
+    type,
+    example: row.example ?? '',
+    description: row.description ?? '',
+    required: false,
+    enabled: row.enabled !== false,
+    fileData: type === 'file' ? row.fileData : undefined,
+    fileName: type === 'file' ? row.fileName : undefined,
+  }
+}
+
 export function applyFormDataJsonImport(
-  existing: Array<{ name: string; example?: string; description?: string; enabled?: boolean }>,
+  existing: ExistingFormDataRow[],
   jsonText: string,
   mode: FormDataImportMode,
 ): FormDataImportRow[] {
   const imported = parseJsonToFormDataRows(jsonText)
-  const current = existing
-    .filter((row) => row.name.trim())
-    .map((row) => ({
-      name: row.name,
-      type: 'string' as const,
-      example: row.example ?? '',
-      description: row.description ?? '',
-      required: false,
-      enabled: row.enabled !== false,
-    }))
+  const current = existing.filter((row) => row.name.trim()).map(toImportRow)
 
   if (mode === 'replace') {
     return imported
@@ -75,8 +92,14 @@ export function applyFormDataJsonImport(
       result.push({ ...imp })
       continue
     }
+    const prev = result[index]
+    // Keep file fields intact when JSON only carries text values.
+    if (prev.type === 'file') {
+      result[index] = { ...prev, enabled: true }
+      continue
+    }
     result[index] = {
-      ...result[index],
+      ...prev,
       example: imp.example,
       enabled: true,
     }

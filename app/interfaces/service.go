@@ -44,7 +44,6 @@ func (Service) Detail(ctx context.Context, userID int64, params DetailRequest) (
 	return LoadDetail(ctx, params.ProjectID, params.InterfaceID)
 }
 
-// LoadDetail loads interface detail without membership checks (for share access).
 func LoadDetail(ctx context.Context, projectID, interfaceID int64) (*DetailItem, error) {
 	row, err := Repo{}.GetWithDetails(ctx, projectID, interfaceID)
 	if err != nil {
@@ -69,7 +68,7 @@ func LoadDetail(ctx context.Context, projectID, interfaceID int64) (*DetailItem,
 
 func (Service) Create(ctx context.Context, userID int64, params CreateRequest) (int64, error) {
 	if userID <= 0 {
-		return 0, bizerr.New("æªç»å½")
+		return 0, bizerr.New("not logged in")
 	}
 	if _, err := project.RequireAccess(ctx, userID, params.WorkspaceID, params.ProjectID, workspace.ActionProjectCreate); err != nil {
 		return 0, err
@@ -99,7 +98,6 @@ func (Service) Create(ctx context.Context, userID int64, params CreateRequest) (
 	return id, nil
 }
 
-// InsertInTx creates an interface and its nested fields inside an existing transaction.
 func InsertInTx(ctx context.Context, tx *ent.Tx, userID, projectID, folderID int64, sortOrder int, params CreateRequest) (int64, error) {
 	method := strings.ToUpper(strings.TrimSpace(params.Method))
 	if method == "" {
@@ -284,7 +282,7 @@ func (Service) Reorder(ctx context.Context, userID int64, params ReorderRequest)
 	}
 
 	if len(params.InterfaceIDs) != len(rows) {
-		return bizerr.New("æ¥å£åè¡¨ä¸å®æ´")
+		return bizerr.New("interface list is incomplete")
 	}
 
 	existingIDs := make(map[int64]struct{}, len(rows))
@@ -295,10 +293,10 @@ func (Service) Reorder(ctx context.Context, userID int64, params ReorderRequest)
 	seen := make(map[int64]struct{}, len(params.InterfaceIDs))
 	for _, id := range params.InterfaceIDs {
 		if _, ok := existingIDs[id]; !ok {
-			return bizerr.New("æ¥å£ä¸å­å¨æä¸å±äºè¯¥åç»")
+			return bizerr.New("interface does not exist or does not belong to this folder")
 		}
 		if _, dup := seen[id]; dup {
-			return bizerr.New("æ¥å£åè¡¨éå¤")
+			return bizerr.New("duplicate interfaces in list")
 		}
 		seen[id] = struct{}{}
 	}

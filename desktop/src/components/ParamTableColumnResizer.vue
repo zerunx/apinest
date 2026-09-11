@@ -76,29 +76,25 @@ onBeforeUnmount(onUp)
 .param-table__resize-handle::after {
   content: '';
   position: absolute;
-  top: 10px;
-  bottom: 10px;
+  /* Optical center sits slightly below geometric mid for header text. */
+  top: calc(50% + 1px);
   left: 50%;
   width: 1px;
-  transform: translateX(-50%);
-  background: var(--color-interface-bar-border);
-  opacity: 0.85;
+  height: 14px;
+  transform: translate(-50%, -50%);
+  background: color-mix(in srgb, var(--color-text-secondary) 75%, transparent);
   border-radius: 1px;
   pointer-events: none;
   transition:
+    height 0.12s ease,
     width 0.12s ease,
-    background-color 0.12s ease,
-    opacity 0.12s ease,
-    top 0.12s ease,
-    bottom 0.12s ease;
+    background-color 0.12s ease;
 }
 
 .param-table__resize-handle:hover::after,
 .param-table__resize-handle--active::after {
   width: 2px;
-  top: 6px;
-  bottom: 6px;
+  height: 20px;
   background: var(--color-primary);
-  opacity: 1;
 }
 </style>

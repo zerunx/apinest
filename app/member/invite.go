@@ -85,7 +85,7 @@ func createInvite(ctx context.Context, workspaceID, userID int64, role uint8) (*
 			SetExpiresAt(inviteExpiresAt()).
 			Save(ctx)
 	}
-	return nil, bizerr.New("生成邀请码失败，请重试")
+	return nil, bizerr.New("failed to generate invite code, please retry")
 }
 
 func findActiveInvite(ctx context.Context, workspaceID int64, role uint8) (*ent.WorkspaceInvite, error) {
@@ -110,7 +110,7 @@ func (Service) GetInviteLink(ctx context.Context, userID int64, params InviteLin
 		role = appworkspace.RoleViewer
 	}
 	if !appworkspace.IsInviteLinkRole(role) {
-		return nil, bizerr.New("邀请角色仅支持编辑者或查看者")
+		return nil, bizerr.New("invite role must be editor or viewer")
 	}
 
 	ws, err := database.DB.Workspace.
@@ -119,7 +119,7 @@ func (Service) GetInviteLink(ctx context.Context, userID int64, params InviteLin
 		Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			return nil, bizerr.New("工作空间不存在")
+			return nil, bizerr.New("workspace not found")
 		}
 		return nil, err
 	}
@@ -146,7 +146,7 @@ func (Service) RefreshInviteLink(ctx context.Context, userID int64, params Invit
 		role = appworkspace.RoleViewer
 	}
 	if !appworkspace.IsInviteLinkRole(role) {
-		return nil, bizerr.New("邀请角色仅支持编辑者或查看者")
+		return nil, bizerr.New("invite role must be editor or viewer")
 	}
 
 	ws, err := database.DB.Workspace.
@@ -155,12 +155,11 @@ func (Service) RefreshInviteLink(ctx context.Context, userID int64, params Invit
 		Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			return nil, bizerr.New("工作空间不存在")
+			return nil, bizerr.New("workspace not found")
 		}
 		return nil, err
 	}
 
-	// Expire existing active invites for this role.
 	_, err = database.DB.WorkspaceInvite.
 		Update().
 		Where(
@@ -184,7 +183,7 @@ func (Service) RefreshInviteLink(ctx context.Context, userID int64, params Invit
 func loadInviteByCode(ctx context.Context, code string) (*ent.WorkspaceInvite, *ent.Workspace, error) {
 	code = strings.TrimSpace(code)
 	if code == "" {
-		return nil, nil, bizerr.New("邀请码无效")
+		return nil, nil, bizerr.New("invalid invite code")
 	}
 
 	inv, err := database.DB.WorkspaceInvite.
@@ -193,12 +192,12 @@ func loadInviteByCode(ctx context.Context, code string) (*ent.WorkspaceInvite, *
 		Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			return nil, nil, bizerr.New("邀请链接无效或已过期")
+			return nil, nil, bizerr.New("invite link is invalid or expired")
 		}
 		return nil, nil, err
 	}
 	if !inv.ExpiresAt.After(time.Now()) {
-		return nil, nil, bizerr.New("邀请链接无效或已过期")
+		return nil, nil, bizerr.New("invite link is invalid or expired")
 	}
 
 	ws, err := database.DB.Workspace.
@@ -207,7 +206,7 @@ func loadInviteByCode(ctx context.Context, code string) (*ent.WorkspaceInvite, *
 		Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			return nil, nil, bizerr.New("工作空间不存在")
+			return nil, nil, bizerr.New("workspace not found")
 		}
 		return nil, nil, err
 	}

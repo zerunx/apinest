@@ -23,8 +23,6 @@ import { indentWithTabStop } from './indent-tab'
 const INDENT = '    '
 
 function editableExtension(readonly: boolean): Extension {
-  // Keep editable so focus, caret, and shortcuts (e.g. Ctrl+A) still work;
-  // readOnly alone blocks content changes.
   return [EditorView.editable.of(true), EditorState.readOnly.of(readonly)]
 }
 
@@ -54,6 +52,7 @@ export type CreateCodeMirrorOptions = {
   dark?: boolean
   extensions?: Extension[]
   onChange?: (value: string) => void
+  onScroll?: (scrollTop: number) => void
 }
 
 export type CodeMirrorHandle = {
@@ -64,6 +63,8 @@ export type CodeMirrorHandle = {
   setReadonly: (readonly: boolean) => void
   setLineNumbers: (show: boolean) => void
   setDark: (dark: boolean) => void
+  getScrollTop: () => number
+  setScrollTop: (top: number) => void
   formatJson: () => boolean
   destroy: () => void
 }
@@ -117,6 +118,11 @@ export function createCodeMirror(options: CreateCodeMirrorOptions): CodeMirrorHa
     }),
   })
 
+  const onScroll = () => {
+    options.onScroll?.(view.scrollDOM.scrollTop)
+  }
+  view.scrollDOM.addEventListener('scroll', onScroll, { passive: true })
+
   return {
     view,
     getDoc() {
@@ -156,10 +162,20 @@ export function createCodeMirror(options: CreateCodeMirrorOptions): CodeMirrorHa
         effects: theme.reconfigure(editorTheme(dark)),
       })
     },
+    getScrollTop() {
+      return view.scrollDOM.scrollTop
+    },
+    setScrollTop(top) {
+      const scroller = view.scrollDOM
+      const next = Math.max(0, Math.round(top))
+      if (Math.abs(scroller.scrollTop - next) < 1) return
+      scroller.scrollTop = next
+    },
     formatJson() {
       return formatJsonDocument(view)
     },
     destroy() {
+      view.scrollDOM.removeEventListener('scroll', onScroll)
       view.destroy()
     },
   }

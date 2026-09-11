@@ -39,7 +39,7 @@ func (Repo) GetByID(ctx context.Context, workspaceID, shareID int64) (*ent.Proje
 		Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			return nil, bizerr.New("分享不存在")
+			return nil, bizerr.New("share not found")
 		}
 		return nil, err
 	}
@@ -56,7 +56,7 @@ func (Repo) GetByIDForUpdate(ctx context.Context, workspaceID, shareID int64) (*
 		Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			return nil, bizerr.New("分享不存在")
+			return nil, bizerr.New("share not found")
 		}
 		return nil, err
 	}
@@ -71,7 +71,7 @@ func (Repo) FindByCode(ctx context.Context, shareCode string) (*ent.ProjectShare
 		Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			return nil, bizerr.New("分享链接无效或已关闭")
+			return nil, bizerr.New("share link is invalid or closed")
 		}
 		return nil, err
 	}
@@ -87,25 +87,24 @@ func (Repo) FindByCodeWithItems(ctx context.Context, shareCode string) (*ent.Pro
 		Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			return nil, bizerr.New("分享链接无效或已关闭")
+			return nil, bizerr.New("share link is invalid or closed")
 		}
 		return nil, err
 	}
 	return row, nil
 }
 
-// LoadEnabledShare 按分享码加载已启用的分享，并校验访问密码。
 func (Repo) LoadEnabledShare(ctx context.Context, shareCode, password string) (*ent.ProjectShare, error) {
 	row, err := (Repo{}).FindByCodeWithItems(ctx, shareCode)
 	if err != nil {
 		return nil, err
 	}
 	if !row.Enabled {
-		return nil, bizerr.New("分享已关闭")
+		return nil, bizerr.New("share is closed")
 	}
 	if strings.TrimSpace(row.Password) != "" {
 		if !utils.Verify(password, row.Password) {
-			return nil, bizerr.New("访问密码错误")
+			return nil, bizerr.New("incorrect access password")
 		}
 	}
 	return row, nil
@@ -152,7 +151,6 @@ func (Repo) Delete(ctx context.Context, workspaceID, shareID int64) (int, error)
 		Exec(ctx)
 }
 
-// ReplaceInterfaces 替换分享关联的接口列表。
 func (Repo) ReplaceInterfaces(ctx context.Context, tx *ent.Tx, shareID int64, interfaceIDs []int64) error {
 	_, err := tx.ProjectShareInterface.
 		Delete().

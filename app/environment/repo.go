@@ -11,7 +11,6 @@ import (
 
 type Repo struct{}
 
-// EnsureExists 校验环境是否存在于指定项目。
 func EnsureExists(ctx context.Context, projectID, environmentID int64) error {
 	return (Repo{}).EnsureExists(ctx, projectID, environmentID)
 }
@@ -28,7 +27,7 @@ func (Repo) EnsureExists(ctx context.Context, projectID, environmentID int64) er
 		return err
 	}
 	if !exists {
-		return bizerr.New("环境不存在")
+		return bizerr.New("environment not found")
 	}
 	return nil
 }

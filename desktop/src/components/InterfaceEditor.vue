@@ -72,7 +72,35 @@
           </div>
         </div>
         <div class="interface-url-actions">
+          <template v-if="isWs">
+            <button
+              class="btn interface-url-actions__send"
+              type="button"
+              :class="wsConnected ? 'btn-danger' : 'btn-primary'"
+              :disabled="wsConnecting || wsDisconnecting"
+              @click="onWsConnectToggle"
+            >
+              {{
+                wsConnecting
+                  ? t('request.connecting')
+                  : wsDisconnecting
+                    ? t('request.disconnecting')
+                    : wsConnected
+                      ? t('request.disconnect')
+                      : t('request.connect')
+              }}
+            </button>
+            <button
+              class="btn btn-primary interface-url-actions__send"
+              type="button"
+              :disabled="!wsConnected || wsSending || !wsCanSend"
+              @click="onWsSend"
+            >
+              {{ wsSending ? t('request.sending') : t('request.send') }}
+            </button>
+          </template>
           <button
+            v-else
             class="btn btn-primary interface-url-actions__send"
             type="button"
             :class="{ 'is-busy': sending }"
@@ -505,13 +533,17 @@
                   </div>
                 </div>
                 <div class="param-table__value">
-                  <input
-                    v-if="row.type !== 'file'"
-                    v-model="row.example"
-                    class="param-table__cell param-table__cell--inner"
-                    :placeholder="t('common.value')"
-                    @input="onFormDataChange(idx)"
-                  />
+                  <div v-if="row.type !== 'file'" class="param-table__value-shell">
+                    <textarea
+                      v-model="row.example"
+                      class="param-table__cell param-table__cell--inner param-table__value-input"
+                      rows="1"
+                      :placeholder="t('common.value')"
+                      @focus="onFormDataValueFocus"
+                      @blur="onFormDataValueBlur"
+                      @input="onFormDataValueInput(idx, $event)"
+                    />
+                  </div>
                   <label v-else class="param-table__file">
                     <input
                       type="file"
@@ -599,7 +631,10 @@
               :class="{ 'interface-response-tabs__tab--active': responseTab === 'body' }"
               @click="responseTab = 'body'"
             >
-              {{ isGrpc ? t('request.response') : t('response.body') }}
+              {{ isWs ? t('response.messages') : isGrpc ? t('request.response') : t('response.body') }}
+              <span v-if="isWs && wsMessages.length" class="interface-response-tabs__badge">
+                {{ wsMessages.length }}
+              </span>
             </button>
             <button
               type="button"
@@ -608,12 +643,43 @@
               @click="responseTab = 'headers'"
             >
               {{ isGrpc ? t('request.metadata') : t('response.headers') }}
-              <span v-if="response?.headers?.length" class="interface-response-tabs__badge">
-                {{ response.headers.length }}
+              <span
+                v-if="(isWs ? wsResponseHeaders : response?.headers)?.length"
+                class="interface-response-tabs__badge"
+              >
+                {{ (isWs ? wsResponseHeaders : response?.headers)?.length }}
               </span>
             </button>
           </div>
-          <div v-if="response && !sending" class="interface-response-bar__right">
+          <div v-if="isWs" class="interface-response-bar__right">
+            <div class="interface-response-meta">
+              <span
+                class="interface-response-meta__status"
+                :class="wsConnected ? 'ok' : wsConnectError ? 'err' : ''"
+              >
+                {{
+                  wsConnected
+                    ? t('request.wsConnected')
+                    : wsConnectError
+                      ? t('request.wsError')
+                      : t('request.wsIdle')
+                }}
+              </span>
+              <template v-if="wsStatusText">
+                <span class="interface-response-meta__sep" aria-hidden="true" />
+                <span class="interface-response-meta__item">{{ wsStatusText }}</span>
+              </template>
+              <button
+                v-if="wsMessages.length"
+                type="button"
+                class="btn interface-response-clear"
+                @click="clearWsMessages"
+              >
+                {{ t('response.clearMessages') }}
+              </button>
+            </div>
+          </div>
+          <div v-else-if="response && !sending" class="interface-response-bar__right">
             <div
               v-if="responseTab === 'body' && !isSendError"
               class="body-format-switch interface-response-type-switch"
@@ -642,7 +708,44 @@
         </div>
 
         <div class="interface-response-content">
-          <div v-if="sending" class="interface-response-loading" role="status" aria-live="polite">
+          <template v-if="isWs">
+            <div v-if="responseTab === 'body'" class="ws-message-list" ref="wsMessageListRef">
+              <p v-if="!wsMessages.length" class="interface-response-empty muted">
+                {{ t('response.wsEmpty') }}
+              </p>
+              <div
+                v-for="msg in wsMessages"
+                :key="msg.id"
+                class="ws-message"
+                :class="`ws-message--${msg.direction}`"
+              >
+                <div class="ws-message__meta">
+                  <span class="ws-message__dir">{{ wsDirectionLabel(msg.direction) }}</span>
+                  <span class="ws-message__type">{{ msg.messageType }}</span>
+                  <span class="ws-message__time">{{ formatWsTime(msg.at) }}</span>
+                </div>
+                <pre class="ws-message__body">{{ msg.data }}</pre>
+              </div>
+            </div>
+            <div v-else class="interface-response-headers-table">
+              <div class="interface-response-headers-table__head">
+                <span>{{ t('common.key') }}</span>
+                <span>{{ t('common.value') }}</span>
+              </div>
+              <div
+                v-for="(h, i) in wsResponseHeaders"
+                :key="`${h.key}-${i}`"
+                class="interface-response-headers-table__row"
+              >
+                <span class="interface-response-headers-table__key">{{ h.key }}</span>
+                <span class="interface-response-headers-table__value">{{ h.value }}</span>
+              </div>
+              <p v-if="!wsResponseHeaders.length" class="interface-response-empty muted">
+                {{ t('response.empty') }}
+              </p>
+            </div>
+          </template>
+          <div v-else-if="sending" class="interface-response-loading" role="status" aria-live="polite">
             <div class="interface-response-loading__spinner" aria-hidden="true" />
             <p class="interface-response-loading__text">{{ t('request.sending') }}</p>
           </div>
@@ -650,10 +753,12 @@
           <template v-else-if="response">
             <RequestBodyRawEditor
               v-if="responseTab === 'body'"
+              ref="responseBodyEditorRef"
               :model-value="responseDisplayBody"
               :content-type="responseBodyType"
               readonly
               class="interface-response-raw"
+              @scroll="onResponseBodyScroll"
             />
             <div v-else class="interface-response-headers-table">
               <div class="interface-response-headers-table__head">
@@ -697,6 +802,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
+import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { useI18n } from '../i18n'
 import { useContainerBoundedResize } from '../composables/useDragResize'
 import { useColumnResize } from '../composables/useColumnResize'
@@ -742,11 +848,37 @@ import {
 import { useToast } from '../composables/useToast'
 import { useWorkspaceContext } from '../composables/useWorkspaceContext'
 import { createTextUndo, matchUndoRedoKey } from '../composables/useTextUndo'
-import type { DictionaryEntryRow, FormDataSendField, SendResponse } from '../types'
+import type { DictionaryEntryRow, FormDataSendField, HeaderPair, SendResponse } from '../types'
 
 export type FolderOption = { id: number; name: string; parent_id: number; label: string }
 
 type QueryParamRow = ParamRow & { enabled: boolean }
+
+type WsMessageItem = {
+  id: string
+  direction: 'in' | 'out' | 'system'
+  kind: string
+  messageType: string
+  data: string
+  at: number
+}
+
+type WsSessionEventPayload = {
+  session_id: string
+  kind: 'connected' | 'sent' | 'message' | 'error' | 'closed'
+  direction: string
+  data: string
+  message_type: string
+  at_ms: number
+}
+
+type WsConnectResult = {
+  session_id: string
+  status: number
+  status_text: string
+  headers: HeaderPair[]
+  url: string
+}
 type HeaderRow = ParamRow & { enabled: boolean }
 type BodyFormat = 'none' | 'form-data' | 'raw'
 type FormDataRow = ParamRow & { enabled: boolean; fileData?: string; fileName?: string }
@@ -766,6 +898,7 @@ const props = defineProps<{
     detail?: Record<string, unknown> | null
     lastResponse?: SendResponse | null
     requestPaneTab?: RequestTabId
+    responseScrollTop?: number
   } | null
 }>()
 
@@ -1132,10 +1265,11 @@ const grpcRequestTabs: { id: RequestTabId; labelKey: string }[] = [
 ]
 
 const isGrpc = computed(() => protocolFamily(protocol.value) === 'grpc')
+const isWs = computed(() => protocolFamily(protocol.value) === 'ws')
 
 const requestTabs = computed(() => {
   if (isGrpc.value) return grpcRequestTabs
-  if (protocolFamily(protocol.value) === 'ws') {
+  if (isWs.value) {
     return allRequestTabs.filter((tab) => tab.id !== 'authorization')
   }
   return allRequestTabs
@@ -1162,11 +1296,19 @@ const authTypeOptions = computed(() => [
   { value: 'basic', label: t('request.authBasic') },
 ])
 
-const bodyFormats = computed(() => [
-  { value: 'none' as const, label: t('request.bodyNone') },
-  { value: 'form-data' as const, label: t('request.bodyFormData') },
-  { value: 'raw' as const, label: t('request.bodyRaw') },
-])
+const bodyFormats = computed(() => {
+  if (isWs.value) {
+    return [
+      { value: 'none' as const, label: t('request.bodyNone') },
+      { value: 'raw' as const, label: t('request.bodyRaw') },
+    ]
+  }
+  return [
+    { value: 'none' as const, label: t('request.bodyNone') },
+    { value: 'form-data' as const, label: t('request.bodyFormData') },
+    { value: 'raw' as const, label: t('request.bodyRaw') },
+  ]
+})
 
 const formDataTypeOptions = computed(() => [
   { value: 'string', label: '[string]' },
@@ -1179,12 +1321,18 @@ const {
   dragging: responseDragging,
   startDrag: startResponseDrag,
   clampToContainer: clampResponseHeight,
+  reloadFromStorage: reloadResponseHeight,
 } = useContainerBoundedResize(splitContainerRef, {
   axis: 'y',
   min: 120,
   initial: 280,
   maxRatio: 0.75,
-  storageKey: 'interface_response_height',
+  // Per-interface height; legacy global key used only as first-time fallback.
+  storageKey: () =>
+    props.interfaceId != null
+      ? `interface_response_height:${props.interfaceId}`
+      : 'interface_response_height:create',
+  fallbackStorageKey: 'interface_response_height',
 })
 const {
   size: grpcListWidth,
@@ -1198,9 +1346,28 @@ const {
   storageKey: 'grpc_method_list_width',
 })
 
+watch(
+  () => props.interfaceId,
+  () => {
+    reloadResponseHeight()
+  },
+)
+
 const folders = ref<FolderOption[]>([])
 const saveUi = ref<'idle' | 'saving' | 'saved'>('idle')
 const sending = ref(false)
+const wsConnected = ref(false)
+const wsConnecting = ref(false)
+const wsDisconnecting = ref(false)
+const wsSending = ref(false)
+const wsSessionId = ref<string | null>(null)
+const wsMessages = ref<WsMessageItem[]>([])
+const wsResponseHeaders = ref<HeaderPair[]>([])
+const wsStatusText = ref('')
+const wsConnectError = ref(false)
+const wsMessageListRef = ref<HTMLElement | null>(null)
+let wsEventUnlisten: UnlistenFn | null = null
+let wsMsgSeq = 0
 let saveUiTimer: ReturnType<typeof setTimeout> | null = null
 const protocol = ref<Protocol>('HTTP')
 const method = ref('POST')
@@ -1230,6 +1397,9 @@ watch(protocol, (next) => {
   if (!allowed.includes(method.value)) {
     method.value = allowed[0] ?? 'GET'
   }
+  if (protocolFamily(next) !== 'ws' && (wsConnected.value || wsSessionId.value)) {
+    void disconnectWsSession(true)
+  }
   if (protocolFamily(next) === 'grpc') {
     if (requestTab.value !== 'message' && requestTab.value !== 'metadata') {
       requestTab.value = 'message'
@@ -1244,12 +1414,17 @@ watch(protocol, (next) => {
   if (requestTab.value === 'message' || requestTab.value === 'metadata') {
     requestTab.value = 'body'
   }
-  if (protocolFamily(next) === 'ws' && requestTab.value === 'authorization') {
-    requestTab.value = 'body'
+  if (protocolFamily(next) === 'ws') {
+    if (requestTab.value === 'authorization') requestTab.value = 'body'
+    if (bodyFormat.value !== 'raw') bodyFormat.value = 'raw'
   }
 })
 
 const urlBase = ref('')
+/** Raw URL bar text. Kept as typed while editing; rebuilt only when Params change. */
+const urlBarText = ref('')
+/** True while parseUrlInput is applying bar → params (skip params → bar rebuild). */
+let syncingUrlFromBar = false
 const name = ref('')
 const folderId = ref<string | number | null>(null)
 const requestTab = ref<RequestTabId>('body')
@@ -1349,9 +1524,9 @@ const {
   start: startTableColResize,
 } = useColumnResize(
   'request_table_col_widths',
-  { key: 300, type: 90, value: 400, desc: 400 }, // 默认
-  { key: 150, type: 90, value: 200, desc: 80 },  // 最小
-  { key: 400, type: 140, value: 500, desc: 500 }, // 最大
+  { key: 300, type: 90, value: 400, desc: 400 }, // default
+  { key: 150, type: 90, value: 200, desc: 80 },  // min
+  { key: 400, type: 140, value: 500, desc: 500 }, // max
 )
 
 const paramGridColumns = computed(
@@ -1450,6 +1625,11 @@ type ResponseBodyType = 'JSON' | 'Text'
 const response = ref<SendResponse | null>(null)
 const responseTab = ref<'body' | 'headers'>('body')
 const responseBodyType = ref<ResponseBodyType>('JSON')
+const responseScrollTop = ref(0)
+const responseBodyEditorRef = ref<{
+  getScrollTop: () => number
+  setScrollTop: (top: number) => void
+} | null>(null)
 const responseBodyTypes = computed(() => [
   { value: 'JSON' as const, label: t('response.bodyJson') },
   { value: 'Text' as const, label: t('response.bodyText') },
@@ -1459,6 +1639,33 @@ const responseDisplayBody = computed(() => {
   const raw = response.value?.body ?? ''
   if (responseBodyType.value !== 'JSON') return raw
   return formatJsonLenient(raw.trim()) ?? raw
+})
+
+function onResponseBodyScroll(top: number) {
+  responseScrollTop.value = top
+}
+
+function restoreResponseBodyScroll(top = responseScrollTop.value) {
+  const next = Math.max(0, Number(top) || 0)
+  responseScrollTop.value = next
+  void nextTick(() => {
+    void nextTick(() => {
+      responseBodyEditorRef.value?.setScrollTop(next)
+    })
+  })
+}
+
+watch(responseTab, (tab) => {
+  if (tab === 'body' && response.value && !isSendError.value) {
+    restoreResponseBodyScroll()
+  }
+})
+
+watch(responseDisplayBody, () => {
+  // Doc rewrite resets CM scroll; re-apply after content settles when we have a saved offset.
+  if (responseTab.value === 'body' && responseScrollTop.value > 0) {
+    restoreResponseBodyScroll()
+  }
 })
 
 const responseBodySize = computed(() => {
@@ -1501,6 +1708,7 @@ function invokeErrorMessage(e: unknown): string {
 }
 
 function applySendError(e: unknown, durationMs = 0) {
+  responseScrollTop.value = 0
   response.value = {
     status: 0,
     status_text: 'Error',
@@ -1591,9 +1799,14 @@ function onImportFormDataJson(payload: { mode: FormDataImportMode; jsonText: str
   try {
     const imported = applyFormDataJsonImport(formDataFields.value, payload.jsonText, payload.mode)
     formDataFields.value = imported.map((row) => ({
-      ...row,
-      fileData: undefined,
-      fileName: undefined,
+      name: row.name,
+      type: row.type,
+      example: row.example,
+      description: row.description,
+      required: row.required,
+      enabled: row.enabled,
+      fileData: row.type === 'file' ? row.fileData : undefined,
+      fileName: row.type === 'file' ? row.fileName : undefined,
     }))
     normalizeFormDataFields()
     importJsonDialogOpen.value = false
@@ -1617,6 +1830,63 @@ function onFormDataChange(idx: number) {
   if (idx !== formDataFields.value.length - 1) return
   if (isParamRowEmpty(formDataFields.value[idx])) return
   normalizeFormDataFields()
+}
+
+const FORM_DATA_VALUE_MAX_HEIGHT = 240
+
+function formDataValueShell(el: HTMLTextAreaElement): HTMLElement | null {
+  return el.closest('.param-table__value-shell') as HTMLElement | null
+}
+
+function formDataValueMaxWidthPx(el: HTMLTextAreaElement): number {
+  const cell = el.closest('.param-table__value') as HTMLElement | null
+  const table = el.closest('.param-table') as HTMLElement | null
+  if (!cell || !table) return Math.max(el.offsetWidth, 160)
+  const cellRect = cell.getBoundingClientRect()
+  const tableRect = table.getBoundingClientRect()
+  // Allow growing past the Value column up to the table's right edge.
+  return Math.max(Math.floor(tableRect.right - cellRect.left - 16), Math.floor(cellRect.width - 12), 160)
+}
+
+function resizeFormDataValueInput(el: HTMLTextAreaElement, expanded: boolean) {
+  const shell = formDataValueShell(el)
+  if (!shell) return
+  if (!expanded) {
+    shell.style.height = ''
+    shell.style.width = ''
+    shell.style.maxWidth = ''
+    el.style.height = ''
+    el.style.overflowY = ''
+    return
+  }
+  shell.style.maxWidth = `${formDataValueMaxWidthPx(el)}px`
+  el.style.overflowY = 'hidden'
+  el.style.height = '0px'
+  const needed = el.scrollHeight + 2
+  const next = Math.min(Math.max(needed, 34), FORM_DATA_VALUE_MAX_HEIGHT)
+  shell.style.height = `${next}px`
+  el.style.height = '100%'
+  el.style.overflowY = needed > FORM_DATA_VALUE_MAX_HEIGHT ? 'auto' : 'hidden'
+}
+
+function onFormDataValueFocus(event: FocusEvent) {
+  const el = event.target as HTMLTextAreaElement
+  requestAnimationFrame(() => {
+    if (document.activeElement === el) resizeFormDataValueInput(el, true)
+  })
+}
+
+function onFormDataValueBlur(event: FocusEvent) {
+  const el = event.target as HTMLTextAreaElement
+  resizeFormDataValueInput(el, false)
+}
+
+function onFormDataValueInput(idx: number, event: Event) {
+  onFormDataChange(idx)
+  const el = event.target as HTMLTextAreaElement
+  if (document.activeElement === el) {
+    resizeFormDataValueInput(el, true)
+  }
 }
 
 function onFormDataTypeChange(idx: number) {
@@ -1776,6 +2046,8 @@ function decodeQueryComponent(value: string) {
   try {
     return decodeURIComponent(value.replace(/\+/g, ' '))
   } catch {
+    // Incomplete sequences like "%2" must stay as-is; re-encoding "%2" → "%252"
+    // would make Backspace appear to "put characters back".
     return value.replace(/\+/g, ' ')
   }
 }
@@ -1789,9 +2061,16 @@ function buildQuerySuffix() {
   return `?${qs}`
 }
 
+function syncUrlBarFromParams() {
+  if (syncingUrlFromBar) return
+  urlBarText.value = `${urlBase.value}${buildQuerySuffix()}`
+}
+
+watch(queryParams, syncUrlBarFromParams, { deep: true })
+
 const displayUrl = computed({
   get() {
-    return `${urlBase.value}${buildQuerySuffix()}`
+    return urlBarText.value
   },
   set(val: string) {
     parseUrlInput(val)
@@ -1920,67 +2199,76 @@ function parseUrlInput(raw: string) {
   // Strip BOM / leading/trailing whitespace (CR/LF/space). A leading newline
   // survives in <input> value and breaks caret alignment vs the highlight layer.
   raw = raw.replace(/^\uFEFF/, '').trim()
-  if (!raw) {
-    urlBase.value = ''
-    clearQueryParams()
-    return
-  }
-
-  // Keep scheme in the URL bar; only update protocol metadata.
-  // After create, only allow same-family protocol changes.
-  const setProtocolFromUrl = (next: Protocol) => {
-    if (isCreateMode.value || switchableProtocols(protocol.value, false).includes(next)) {
-      protocol.value = next
+  // Keep the bar text exactly as typed (after trim). Do not rebuild from decoded
+  // params on each keystroke — that rewrites incomplete escapes (e.g. "%2"→"%252")
+  // and drops a trailing "?" before any key is entered.
+  syncingUrlFromBar = true
+  try {
+    if (!raw) {
+      urlBase.value = ''
+      clearQueryParams()
+      return
     }
-  }
-  if (/^https:\/\//i.test(raw)) {
-    setProtocolFromUrl('HTTPS')
-  } else if (/^http:\/\//i.test(raw)) {
-    setProtocolFromUrl('HTTP')
-  } else if (/^wss:\/\//i.test(raw)) {
-    setProtocolFromUrl('WS')
-  } else if (/^ws:\/\//i.test(raw)) {
-    setProtocolFromUrl('WS')
-  } else if (/^tcp:\/\//i.test(raw)) {
-    setProtocolFromUrl('TCP')
-  } else if (/^udp:\/\//i.test(raw)) {
-    setProtocolFromUrl('UDP')
-  }
 
-  const hashIndex = raw.indexOf('#')
-  const withoutHash = hashIndex >= 0 ? raw.slice(0, hashIndex) : raw
-  const hash = hashIndex >= 0 ? raw.slice(hashIndex) : ''
-  const qIndex = withoutHash.indexOf('?')
+    // Keep scheme in the URL bar; only update protocol metadata.
+    // After create, only allow same-family protocol changes.
+    const setProtocolFromUrl = (next: Protocol) => {
+      if (isCreateMode.value || switchableProtocols(protocol.value, false).includes(next)) {
+        protocol.value = next
+      }
+    }
+    if (/^https:\/\//i.test(raw)) {
+      setProtocolFromUrl('HTTPS')
+    } else if (/^http:\/\//i.test(raw)) {
+      setProtocolFromUrl('HTTP')
+    } else if (/^wss:\/\//i.test(raw)) {
+      setProtocolFromUrl('WS')
+    } else if (/^ws:\/\//i.test(raw)) {
+      setProtocolFromUrl('WS')
+    } else if (/^tcp:\/\//i.test(raw)) {
+      setProtocolFromUrl('TCP')
+    } else if (/^udp:\/\//i.test(raw)) {
+      setProtocolFromUrl('UDP')
+    }
 
-  if (qIndex === -1) {
-    // Keep exactly what was typed (e.g. "http://"); never force "/".
-    urlBase.value = `${withoutHash}${hash}`
-    clearQueryParams()
-    return
-  }
+    const hashIndex = raw.indexOf('#')
+    const withoutHash = hashIndex >= 0 ? raw.slice(0, hashIndex) : raw
+    const hash = hashIndex >= 0 ? raw.slice(hashIndex) : ''
+    const qIndex = withoutHash.indexOf('?')
 
-  urlBase.value = `${withoutHash.slice(0, qIndex)}${hash}`
-  const search = withoutHash.slice(qIndex + 1)
-  if (!search) {
-    clearQueryParams()
-    return
-  }
+    if (qIndex === -1) {
+      // Keep exactly what was typed (e.g. "http://"); never force "/".
+      urlBase.value = `${withoutHash}${hash}`
+      clearQueryParams()
+      return
+    }
 
-  const rows: QueryParamRow[] = []
-  for (const part of search.split('&')) {
-    if (!part) continue
-    const eq = part.indexOf('=')
-    const key = eq >= 0 ? part.slice(0, eq) : part
-    const value = eq >= 0 ? part.slice(eq + 1) : ''
-    rows.push({
-      ...emptyRow(),
-      name: decodeQueryComponent(key),
-      example: decodeQueryComponent(value),
-      enabled: true,
-    })
+    urlBase.value = `${withoutHash.slice(0, qIndex)}${hash}`
+    const search = withoutHash.slice(qIndex + 1)
+    if (!search) {
+      clearQueryParams()
+      return
+    }
+
+    const rows: QueryParamRow[] = []
+    for (const part of search.split('&')) {
+      if (!part) continue
+      const eq = part.indexOf('=')
+      const key = eq >= 0 ? part.slice(0, eq) : part
+      const value = eq >= 0 ? part.slice(eq + 1) : ''
+      rows.push({
+        ...emptyRow(),
+        name: decodeQueryComponent(key),
+        example: decodeQueryComponent(value),
+        enabled: true,
+      })
+    }
+    queryParams.value = rows
+    normalizeQueryParams()
+  } finally {
+    urlBarText.value = raw
+    syncingUrlFromBar = false
   }
-  queryParams.value = rows
-  normalizeQueryParams()
 }
 
 /** Persist URL as typed (including scheme/host). Never force a leading "/". */
@@ -2019,6 +2307,237 @@ function resolveRequestUrl(rawInput?: string): string | null {
     return new URL(`${scheme}://${hostPath}`).href
   } catch {
     return null
+  }
+}
+
+/** WS send needs ws/wss. Map http(s) typed in the bar to the websocket scheme. */
+function toWebSocketUrl(url: string): string {
+  if (/^https:\/\//i.test(url)) return `wss://${url.slice(url.indexOf('://') + 3)}`
+  if (/^http:\/\//i.test(url)) return `ws://${url.slice(url.indexOf('://') + 3)}`
+  return url
+}
+
+const wsCanSend = computed(() => {
+  if (bodyFormat.value === 'none') return false
+  if (bodyFormat.value === 'raw') return Boolean(bodyRaw.value.trim())
+  return false
+})
+
+function appendWsMessage(partial: Omit<WsMessageItem, 'id' | 'at'> & { at?: number }) {
+  wsMsgSeq += 1
+  wsMessages.value.push({
+    id: `m-${wsMsgSeq}`,
+    at: partial.at ?? Date.now(),
+    direction: partial.direction,
+    kind: partial.kind,
+    messageType: partial.messageType,
+    data: partial.data,
+  })
+  void nextTick(() => {
+    const el = wsMessageListRef.value
+    if (el) el.scrollTop = el.scrollHeight
+  })
+}
+
+function clearWsMessages() {
+  wsMessages.value = []
+}
+
+function formatWsTime(at: number) {
+  try {
+    return new Date(at).toLocaleTimeString()
+  } catch {
+    return String(at)
+  }
+}
+
+function wsDirectionLabel(direction: WsMessageItem['direction']) {
+  if (direction === 'in') return t('response.wsIncoming')
+  if (direction === 'out') return t('response.wsOutgoing')
+  return t('response.wsSystem')
+}
+
+function resetWsUiState() {
+  wsConnected.value = false
+  wsConnecting.value = false
+  wsDisconnecting.value = false
+  wsSending.value = false
+  wsSessionId.value = null
+  wsStatusText.value = ''
+}
+
+async function ensureWsEventListener() {
+  if (wsEventUnlisten) return
+  wsEventUnlisten = await listen<WsSessionEventPayload>('ws-session-event', (event) => {
+    const payload = event.payload
+    if (!payload?.session_id) return
+    if (wsSessionId.value && payload.session_id !== wsSessionId.value) return
+
+    const direction =
+      payload.direction === 'in' || payload.direction === 'out' || payload.direction === 'system'
+        ? payload.direction
+        : 'system'
+
+    if (payload.kind === 'connected') {
+      wsConnected.value = true
+      wsConnecting.value = false
+      wsConnectError.value = false
+      appendWsMessage({
+        direction: 'system',
+        kind: payload.kind,
+        messageType: payload.message_type || 'system',
+        data: payload.data,
+      })
+      return
+    }
+
+    if (payload.kind === 'sent' || payload.kind === 'message') {
+      appendWsMessage({
+        direction,
+        kind: payload.kind,
+        messageType: payload.message_type || 'text',
+        data: payload.data,
+      })
+      return
+    }
+
+    if (payload.kind === 'error') {
+      wsConnectError.value = true
+      appendWsMessage({
+        direction: 'system',
+        kind: payload.kind,
+        messageType: 'error',
+        data: payload.data,
+      })
+      return
+    }
+
+    if (payload.kind === 'closed') {
+      appendWsMessage({
+        direction: 'system',
+        kind: payload.kind,
+        messageType: payload.message_type || 'system',
+        data: payload.data || t('request.wsDisconnected'),
+      })
+      wsConnected.value = false
+      wsConnecting.value = false
+      wsDisconnecting.value = false
+      wsSending.value = false
+      wsSessionId.value = null
+      if (!wsStatusText.value.includes('101')) {
+        wsStatusText.value = payload.data || t('request.wsDisconnected')
+      }
+    }
+  })
+}
+
+async function disconnectWsSession(silent = false) {
+  const sessionId = wsSessionId.value
+  if (!sessionId) {
+    resetWsUiState()
+    return
+  }
+  wsDisconnecting.value = true
+  try {
+    await invoke('ws_disconnect', { args: { session_id: sessionId } })
+  } catch (e) {
+    if (!silent) {
+      appendWsMessage({
+        direction: 'system',
+        kind: 'error',
+        messageType: 'error',
+        data: invokeErrorMessage(e),
+      })
+    }
+  } finally {
+    // Closed event will clear session; fall back if it never arrives.
+    window.setTimeout(() => {
+      if (wsSessionId.value === sessionId) resetWsUiState()
+    }, 800)
+  }
+}
+
+async function onWsConnectToggle() {
+  if (wsConnected.value || wsSessionId.value) {
+    await disconnectWsSession()
+    return
+  }
+  await refreshEnvVars()
+  const substituted = applyEnvVars(displayUrl.value.trim(), envVarMap.value)
+  const url = resolveRequestUrl(substituted)
+  if (!url) {
+    showToast(t('request.invalidUrl'), 1500, 'warning')
+    return
+  }
+  await ensureWsEventListener()
+  wsConnecting.value = true
+  wsConnectError.value = false
+  wsStatusText.value = ''
+  responseTab.value = 'body'
+  try {
+    const result = await invoke<WsConnectResult>('ws_connect', {
+      args: {
+        url: toWebSocketUrl(url),
+        headers: buildSendHeaders(),
+        variables: Object.keys(envVarMap.value).length ? envVarMap.value : null,
+      },
+    })
+    wsSessionId.value = result.session_id
+    wsResponseHeaders.value = result.headers ?? []
+    wsStatusText.value = result.status
+      ? `${result.status} ${result.status_text}`
+      : result.status_text
+    wsConnected.value = true
+    wsConnectError.value = false
+    // Connected system line also comes from backend event; keep UI responsive immediately.
+  } catch (e) {
+    wsConnectError.value = true
+    wsConnected.value = false
+    wsSessionId.value = null
+    const msg = invokeErrorMessage(e)
+    wsStatusText.value = msg
+    appendWsMessage({
+      direction: 'system',
+      kind: 'error',
+      messageType: 'error',
+      data: msg,
+    })
+  } finally {
+    wsConnecting.value = false
+    emit('state-change')
+  }
+}
+
+async function onWsSend() {
+  if (!wsConnected.value || !wsSessionId.value) {
+    showToast(t('request.wsNeedConnect'), 1500, 'warning')
+    return
+  }
+  const body = bodyFormat.value === 'raw' ? bodyRaw.value : ''
+  if (!body.trim()) {
+    showToast(t('request.wsEmptyBody'), 1500, 'warning')
+    return
+  }
+  await refreshEnvVars()
+  wsSending.value = true
+  responseTab.value = 'body'
+  try {
+    await invoke('ws_send', {
+      args: {
+        session_id: wsSessionId.value,
+        body,
+        variables: Object.keys(envVarMap.value).length ? envVarMap.value : null,
+      },
+    })
+  } catch (e) {
+    appendWsMessage({
+      direction: 'system',
+      kind: 'error',
+      messageType: 'error',
+      data: invokeErrorMessage(e),
+    })
+  } finally {
+    wsSending.value = false
   }
 }
 
@@ -2336,6 +2855,10 @@ function applyInitial(resetUi = false) {
   if (response.value) {
     responseBodyType.value = detectResponseBodyType(response.value.body ?? '')
   }
+  responseScrollTop.value =
+    typeof init?.responseScrollTop === 'number' && Number.isFinite(init.responseScrollTop)
+      ? Math.max(0, init.responseScrollTop)
+      : 0
   if (resetUi) {
     requestTab.value = requestTabForProtocol(init?.requestPaneTab, protocol.value)
   }
@@ -2478,6 +3001,10 @@ function applyInitial(resetUi = false) {
   } else {
     resetGrpcState()
   }
+
+  if (response.value && !isSendError.value && responseTab.value === 'body') {
+    restoreResponseBodyScroll(responseScrollTop.value)
+  }
 }
 
 async function loadFolders() {
@@ -2518,6 +3045,7 @@ async function onSend() {
       return
     }
     sending.value = true
+    responseScrollTop.value = 0
     response.value = null
     responseTab.value = 'body'
     const grpcStarted = Date.now()
@@ -2535,6 +3063,7 @@ async function onSend() {
           variables: Object.keys(envVarMap.value).length ? envVarMap.value : null,
         },
       })
+      responseScrollTop.value = 0
       response.value = result
       responseBodyType.value = detectResponseBodyType(result.body ?? '')
       responseTab.value = 'body'
@@ -2556,6 +3085,7 @@ async function onSend() {
     }
   }
   sending.value = true
+  responseScrollTop.value = 0
   response.value = null
   responseTab.value = 'body'
   const started = Date.now()
@@ -2571,6 +3101,7 @@ async function onSend() {
         variables: Object.keys(envVarMap.value).length ? envVarMap.value : null,
       },
     })
+    responseScrollTop.value = 0
     response.value = result
     responseBodyType.value = detectResponseBodyType(result.body ?? '')
     responseTab.value = 'body'
@@ -2583,6 +3114,11 @@ async function onSend() {
 }
 
 function exportTabState() {
+  const liveScroll =
+    responseTab.value === 'body'
+      ? (responseBodyEditorRef.value?.getScrollTop() ?? responseScrollTop.value)
+      : responseScrollTop.value
+  responseScrollTop.value = liveScroll
   return {
     name: name.value,
     method: method.value,
@@ -2590,6 +3126,7 @@ function exportTabState() {
     folderId: folderId.value,
     lastResponse: response.value,
     requestPaneTab: requestTab.value,
+    responseScrollTop: liveScroll,
     detail: {
       ...buildDetail(),
       folder_id: folderId.value,
@@ -2734,6 +3271,11 @@ onUnmounted(() => {
     clearTimeout(saveUiTimer)
     saveUiTimer = null
   }
+  void disconnectWsSession(true)
+  if (wsEventUnlisten) {
+    wsEventUnlisten()
+    wsEventUnlisten = null
+  }
 })
 
 watch(
@@ -2787,12 +3329,13 @@ watch(
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 .body-pane > .param-table .param-table__row--head {
   position: sticky;
   top: 0;
-  z-index: 2;
+  z-index: 4;
 }
 
 .body-format-row {
@@ -2996,7 +3539,7 @@ watch(
 }
 
 .param-table {
-  --param-table-head-height: 34px;
+  --param-table-head-height: 40px;
   border: 1px solid var(--color-interface-bar-border);
   border-radius: var(--raw-editor-selection-radius);
   overflow: hidden;
@@ -3036,7 +3579,8 @@ watch(
 }
 
 .param-table__row--head {
-  --param-table-head-height: 34px;
+  --param-table-head-height: 40px;
+  height: var(--param-table-head-height);
   min-height: var(--param-table-head-height);
   background: var(--color-workspace-content);
   pointer-events: none;
@@ -3045,6 +3589,9 @@ watch(
 
 .param-table__row--head .param-table__check {
   pointer-events: auto;
+  margin: 0;
+  height: 100%;
+  align-self: stretch;
 }
 
 .param-table__head-cell,
@@ -3184,17 +3731,82 @@ watch(
 }
 
 .param-table__value {
+  position: relative;
   min-width: 0;
   height: 100%;
   min-height: 42px;
   display: flex;
-  align-items: center;
+  /* Keep shell at margin-top (3px), matching absolute top when focused — avoid 1px jump from centering. */
+  align-items: flex-start;
+}
+
+.param-table__row:has(.param-table__value-shell:focus-within) {
+  z-index: 3;
 }
 
 .param-table__cell--inner {
   flex: 1;
   min-width: 0;
   width: calc(100% - 12px);
+}
+
+.param-table__value-shell {
+  flex: 1;
+  min-width: 0;
+  width: calc(100% - 12px);
+  height: 34px;
+  margin: 3px 6px;
+  display: flex;
+  align-items: stretch;
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  border-radius: 4px;
+}
+
+.param-table__value-shell:focus-within {
+  position: absolute;
+  left: 6px;
+  top: 3px;
+  z-index: 3;
+  width: calc(100% - 12px);
+  height: auto;
+  min-height: 34px;
+  max-height: 240px;
+  margin: 0;
+  border-color: var(--color-primary);
+  background: var(--color-workspace-content);
+  box-shadow: 0 4px 16px color-mix(in srgb, #000 28%, transparent);
+  overflow: hidden;
+  resize: both;
+}
+
+.param-table__value-input {
+  resize: none;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  border: none;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  /* 6+20+6 = 32 matches shell content box (34 - 2px border). */
+  padding: 6px 10px;
+  line-height: 20px;
+  min-height: 0;
+  box-sizing: border-box;
+}
+
+.param-table__value-shell:focus-within .param-table__value-input {
+  border: none;
+  background: transparent;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+  /* Keep the same padding/line-height as collapsed to prevent text jump. */
+  padding: 6px 10px;
+  line-height: 20px;
+  overflow-x: hidden;
+  overflow-y: hidden;
 }
 
 .param-table__type {

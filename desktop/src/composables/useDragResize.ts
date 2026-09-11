@@ -2,14 +2,22 @@ import { onBeforeUnmount, ref, type Ref } from 'vue'
 
 type Axis = 'x' | 'y'
 
+type StorageKey = string | (() => string | undefined) | undefined
+
 type DragResizeOptions = {
   axis: Axis
   min: number
   max: number
   initial: number
-  storageKey?: string
+  storageKey?: StorageKey
+  /** Used when the dynamic key has no value yet (e.g. migrate from a global key). */
+  fallbackStorageKey?: string
   /** When true, dragging positive direction shrinks `size` (e.g. right-side panel). */
   invert?: boolean
+}
+
+function resolveStorageKey(key: StorageKey) {
+  return typeof key === 'function' ? key() : key
 }
 
 function readStored(key: string | undefined, fallback: number) {
@@ -32,8 +40,30 @@ function writeStored(key: string | undefined, value: number) {
   }
 }
 
+function readStoredWithFallback(
+  key: StorageKey,
+  fallbackStorageKey: string | undefined,
+  initial: number,
+) {
+  const primary = resolveStorageKey(key)
+  if (primary) {
+    try {
+      const raw = localStorage.getItem(primary)
+      if (raw != null) {
+        const n = Number(raw)
+        if (Number.isFinite(n)) return n
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return readStored(fallbackStorageKey, initial)
+}
+
 export function useDragResize(options: DragResizeOptions) {
-  const size = ref(readStored(options.storageKey, options.initial))
+  const size = ref(
+    readStoredWithFallback(options.storageKey, options.fallbackStorageKey, options.initial),
+  )
   const dragging = ref(false)
   let startPos = 0
   let startSize = 0
@@ -41,6 +71,18 @@ export function useDragResize(options: DragResizeOptions) {
 
   function clamp(value: number) {
     return Math.min(maxSize, Math.max(options.min, value))
+  }
+
+  function currentKey() {
+    return resolveStorageKey(options.storageKey)
+  }
+
+  function reloadFromStorage() {
+    size.value = readStoredWithFallback(
+      options.storageKey,
+      options.fallbackStorageKey,
+      options.initial,
+    )
   }
 
   function onMove(e: MouseEvent) {
@@ -52,7 +94,7 @@ export function useDragResize(options: DragResizeOptions) {
 
   function onUp() {
     dragging.value = false
-    writeStored(options.storageKey, size.value)
+    writeStored(currentKey(), size.value)
     window.removeEventListener('mousemove', onMove)
     window.removeEventListener('mouseup', onUp)
     document.body.style.removeProperty('cursor')
@@ -73,14 +115,14 @@ export function useDragResize(options: DragResizeOptions) {
 
   onBeforeUnmount(onUp)
 
-  return { size, dragging, startDrag }
+  return { size, dragging, startDrag, reloadFromStorage }
 }
 
 export function useContainerBoundedResize(
   containerRef: Ref<HTMLElement | null>,
   options: Omit<DragResizeOptions, 'max'> & { maxRatio?: number; min: number },
 ) {
-  const { size, dragging, startDrag } = useDragResize({
+  const { size, dragging, startDrag, reloadFromStorage } = useDragResize({
     ...options,
     max: options.initial * 4,
   })
@@ -95,7 +137,7 @@ export function useContainerBoundedResize(
 
   function clampToContainer() {
     size.value = Math.min(getMax(), Math.max(options.min, size.value))
-    writeStored(options.storageKey, size.value)
+    writeStored(resolveStorageKey(options.storageKey), size.value)
   }
 
   function startBoundedDrag(e: MouseEvent) {
@@ -103,5 +145,16 @@ export function useContainerBoundedResize(
     startDrag(e, getMax())
   }
 
-  return { size, dragging, startDrag: startBoundedDrag, clampToContainer }
+  function reloadAndClamp() {
+    reloadFromStorage()
+    clampToContainer()
+  }
+
+  return {
+    size,
+    dragging,
+    startDrag: startBoundedDrag,
+    clampToContainer,
+    reloadFromStorage: reloadAndClamp,
+  }
 }

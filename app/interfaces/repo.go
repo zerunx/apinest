@@ -19,7 +19,6 @@ import (
 
 type Repo struct{}
 
-// EnsureExists 校验接口是否存在于指定项目。
 func EnsureExists(ctx context.Context, projectID, interfaceID int64) error {
 	return (Repo{}).EnsureExists(ctx, projectID, interfaceID)
 }
@@ -36,12 +35,11 @@ func (Repo) EnsureExists(ctx context.Context, projectID, interfaceID int64) erro
 		return err
 	}
 	if !exists {
-		return bizerr.New("接口不存在")
+		return bizerr.New("interface not found")
 	}
 	return nil
 }
 
-// CountInProject 统计给定接口 ID 中属于指定项目的数量。
 func (Repo) CountInProject(ctx context.Context, projectID int64, ids []int64) (int, error) {
 	if len(ids) == 0 {
 		return 0, nil

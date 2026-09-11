@@ -9,8 +9,6 @@ import (
 	bizerr "nest-api/pkg/errors"
 )
 
-// RequireAccess checks workspace permission and project membership.
-// Owner/Admin can access every project in the workspace.
 func RequireAccess(ctx context.Context, userID, workspaceID, projectID int64, action workspace.Action) (*workspace.Access, error) {
 	access, err := workspace.Require(ctx, userID, workspaceID, action)
 	if err != nil {
@@ -27,7 +25,7 @@ func RequireAccess(ctx context.Context, userID, workspaceID, projectID int64, ac
 		return nil, err
 	}
 	if !ok {
-		return nil, bizerr.New("无权访问该项目")
+		return nil, bizerr.New("no permission to access this project")
 	}
 	return access, nil
 }

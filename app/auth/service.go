@@ -19,12 +19,12 @@ type Service struct{}
 
 func (Service) Register(ctx context.Context, params RegisterRequest) (LoginResponse, error) {
 	if params.Password != params.ConfirmPassword {
-		return LoginResponse{}, bizerr.New("两次输入的密码不一致")
+		return LoginResponse{}, bizerr.New("passwords do not match")
 	}
 
 	account := strings.TrimSpace(params.Account)
 	if !accountPattern.MatchString(account) {
-		return LoginResponse{}, bizerr.New("账号仅支持字母、数字和下划线")
+		return LoginResponse{}, bizerr.New("account may only contain letters, digits, and underscores")
 	}
 
 	email := strings.TrimSpace(strings.ToLower(params.Email))
@@ -37,7 +37,7 @@ func (Service) Register(ctx context.Context, params RegisterRequest) (LoginRespo
 		return LoginResponse{}, err
 	}
 	if exists {
-		return LoginResponse{}, bizerr.New("账号已存在")
+		return LoginResponse{}, bizerr.New("account already exists")
 	}
 
 	if email != "" {
@@ -49,7 +49,7 @@ func (Service) Register(ctx context.Context, params RegisterRequest) (LoginRespo
 			return LoginResponse{}, err
 		}
 		if exists {
-			return LoginResponse{}, bizerr.New("邮箱已被使用")
+			return LoginResponse{}, bizerr.New("email is already in use")
 		}
 	}
 
@@ -82,17 +82,17 @@ func (Service) Login(ctx context.Context, params LoginRequest) (LoginResponse, e
 		Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			return LoginResponse{}, bizerr.New("账号或密码错误")
+			return LoginResponse{}, bizerr.New("invalid account or password")
 		}
 		return LoginResponse{}, err
 	}
 
 	if u.Status != 1 {
-		return LoginResponse{}, bizerr.New("账号已被禁用")
+		return LoginResponse{}, bizerr.New("account is disabled")
 	}
 
 	if !utils.Verify(params.Password, u.Password) {
-		return LoginResponse{}, bizerr.New("账号或密码错误")
+		return LoginResponse{}, bizerr.New("invalid account or password")
 	}
 
 	return issueTokenPair(u)
@@ -105,7 +105,7 @@ func (Service) Me(ctx context.Context, userID int64) (UserProfile, error) {
 		Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			return UserProfile{}, bizerr.New("用户不存在")
+			return UserProfile{}, bizerr.New("user not found")
 		}
 		return UserProfile{}, err
 	}

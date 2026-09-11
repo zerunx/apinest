@@ -7,6 +7,7 @@ mod importexport;
 mod local;
 mod settings;
 mod sync;
+mod ws_send;
 
 pub use auth::*;
 pub use catalog::*;
@@ -17,3 +18,4 @@ pub use importexport::*;
 pub use local::*;
 pub use settings::*;
 pub use sync::*;
+pub use ws_send::*;

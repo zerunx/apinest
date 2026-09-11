@@ -65,10 +65,10 @@ func uniqueInterfaceIDs(ids []int64) []int64 {
 func normalizeShareName(name string) (string, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return "", bizerr.New("请输入分享名称")
+		return "", bizerr.New("share name is required")
 	}
 	if utf8.RuneCountInString(name) > shareNameMaxLen {
-		return "", bizerr.New("分享名称不能超过 50 个字符")
+		return "", bizerr.New("share name must be at most 50 characters")
 	}
 	return name, nil
 }
@@ -76,7 +76,7 @@ func normalizeShareName(name string) (string, error) {
 func (Service) validateInterfaces(ctx context.Context, projectID int64, interfaceIDs []int64) ([]int64, error) {
 	ids := uniqueInterfaceIDs(interfaceIDs)
 	if len(ids) == 0 {
-		return nil, bizerr.New("请至少选择一个接口")
+		return nil, bizerr.New("select at least one interface")
 	}
 
 	count, err := (interfaces.Repo{}).CountInProject(ctx, projectID, ids)
@@ -84,7 +84,7 @@ func (Service) validateInterfaces(ctx context.Context, projectID int64, interfac
 		return nil, err
 	}
 	if count != len(ids) {
-		return nil, bizerr.New("存在不属于该项目的接口")
+		return nil, bizerr.New("some interfaces do not belong to this project")
 	}
 	return ids, nil
 }
@@ -199,7 +199,7 @@ func (Service) Create(ctx context.Context, userID int64, params CreateRequest) (
 		code = ""
 	}
 	if code == "" {
-		return nil, bizerr.New("生成分享码失败，请重试")
+		return nil, bizerr.New("failed to generate share code, please retry")
 	}
 
 	tx, err := database.DB.Tx(ctx)
@@ -307,7 +307,7 @@ func (Service) Delete(ctx context.Context, userID int64, params DeleteRequest) e
 		return err
 	}
 	if n == 0 {
-		return bizerr.New("分享不存在")
+		return bizerr.New("share not found")
 	}
 	return nil
 }
@@ -502,7 +502,7 @@ func (Service) AccessDetail(ctx context.Context, params AccessDetailRequest) (*i
 		}
 	}
 	if !allowed {
-		return nil, bizerr.New("该接口未包含在此分享中")
+		return nil, bizerr.New("interface is not included in this share")
 	}
 
 	return interfaces.LoadDetail(ctx, row.ProjectID, params.InterfaceID)

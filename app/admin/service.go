@@ -86,13 +86,13 @@ func (Service) TransferWorkspace(ctx context.Context, workspaceID, ownerID int64
 		return err
 	}
 	if !exists {
-		return bizerr.New("目标用户不存在")
+		return bizerr.New("target user not found")
 	}
 
 	ws, err := database.DB.Workspace.Get(ctx, workspaceID)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			return bizerr.New("工作空间不存在")
+			return bizerr.New("workspace not found")
 		}
 		return err
 	}
@@ -129,14 +129,14 @@ func (Service) UpdateUser(ctx context.Context, operatorID, targetID int64, param
 		Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			return bizerr.New("用户不存在")
+			return bizerr.New("user not found")
 		}
 		return err
 	}
 
 	account := strings.TrimSpace(params.Account)
 	if !accountPattern.MatchString(account) {
-		return bizerr.New("账号仅支持字母、数字和下划线")
+		return bizerr.New("account may only contain letters, digits, and underscores")
 	}
 
 	name := strings.TrimSpace(params.Name)
@@ -152,7 +152,7 @@ func (Service) UpdateUser(ctx context.Context, operatorID, targetID int64, param
 			return err
 		}
 		if exists {
-			return bizerr.New("账号已存在")
+			return bizerr.New("account already exists")
 		}
 	}
 
@@ -165,13 +165,13 @@ func (Service) UpdateUser(ctx context.Context, operatorID, targetID int64, param
 			return err
 		}
 		if exists {
-			return bizerr.New("邮箱已被使用")
+			return bizerr.New("email is already in use")
 		}
 	}
 
 	if target.IsAdmin && !params.IsAdmin {
 		if operatorID == targetID {
-			return bizerr.New("不能取消自己的管理员权限")
+			return bizerr.New("cannot remove your own admin role")
 		}
 		count, err := database.DB.User.
 			Query().
@@ -181,12 +181,12 @@ func (Service) UpdateUser(ctx context.Context, operatorID, targetID int64, param
 			return err
 		}
 		if count == 0 {
-			return bizerr.New("至少保留一名管理员")
+			return bizerr.New("at least one admin must remain")
 		}
 	}
 
 	if target.Status == 1 && status == 0 && operatorID == targetID {
-		return bizerr.New("不能禁用自己的账号")
+		return bizerr.New("cannot disable your own account")
 	}
 
 	upd := database.DB.User.
@@ -211,7 +211,7 @@ func (Service) UpdateUser(ctx context.Context, operatorID, targetID int64, param
 
 func (Service) DeleteUser(ctx context.Context, operatorID, targetID int64) error {
 	if operatorID == targetID {
-		return bizerr.New("不能删除自己的账号")
+		return bizerr.New("cannot delete your own account")
 	}
 
 	target, err := database.DB.User.
@@ -220,7 +220,7 @@ func (Service) DeleteUser(ctx context.Context, operatorID, targetID int64) error
 		Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			return bizerr.New("用户不存在")
+			return bizerr.New("user not found")
 		}
 		return err
 	}
@@ -234,7 +234,7 @@ func (Service) DeleteUser(ctx context.Context, operatorID, targetID int64) error
 			return err
 		}
 		if count == 0 {
-			return bizerr.New("至少保留一名管理员")
+			return bizerr.New("at least one admin must remain")
 		}
 	}
 
@@ -246,7 +246,7 @@ func (Service) DeleteUser(ctx context.Context, operatorID, targetID int64) error
 		return err
 	}
 	if owned {
-		return bizerr.New("该用户仍拥有工作空间，请先转移后再删除")
+		return bizerr.New("user still owns workspaces; transfer them before deleting")
 	}
 
 	tx, err := database.DB.Tx(ctx)

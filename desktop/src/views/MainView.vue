@@ -211,7 +211,8 @@
       :confirm-label="t('common.confirm')"
       :close-on-confirm="false"
       @confirm="confirmSaveBeforeClose"
-      @update:open="onSaveBeforeCloseOpenChange"
+      @cancel="discardSaveBeforeClose"
+      @dismiss="abortSaveBeforeClose"
     />
     <EnvironmentManageDialog v-model:open="envManageOpen" />
     <ImportApiDialog
@@ -308,6 +309,7 @@ type RequestTab = {
   detail: Record<string, unknown> | null
   lastResponse: SendResponse | null
   requestPaneTab: 'params' | 'authorization' | 'headers' | 'body' | 'message' | 'metadata'
+  responseScrollTop: number
 }
 
 function cloneSendResponse(res: SendResponse | null | undefined): SendResponse | null {
@@ -469,6 +471,10 @@ function tabStateFromEditor(tab: RequestTab): RequestTab | null {
     interfaceId: activeInterfaceId.value,
     lastResponse: cloneSendResponse(state.lastResponse),
     requestPaneTab: state.requestPaneTab ?? tab.requestPaneTab ?? 'body',
+    responseScrollTop:
+      typeof state.responseScrollTop === 'number' && Number.isFinite(state.responseScrollTop)
+        ? Math.max(0, state.responseScrollTop)
+        : (tab.responseScrollTop ?? 0),
     dirty: tabIsDirty(tab, snap),
     snapshot: tab.snapshot,
   }
@@ -518,6 +524,7 @@ function createApiTab(folderId?: number): RequestTab {
     detail: { folder_id: resolvedFolderId },
     lastResponse: null,
     requestPaneTab: 'body',
+    responseScrollTop: 0,
   }
 }
 
@@ -545,6 +552,7 @@ function applyTabToForm(tab: RequestTab, options?: { remount?: boolean }) {
     },
     lastResponse: cloneSendResponse(tab.lastResponse),
     requestPaneTab: tab.requestPaneTab ?? 'body',
+    responseScrollTop: tab.responseScrollTop ?? 0,
   }
   // Remount only when explicitly requested. Default keep-alive avoids flashing
   // method/url/name/folder/body while the editor tears down and remounts.
@@ -1257,6 +1265,10 @@ async function onInterfaceSaved(id: number) {
         detail: state.detail as Record<string, unknown>,
         lastResponse: cloneSendResponse(state.lastResponse),
         requestPaneTab: state.requestPaneTab ?? active.requestPaneTab ?? 'body',
+        responseScrollTop:
+          typeof state.responseScrollTop === 'number' && Number.isFinite(state.responseScrollTop)
+            ? Math.max(0, state.responseScrollTop)
+            : (active.responseScrollTop ?? 0),
         snapshot: snap,
         dirty: false,
       })
@@ -1292,12 +1304,16 @@ function requestCloseTab(id: string) {
   saveBeforeCloseOpen.value = true
 }
 
-function onSaveBeforeCloseOpenChange(open: boolean) {
-  if (open) return
-  if (!pendingCloseTabId.value) return
+/** ESC / overlay: only close the prompt, keep the unsaved tab. */
+function abortSaveBeforeClose() {
+  pendingCloseTabId.value = ''
+}
+
+/** Cancel button: discard changes and close the tab. */
+function discardSaveBeforeClose() {
   const id = pendingCloseTabId.value
   pendingCloseTabId.value = ''
-  closeTab(id)
+  if (id) closeTab(id)
 }
 
 async function confirmSaveBeforeClose() {
@@ -1508,6 +1524,7 @@ async function onSelectApi(id: number, options?: { restore?: boolean }) {
     detail,
     lastResponse: null,
     requestPaneTab: 'body',
+    responseScrollTop: 0,
   }
   tabs.value.push(tab)
   activeTabId.value = tab.id

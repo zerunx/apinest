@@ -26,7 +26,7 @@ func (c UserService) Create(ctx context.Context, params CreateRequest) error {
 	}
 
 	if exist {
-		return bizerr.New("用户已存在")
+		return bizerr.New("user already exists")
 	}
 	// hash, err := utils.Hash(params.Password)
 
@@ -77,7 +77,7 @@ func (c UserService) Update(ctx context.Context, params UpdateRequest) error {
 
 	if err != nil {
 		if ent.IsNotFound(err) {
-			return bizerr.New("用户不存在")
+			return bizerr.New("user not found")
 		}
 		return err
 	}
@@ -97,7 +97,7 @@ func (c UserService) Update(ctx context.Context, params UpdateRequest) error {
 		}
 
 		if exist {
-			return bizerr.New("手机号已存在")
+			return bizerr.New("phone number already exists")
 		}
 	}
 

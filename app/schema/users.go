@@ -121,7 +121,6 @@ func (User) Edges() []ent.Edge {
 
 func (User) Indexes() []ent.Index {
 	return []ent.Index{
-		// Active accounts only; soft-deleted rows may reuse the same account.
 		index.Fields("account").
 			Unique().
 			Annotations(entsql.IndexWhere("deleted_at IS NULL")),

@@ -76,7 +76,7 @@ func (Service) Get(ctx context.Context, userID int64, params GetRequest) (*Item,
 		Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			return nil, bizerr.New("工作空间不存在")
+			return nil, bizerr.New("workspace not found")
 		}
 		return nil, err
 	}
@@ -95,7 +95,7 @@ func (Service) Update(ctx context.Context, userID int64, params UpdateRequest) e
 		Save(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			return bizerr.New("工作空间不存在")
+			return bizerr.New("workspace not found")
 		}
 		return err
 	}
@@ -115,7 +115,7 @@ func (Service) TransferOwner(ctx context.Context, userID int64, params TransferO
 		return err
 	}
 	if params.OwnerID == userID {
-		return bizerr.New("不能转让给自己")
+		return bizerr.New("cannot transfer to yourself")
 	}
 
 	exists, err := database.DB.User.
@@ -126,7 +126,7 @@ func (Service) TransferOwner(ctx context.Context, userID int64, params TransferO
 		return err
 	}
 	if !exists {
-		return bizerr.New("目标用户不存在")
+		return bizerr.New("target user not found")
 	}
 
 	tx, err := database.DB.Tx(ctx)
@@ -141,7 +141,7 @@ func (Service) TransferOwner(ctx context.Context, userID int64, params TransferO
 	if err != nil {
 		_ = tx.Rollback()
 		if ent.IsNotFound(err) {
-			return bizerr.New("工作空间不存在")
+			return bizerr.New("workspace not found")
 		}
 		return err
 	}

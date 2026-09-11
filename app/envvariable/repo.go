@@ -11,7 +11,6 @@ import (
 
 type Repo struct{}
 
-// EnsureExists 校验变量是否存在于指定环境。
 func EnsureExists(ctx context.Context, environmentID, variableID int64) error {
 	return (Repo{}).EnsureExists(ctx, environmentID, variableID)
 }
@@ -28,7 +27,7 @@ func (Repo) EnsureExists(ctx context.Context, environmentID, variableID int64) e
 		return err
 	}
 	if !exists {
-		return bizerr.New("变量不存在")
+		return bizerr.New("variable not found")
 	}
 	return nil
 }

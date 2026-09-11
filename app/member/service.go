@@ -64,7 +64,7 @@ func (Service) Invite(ctx context.Context, userID int64, params InviteRequest) e
 		return err
 	}
 	if !exists {
-		return bizerr.New("用户不存在")
+		return bizerr.New("user not found")
 	}
 
 	exists, err = database.DB.WorkspaceMember.
@@ -78,7 +78,7 @@ func (Service) Invite(ctx context.Context, userID int64, params InviteRequest) e
 		return err
 	}
 	if exists {
-		return bizerr.New("用户已是工作空间成员")
+		return bizerr.New("user is already a workspace member")
 	}
 
 	_, err = database.DB.WorkspaceMember.
@@ -104,12 +104,12 @@ func (Service) Update(ctx context.Context, userID int64, params UpdateRequest) e
 		Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			return bizerr.New("成员不存在")
+			return bizerr.New("member not found")
 		}
 		return err
 	}
 	if target.Role == workspace.RoleOwner {
-		return bizerr.New("不能修改 Owner 角色")
+		return bizerr.New("cannot change the owner role")
 	}
 
 	_, err = database.DB.WorkspaceMember.
@@ -133,12 +133,12 @@ func (Service) Delete(ctx context.Context, userID int64, params DeleteRequest) e
 		Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			return bizerr.New("成员不存在")
+			return bizerr.New("member not found")
 		}
 		return err
 	}
 	if target.Role == workspace.RoleOwner {
-		return bizerr.New("不能移除 Owner")
+		return bizerr.New("cannot remove the owner")
 	}
 
 	return database.DB.WorkspaceMember.DeleteOneID(params.MemberID).Exec(ctx)

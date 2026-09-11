@@ -21,6 +21,7 @@ pub fn run() {
                 .map_err(|e| format!("app data dir: {e}"))?;
             let database = Db::open(data_dir).map_err(|e| e.to_string())?;
             app.manage(database);
+            app.manage(WsHub::new());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -74,6 +75,9 @@ pub fn run() {
             delete_workspace_dictionary,
             import_system_dictionary,
             send_http_request,
+            ws_connect,
+            ws_send,
+            ws_disconnect,
             list_request_history,
             get_setting_value,
             set_setting_value,

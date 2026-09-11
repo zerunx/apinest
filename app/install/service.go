@@ -31,7 +31,7 @@ func (Service) Status() StatusResponse {
 
 func (s Service) TestDatabase(params TestDatabaseRequest) (TestDatabaseResponse, error) {
 	if params.Database.Driver == "mysql" {
-		return TestDatabaseResponse{}, bizerr.New("MySQL 将在后续版本中支持，请暂时使用 PostgreSQL")
+		return TestDatabaseResponse{}, bizerr.New("MySQL will be supported in a later version; please use PostgreSQL for now")
 	}
 
 	cfg := toDatabaseConfig(params.Database)
@@ -47,7 +47,7 @@ func (s Service) TestDatabase(params TestDatabaseRequest) (TestDatabaseResponse,
 	adminCfg.DBName = "postgres"
 
 	if err := database.TestConnection(adminCfg); err != nil {
-		return TestDatabaseResponse{}, bizerr.New("无法连接数据库，请检查主机、端口、账号和密码")
+		return TestDatabaseResponse{}, bizerr.New("cannot connect to the database; check host, port, username, and password")
 	}
 
 	return TestDatabaseResponse{
@@ -61,41 +61,41 @@ func (s Service) Install(ctx context.Context, params InstallRequest) (InstallRes
 	defer installMu.Unlock()
 
 	if runtime.IsInstalled() {
-		return InstallResponse{}, bizerr.New("系统已安装，请勿重复安装")
+		return InstallResponse{}, bizerr.New("system is already installed")
 	}
 
 	if params.Database.Driver == "mysql" {
-		return InstallResponse{}, bizerr.New("MySQL 将在后续版本中支持，请暂时使用 PostgreSQL")
+		return InstallResponse{}, bizerr.New("MySQL will be supported in a later version; please use PostgreSQL for now")
 	}
 
 	if params.Admin.Password != params.Admin.ConfirmPassword {
-		return InstallResponse{}, bizerr.New("两次输入的管理员密码不一致")
+		return InstallResponse{}, bizerr.New("admin passwords do not match")
 	}
 
 	adminAccount := strings.TrimSpace(params.Admin.Username)
 	if !accountPattern.MatchString(adminAccount) {
-		return InstallResponse{}, bizerr.New("管理员账号仅支持字母、数字和下划线")
+		return InstallResponse{}, bizerr.New("admin account may only contain letters, digits, and underscores")
 	}
 
 	appUser := params.AppDatabase.Username
 	appPassword := params.AppDatabase.Password
 
 	if !pgRoleNamePattern.MatchString(appUser) {
-		return InstallResponse{}, bizerr.New("应用数据库用户名需以小写字母开头，仅包含小写字母、数字和下划线")
+		return InstallResponse{}, bizerr.New("app database username must start with a lowercase letter and contain only lowercase letters, digits, and underscores")
 	}
 
 	if appUser == params.Database.User {
-		return InstallResponse{}, bizerr.New("应用数据库用户名不能与超级用户名相同")
+		return InstallResponse{}, bizerr.New("app database username cannot be the same as the superuser name")
 	}
 
 	cfg := toDatabaseConfig(params.Database)
 
 	if err := database.EnsureDatabase(cfg); err != nil {
-		return InstallResponse{}, bizerr.New(fmt.Sprintf("创建数据库失败: %v", err))
+		return InstallResponse{}, bizerr.New(fmt.Sprintf("failed to create database: %v", err))
 	}
 
 	if err := database.EnsureAppUser(cfg, appUser, appPassword); err != nil {
-		return InstallResponse{}, bizerr.New(fmt.Sprintf("创建应用数据库用户失败: %v", err))
+		return InstallResponse{}, bizerr.New(fmt.Sprintf("failed to create app database user: %v", err))
 	}
 
 	appCfg := cfg
@@ -103,7 +103,7 @@ func (s Service) Install(ctx context.Context, params InstallRequest) (InstallRes
 	appCfg.Password = appPassword
 
 	if err := database.InitWithConfig(appCfg); err != nil {
-		return InstallResponse{}, bizerr.New(fmt.Sprintf("初始化数据库失败: %v", err))
+		return InstallResponse{}, bizerr.New(fmt.Sprintf("failed to initialize database: %v", err))
 	}
 
 	hash, err := utils.Hash(params.Admin.Password)
@@ -120,7 +120,7 @@ func (s Service) Install(ctx context.Context, params InstallRequest) (InstallRes
 		SetStatus(1).
 		Save(ctx)
 	if err != nil {
-		return InstallResponse{}, bizerr.New(fmt.Sprintf("创建管理员失败: %v", err))
+		return InstallResponse{}, bizerr.New(fmt.Sprintf("failed to create admin: %v", err))
 	}
 
 	runtimeCfg := configs.RuntimeConfig{
@@ -139,7 +139,7 @@ func (s Service) Install(ctx context.Context, params InstallRequest) (InstallRes
 	}
 
 	if err := runtime.Save(runtimeCfg); err != nil {
-		return InstallResponse{}, bizerr.New(fmt.Sprintf("保存配置失败: %v", err))
+		return InstallResponse{}, bizerr.New(fmt.Sprintf("failed to save config: %v", err))
 	}
 
 	return InstallResponse{

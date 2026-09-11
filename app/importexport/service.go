@@ -85,7 +85,7 @@ func (Service) Export(ctx context.Context, userID int64, params ExportRequest) (
 func (Service) Import(ctx context.Context, userID int64, params ImportRequest) (*ImportResult, error) {
 	source := strings.ToLower(strings.TrimSpace(params.Source))
 	if source != SourceApinest {
-		return nil, bizerr.New("该导入格式暂未支持")
+		return nil, bizerr.New("this import format is not supported yet")
 	}
 	if _, err := project.RequireAccess(ctx, userID, params.WorkspaceID, params.ProjectID, workspace.ActionProjectCreate); err != nil {
 		return nil, err
@@ -93,7 +93,7 @@ func (Service) Import(ctx context.Context, userID int64, params ImportRequest) (
 
 	var doc Document
 	if err := json.Unmarshal(params.Document, &doc); err != nil {
-		return nil, bizerr.New("导入文件不是有效的 JSON")
+		return nil, bizerr.New("import file is not valid JSON")
 	}
 	if err := validateDocument(doc); err != nil {
 		return nil, err
@@ -137,10 +137,10 @@ func (Service) Import(ctx context.Context, userID int64, params ImportRequest) (
 
 func validateDocument(doc Document) error {
 	if !strings.EqualFold(strings.TrimSpace(doc.Format), FormatApinest) {
-		return bizerr.New("不是 ApiNest 导出文件")
+		return bizerr.New("not an ApiNest export file")
 	}
 	if doc.Version != Version {
-		return bizerr.New("不支持的导出版本")
+		return bizerr.New("unsupported export version")
 	}
 	return nil
 }
