@@ -18,6 +18,16 @@ It replaces scattered spreadsheets and private API lists, keeping API definition
 - Username: `admin`
 - Password: `123123`
 
+## Screenshots
+
+### Web
+
+<img src="docs/images/web.png" alt="ApiNest Web" width="800" />
+
+### Desktop
+
+<img src="docs/images/desktop.png" alt="ApiNest Desktop" width="800" />
+
 ## Quick start
 
 Image: [Docker Hub · zerunx/nest](https://hub.docker.com/r/zerunx/nest/tags)

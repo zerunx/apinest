@@ -33,3 +33,6 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "time",
 tokio-tungstenite = { version = "0.26", default-features = false, features = ["connect", "native-tls"] }
 futures-util = { version = "0.3", default-features = false, features = ["sink"] }
 tonic = { version = "0.12", default-features = false, features = ["transport", "tls-webpki-roots"] }
+
+[target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
+tauri-plugin-single-instance = "2"

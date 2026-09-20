@@ -18,6 +18,16 @@
 - 账号：`admin`
 - 密码：`123123`
 
+## 截图
+
+### Web
+
+<img src="docs/images/web.png" alt="ApiNest Web" width="800" />
+
+### Desktop
+
+<img src="docs/images/desktop.png" alt="ApiNest Desktop" width="800" />
+
 ## 快速开始
 
 镜像地址：[Docker Hub · zerunx/nest](https://hub.docker.com/r/zerunx/nest/tags)

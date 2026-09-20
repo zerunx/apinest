@@ -196,7 +196,11 @@
           class="interface-request-content"
           :class="{ 'interface-request-content--fill': isGrpc && requestTab === 'message' }"
         >
-          <div v-if="requestTab === 'params'" class="param-table param-table--resizable-wrap">
+          <div
+            v-if="requestTab === 'params'"
+            ref="paramTableEl"
+            class="param-table param-table--resizable-wrap"
+          >
             <ParamTableColumnResizer
               :columns="paramGridColumns"
               :handles="[false, 'key', 'value', false, false]"
@@ -335,7 +339,7 @@
               </svg>
               {{ t('request.hiddenHeaders', { n: hiddenHeaders.length }) }}
             </button>
-            <div class="param-table param-table--resizable-wrap">
+            <div ref="paramTableEl" class="param-table param-table--resizable-wrap">
             <ParamTableColumnResizer
               :columns="paramGridColumns"
               :handles="[false, 'key', 'value', false, false]"
@@ -475,7 +479,11 @@
               {{ t('request.bodyNoneHint') }}
             </p>
 
-            <div v-else-if="bodyFormat === 'form-data'" class="param-table param-table--resizable-wrap">
+            <div
+              v-else-if="bodyFormat === 'form-data'"
+              ref="paramTableEl"
+              class="param-table param-table--resizable-wrap"
+            >
               <ParamTableColumnResizer
                 :columns="formDataGridColumns"
                 :handles="[false, 'key', 'type', 'value', false, false]"
@@ -1519,23 +1527,51 @@ watch(
   { immediate: true },
 )
 const importJsonDialogOpen = ref(false)
+const paramTableEl = ref<HTMLElement | null>(null)
 const {
   widths: tableColWidths,
   start: startTableColResize,
+  fitToWidth: fitTableColWidths,
 } = useColumnResize(
   'request_table_col_widths',
   { key: 300, type: 90, value: 400, desc: 400 }, // default
   { key: 150, type: 90, value: 200, desc: 80 },  // min
-  { key: 400, type: 140, value: 500, desc: 500 }, // max
+  { key: 500, type: 140, value: 700, desc: 500 }, // max
 )
 
 const paramGridColumns = computed(
   () =>
-    `40px ${tableColWidths.value.key}px ${tableColWidths.value.value}px minmax(0, 1fr) 40px`,
+    `40px ${tableColWidths.value.key}px ${tableColWidths.value.value}px ${tableColWidths.value.desc}px 40px`,
 )
 const formDataGridColumns = computed(
   () =>
-    `40px ${tableColWidths.value.key}px ${tableColWidths.value.type}px ${tableColWidths.value.value}px minmax(0, 1fr) 72px`,
+    `40px ${tableColWidths.value.key}px ${tableColWidths.value.type}px ${tableColWidths.value.value}px ${tableColWidths.value.desc}px 72px`,
+)
+
+function currentParamTableLayout(): 'params' | 'form-data' {
+  return requestTab.value === 'body' && bodyFormat.value === 'form-data' ? 'form-data' : 'params'
+}
+
+function fitActiveParamTable() {
+  const el = paramTableEl.value
+  if (!el) return
+  fitTableColWidths(el.clientWidth, currentParamTableLayout())
+}
+
+let paramTableRo: ResizeObserver | null = null
+
+watch(
+  paramTableEl,
+  (el) => {
+    if (paramTableRo) {
+      paramTableRo.disconnect()
+      paramTableRo = null
+    }
+    if (!el || typeof ResizeObserver === 'undefined') return
+    paramTableRo = new ResizeObserver(() => fitActiveParamTable())
+    paramTableRo.observe(el)
+    fitActiveParamTable()
+  },
 )
 
 const requestHeaders = ref<HeaderRow[]>([defaultHeaderRow()])
@@ -3267,6 +3303,10 @@ onUnmounted(() => {
   baselineSnapshot.value = ''
   hideUrlVarTip()
   urlUndo.dispose()
+  if (paramTableRo) {
+    paramTableRo.disconnect()
+    paramTableRo = null
+  }
   if (saveUiTimer) {
     clearTimeout(saveUiTimer)
     saveUiTimer = null
@@ -3336,6 +3376,14 @@ watch(
   position: sticky;
   top: 0;
   z-index: 4;
+}
+
+/* Keep resize handles stuck with the sticky form-data header while scrolling. */
+.body-pane > .param-table :deep(.param-table__resize-overlay) {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  margin-bottom: calc(-1 * var(--param-table-head-height, 40px));
 }
 
 .body-format-row {
@@ -3606,6 +3654,7 @@ watch(
   color: var(--color-text-secondary);
   background: transparent;
   position: relative;
+  overflow: hidden;
 }
 
 .param-table__head-action {

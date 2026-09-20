@@ -122,7 +122,7 @@ func InsertInTx(ctx context.Context, tx *ent.Tx, userID, projectID, folderID int
 
 	name := strings.TrimSpace(params.Name)
 	if name == "" {
-		name = "æªå½åæ¥å£"
+		name = "New Interface"
 	}
 	if utf8.RuneCountInString(name) > 100 {
 		name = string([]rune(name)[:100])

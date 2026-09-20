@@ -53,7 +53,8 @@ onBeforeUnmount(onUp)
   left: 0;
   right: 0;
   height: var(--param-table-head-height, 34px);
-  z-index: 3;
+  /* Above sticky form-data head (z-index: 4) so the drag line stays visible. */
+  z-index: 5;
   pointer-events: none;
 }
 
