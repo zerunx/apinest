@@ -141,6 +141,7 @@
           class="interface-meta-row__folder"
           :options="folderOptions"
           :placeholder="t('create.selectFolder')"
+          fit-content
         />
         <input
           v-model="name"
@@ -1433,6 +1434,7 @@ const urlBase = ref('')
 const urlBarText = ref('')
 /** True while parseUrlInput is applying bar → params (skip params → bar rebuild). */
 let syncingUrlFromBar = false
+let syncingUrlFromBarToken = 0
 const name = ref('')
 const folderId = ref<string | number | null>(null)
 const requestTab = ref<RequestTabId>('body')
@@ -2073,19 +2075,9 @@ function removeHeaderRow(idx: number) {
   normalizeRequestHeaders()
 }
 
-/** Encode for URL bar display; keep `/` readable (do not show as %2F). */
+/** Pass-through: keep query key/value text exactly as shown in Params / URL. */
 function encodeQueryComponent(value: string) {
-  return encodeURIComponent(value).replace(/%2F/gi, '/')
-}
-
-function decodeQueryComponent(value: string) {
-  try {
-    return decodeURIComponent(value.replace(/\+/g, ' '))
-  } catch {
-    // Incomplete sequences like "%2" must stay as-is; re-encoding "%2" → "%252"
-    // would make Backspace appear to "put characters back".
-    return value.replace(/\+/g, ' ')
-  }
+  return value
 }
 
 function buildQuerySuffix() {
@@ -2095,6 +2087,29 @@ function buildQuerySuffix() {
     .map((r) => `${encodeQueryComponent(r.name.trim())}=${encodeQueryComponent(r.example)}`)
     .join('&')
   return `?${qs}`
+}
+
+/** Normal query names: letters/digits/._- (e.g. asd23-32, foo.bar, 2). */
+function isPlainQueryKey(name: string) {
+  return /^[A-Za-z0-9_][A-Za-z0-9_.-]*$/.test(name)
+}
+
+/**
+ * From a segment like "*(**)($%#b=fasdasd", pull a plain key at the end ("b")
+ * so junk before it can fold into the previous value.
+ */
+function extractTrailingPlainKey(beforeEq: string): { prefix: string; key: string } | null {
+  if (!beforeEq) return { prefix: '', key: '' }
+  if (isPlainQueryKey(beforeEq)) return { prefix: '', key: beforeEq }
+  const m = beforeEq.match(/([A-Za-z0-9_][A-Za-z0-9_.-]*)$/)
+  if (!m) return null
+  const key = m[1]
+  return { prefix: beforeEq.slice(0, beforeEq.length - key.length), key }
+}
+
+function appendToLastQueryValue(rows: QueryParamRow[], text: string) {
+  if (!rows.length || !text) return
+  rows[rows.length - 1].example += text
 }
 
 function syncUrlBarFromParams() {
@@ -2236,8 +2251,9 @@ function parseUrlInput(raw: string) {
   // survives in <input> value and breaks caret alignment vs the highlight layer.
   raw = raw.replace(/^\uFEFF/, '').trim()
   // Keep the bar text exactly as typed (after trim). Do not rebuild from decoded
-  // params on each keystroke — that rewrites incomplete escapes (e.g. "%2"→"%252")
-  // and drops a trailing "?" before any key is entered.
+  // params on each keystroke — that rewrites incomplete escapes and drops a
+  // trailing "?" / "&" before the next segment is entered.
+  const syncToken = ++syncingUrlFromBarToken
   syncingUrlFromBar = true
   try {
     if (!raw) {
@@ -2267,20 +2283,18 @@ function parseUrlInput(raw: string) {
       setProtocolFromUrl('UDP')
     }
 
-    const hashIndex = raw.indexOf('#')
-    const withoutHash = hashIndex >= 0 ? raw.slice(0, hashIndex) : raw
-    const hash = hashIndex >= 0 ? raw.slice(hashIndex) : ''
-    const qIndex = withoutHash.indexOf('?')
-
+    // Everything after the first "?" is query text — including "#", "%", etc.
+    // Do not treat "#" as a fragment here; that was putting "#..." into urlBase
+    // and prepending it when Params edited the bar.
+    const qIndex = raw.indexOf('?')
     if (qIndex === -1) {
-      // Keep exactly what was typed (e.g. "http://"); never force "/".
-      urlBase.value = `${withoutHash}${hash}`
+      urlBase.value = raw
       clearQueryParams()
       return
     }
 
-    urlBase.value = `${withoutHash.slice(0, qIndex)}${hash}`
-    const search = withoutHash.slice(qIndex + 1)
+    urlBase.value = raw.slice(0, qIndex)
+    const search = raw.slice(qIndex + 1)
     if (!search) {
       clearQueryParams()
       return
@@ -2288,22 +2302,66 @@ function parseUrlInput(raw: string) {
 
     const rows: QueryParamRow[] = []
     for (const part of search.split('&')) {
-      if (!part) continue
+      if (!part) {
+        // Consecutive "&&" — keep each extra "&" on the previous value.
+        appendToLastQueryValue(rows, '&')
+        continue
+      }
       const eq = part.indexOf('=')
-      const key = eq >= 0 ? part.slice(0, eq) : part
-      const value = eq >= 0 ? part.slice(eq + 1) : ''
+      if (eq < 0) {
+        // No "=": fold into the previous value.
+        appendToLastQueryValue(rows, `&${part}`)
+        continue
+      }
+
+      const before = part.slice(0, eq)
+      const after = part.slice(eq + 1)
+      const split = extractTrailingPlainKey(before)
+
+      if (split && split.prefix && rows.length) {
+        // e.g. "*(**)($%#b=fasdasd" → fold junk into previous, new row key "b"
+        appendToLastQueryValue(rows, `&${split.prefix}`)
+        rows.push({
+          ...emptyRow(),
+          name: split.key,
+          example: after,
+          enabled: true,
+        })
+        continue
+      }
+
+      if (split && !split.prefix) {
+        rows.push({
+          ...emptyRow(),
+          name: split.key,
+          example: after,
+          enabled: true,
+        })
+        continue
+      }
+
+      // No plain key (or first row with a weird name) — keep as-is, or fold all.
+      if (!isPlainQueryKey(before) && rows.length) {
+        appendToLastQueryValue(rows, `&${part}`)
+        continue
+      }
+
       rows.push({
         ...emptyRow(),
-        name: decodeQueryComponent(key),
-        example: decodeQueryComponent(value),
+        name: before,
+        example: after,
         enabled: true,
       })
     }
-    queryParams.value = rows
+    queryParams.value = rows.length ? rows : [emptyParamRow()]
     normalizeQueryParams()
   } finally {
     urlBarText.value = raw
-    syncingUrlFromBar = false
+    // queryParams watch flushes after this sync stack; clear the guard next tick
+    // so it cannot rewrite typed "?", "&", "#", or raw "%".
+    void nextTick(() => {
+      if (syncToken === syncingUrlFromBarToken) syncingUrlFromBar = false
+    })
   }
 }
 
@@ -2590,7 +2648,7 @@ function compactParams(rows: Array<ParamRow & { enabled?: boolean }>) {
     }))
 }
 
-/** Keep selected file payload so tab switch / save / reopen can still send it. */
+/** Persist file name only — never base64 payload (keeps tab switch / dirty checks fast). */
 function compactFormDataFields(rows: FormDataRow[]) {
   return rows
     .filter((r) => r.name.trim())
@@ -2607,7 +2665,6 @@ function compactFormDataFields(rows: FormDataRow[]) {
       return {
         ...base,
         file_name: r.fileName || r.example || undefined,
-        file_data: r.fileData || undefined,
       }
     })
 }
@@ -2948,10 +3005,6 @@ function applyInitial(resetUi = false) {
             type === 'file'
               ? String(x.file_name ?? x.fileName ?? x.example ?? '').trim() || undefined
               : undefined
-          const fileData =
-            type === 'file'
-              ? String(x.file_data ?? x.fileData ?? '').trim() || undefined
-              : undefined
           return {
             name: String(x.name ?? ''),
             type,
@@ -2960,7 +3013,8 @@ function applyInitial(resetUi = false) {
             example: String(x.example ?? fileName ?? ''),
             enabled: x.enabled !== false,
             fileName,
-            fileData,
+            // Never hydrate base64 from saved detail — it freezes tab/interface switching.
+            fileData: undefined,
           }
         })
       } else {
@@ -3327,12 +3381,16 @@ watch(
     const projectChanged =
       Array.isArray(prev) && (next[0] !== prev[0] || next[1] !== prev[1])
     // Project switch: wait for folders so the folder select stays consistent.
-    // Same-project tab switch: apply immediately to avoid field flash.
+    // Same-project tab open/switch: apply form first, then refresh folder labels
+    // (covers left-tree rename/create without delaying paint).
     if (projectChanged) {
       await loadFolders()
       if (!editorAlive) return
+      applyInitial(true)
+    } else {
+      applyInitial(true)
+      void loadFolders()
     }
-    applyInitial(true)
     await nextTick()
     if (!editorAlive) return
     emit('editor-ready')
@@ -3370,6 +3428,10 @@ watch(
   overflow-x: hidden;
   overflow-y: auto;
   scrollbar-gutter: stable;
+  /* Open into the response split so the box bottom + handle don't read as two lines. */
+  border-bottom: none;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
 }
 
 .body-pane > .param-table .param-table__row--head {

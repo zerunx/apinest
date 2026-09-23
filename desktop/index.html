@@ -6,8 +6,107 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ApiNest Desktop</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #f3f3f3;
+        color: #333;
+        font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        html,
+        body {
+          background: #1a1a1a;
+          color: #e8e8e8;
+        }
+
+        #app-boot-splash {
+          background: #1a1a1a;
+        }
+
+        #app-boot-splash .boot-splash__spinner {
+          border-color: rgba(255, 255, 255, 0.14);
+          border-top-color: #4da8e8;
+        }
+
+        #app-boot-splash .boot-splash__title {
+          color: #e8e8e8;
+        }
+      }
+
+      #app-boot-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 99999;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
+        background: #f3f3f3;
+        transition: opacity 0.18s ease;
+        /* Match global.css early so spinner size does not jump when it loads. */
+        box-sizing: border-box;
+      }
+
+      #app-boot-splash *,
+      #app-boot-splash *::before,
+      #app-boot-splash *::after {
+        box-sizing: border-box;
+      }
+
+      #app-boot-splash.is-leaving {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      #app-boot-splash .boot-splash__logo {
+        width: 72px;
+        height: 72px;
+        flex: 0 0 72px;
+        object-fit: contain;
+        user-select: none;
+        -webkit-user-drag: none;
+      }
+
+      #app-boot-splash .boot-splash__title {
+        margin: 0;
+        font-size: 18px;
+        line-height: 1.2;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        color: #333;
+      }
+
+      #app-boot-splash .boot-splash__spinner {
+        width: 28px;
+        height: 28px;
+        flex: 0 0 28px;
+        margin-top: 4px;
+        border: 2.5px solid rgba(0, 0, 0, 0.1);
+        border-top-color: #007acc;
+        border-radius: 50%;
+        animation: boot-spin 0.75s linear infinite;
+      }
+
+      @keyframes boot-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
   </head>
   <body>
+    <div id="app-boot-splash" aria-busy="true" aria-live="polite">
+      <img class="boot-splash__logo" src="/nest.png" alt="" draggable="false" />
+      <p class="boot-splash__title">Api Nest</p>
+      <div class="boot-splash__spinner" aria-hidden="true"></div>
+    </div>
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>

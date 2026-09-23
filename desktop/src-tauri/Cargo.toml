@@ -1,8 +1,8 @@
 [package]
 name = "desktop"
-version = "0.3.2"
+version = "0.3.3"
 description = "ApiNest desktop client"
-authors = ["you"]
+authors = ["zerunx"]
 edition = "2021"
 
 [lib]

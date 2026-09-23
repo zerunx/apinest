@@ -162,14 +162,6 @@ Artifacts are under `desktop/src-tauri/target/release/bundle/`:
 
 Build on the target OS (Windows for exe/msi, macOS for app/dmg).
 
-To bump the version, edit `version` in these files (lockfiles update on build/install):
-
-- `desktop/package.json`
-- `desktop/src-tauri/tauri.conf.json`
-- `desktop/src-tauri/Cargo.toml`
-- `desktop/src/components/SettingsDialog.vue` (About UI)
-- Optionally align Web: `web/package.json`
-
 ## Roadmap
 
 - [x] Desktop client integration
@@ -181,9 +173,8 @@ To bump the version, edit `version` in these files (lockfiles update on build/in
 - [x] ApiNest import / export
 - [ ] Import from Postman, Apifox, Eolink, YApi, and similar formats
 - [x] Web API-doc view styling
-- [ ] Liquid-glass theme and finer borders
 - [ ] Built-in / multi-database support (PostgreSQL only for now)
-- [ ] Dictionary library
+- [x] Dictionary library
 
 ## License
 

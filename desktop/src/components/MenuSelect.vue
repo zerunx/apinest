@@ -22,6 +22,7 @@
         v-if="open"
         ref="menuRef"
         class="menu-select__menu"
+        :class="{ 'menu-select__menu--fit-content': fitContent }"
         :style="menuStyle"
         @click.stop
       >
@@ -53,6 +54,7 @@ const props = withDefaults(
     placeholder?: string
     compact?: boolean
     fitMenu?: boolean
+    fitContent?: boolean
     dense?: boolean
     stretch?: boolean
     plain?: boolean
@@ -64,6 +66,7 @@ const props = withDefaults(
     placeholder: '—',
     compact: false,
     fitMenu: false,
+    fitContent: false,
     dense: false,
     stretch: false,
     plain: false,
@@ -103,6 +106,19 @@ function placeMenu() {
     menuStyle.width = `${width}px`
     menuStyle.left =
       props.menuAlign === 'right' ? `${rect.right - width}px` : `${rect.left}px`
+    return
+  }
+  if (props.fitContent) {
+    // Match trigger width as floor; CSS max-width caps growth.
+    const minWidth = Math.max(rect.width, props.menuMinWidth)
+    menuStyle.minWidth = `${minWidth}px`
+    menuStyle.width = ''
+    menuStyle.top = props.dense ? `${rect.bottom + 2}px` : `${rect.bottom + 4}px`
+    if (props.menuAlign === 'right' && menuRef.value) {
+      menuStyle.left = `${rect.right - menuRef.value.offsetWidth}px`
+    } else {
+      menuStyle.left = `${rect.left}px`
+    }
     return
   }
   if (props.fitMenu) {
@@ -257,6 +273,23 @@ onUnmounted(() => {
   box-shadow: var(--shadow-menu);
 }
 
+.menu-select__menu--fit-content {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: max-content;
+  max-width: min(280px, calc(100vw - 24px));
+}
+
+.menu-select__menu--fit-content .menu-select__item {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .menu-select__item {
   width: 100%;
   border: 0;
@@ -266,7 +299,9 @@ onUnmounted(() => {
   padding: 7px 10px;
   border-radius: 5px;
   font-size: 13px;
+  line-height: 20px;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .menu-select__item:hover,

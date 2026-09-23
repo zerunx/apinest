@@ -227,8 +227,9 @@
 
 .interface-split-handle {
   flex-shrink: 0;
+  /* Hit target; the visible line sits flush at the top against the request pane. */
   height: 6px;
-  margin: 2px 0;
+  margin: 0;
   cursor: row-resize;
   position: relative;
 }
@@ -238,9 +239,8 @@
   position: absolute;
   left: 0;
   right: 0;
-  top: 50%;
+  top: 0;
   height: 1px;
-  transform: translateY(-50%);
   background: var(--color-interface-panel-border);
 }
 

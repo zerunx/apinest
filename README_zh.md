@@ -160,14 +160,6 @@ pnpm run tauri:build
 - Windows：`nsis/*.exe`、`msi/*.msi`
 - macOS：`macos/*.app`、`dmg/*.dmg`
 
-升版本时改这些文件里的 `version` ：
-
-- `desktop/package.json`
-- `desktop/src-tauri/tauri.conf.json`
-- `desktop/src-tauri/Cargo.toml`
-- `desktop/src/components/SettingsDialog.vue`
-- `web/package.json`
-
 ## 路线图
 
 - [x] 桌面端对接
@@ -179,9 +171,8 @@ pnpm run tauri:build
 - [x] apinest 导入，导出
 - [ ] postman apifox eolink yapi 等接口格式导入
 - [x] Web端接口查看的样式
-- [ ] 液态玻璃主题与边框细化
 - [ ] 内置 / 多数据库支持（当前仅外部 PostgreSQL）
-- [ ] 字典库
+- [x] 字典库 
 
 ## License
 

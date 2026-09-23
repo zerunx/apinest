@@ -140,7 +140,7 @@
             @editor-ready="onEditorReady"
             @cancel="onEditorCancel"
           />
-          <div v-else class="empty-work">
+          <div v-else-if="workspaceContentReady" class="empty-work">
             <p v-if="!workspaceId || !projectId" class="muted empty-work-hint">
               {{ t('create.needProjectFirst') }}
             </p>
@@ -320,6 +320,29 @@ function cloneSendResponse(res: SendResponse | null | undefined): SendResponse |
   }
 }
 
+/** Drop base64 file payloads from form-data detail so tab switches stay snappy. */
+function stripFormDataFilePayloads<T>(detail: T): T {
+  if (!detail || typeof detail !== 'object') return detail
+  const root = detail as Record<string, unknown>
+  const body = root.request_body
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return detail
+  const fields = (body as { fields?: unknown }).fields
+  if (!Array.isArray(fields)) return detail
+  return {
+    ...root,
+    request_body: {
+      ...(body as Record<string, unknown>),
+      fields: fields.map((field) => {
+        if (!field || typeof field !== 'object' || Array.isArray(field)) return field
+        const next = { ...(field as Record<string, unknown>) }
+        delete next.file_data
+        delete next.fileData
+        return next
+      }),
+    },
+  } as T
+}
+
 const { t } = useI18n()
 const { showToast } = useToast()
 const {
@@ -435,7 +458,6 @@ useCloseTabShortcut(
 )
 
 let tabSeq = 1
-let contextBootstrapped = false
 let restoringTabs = false
 
 function defaultHeaders(): HeaderPair[] {
@@ -465,7 +487,7 @@ function tabStateFromEditor(tab: RequestTab): RequestTab | null {
       state.folderId != null && Number.isFinite(Number(state.folderId))
         ? Number(state.folderId)
         : tab.folderId,
-    detail: state.detail,
+    detail: stripFormDataFilePayloads(state.detail),
     headers: defaultHeaders(),
     body: String((state.detail as { request_body?: { raw?: string } }).request_body?.raw ?? ''),
     interfaceId: activeInterfaceId.value,
@@ -546,10 +568,10 @@ function applyTabToForm(tab: RequestTab, options?: { remount?: boolean }) {
     url: tab.url,
     folder_id: folderId,
     status: (tab.detail as { status?: number } | null)?.status ?? 3,
-    detail: {
+    detail: stripFormDataFilePayloads({
       ...(tab.detail ?? {}),
       ...(folderId != null ? { folder_id: folderId } : {}),
-    },
+    }),
     lastResponse: cloneSendResponse(tab.lastResponse),
     requestPaneTab: tab.requestPaneTab ?? 'body',
     responseScrollTop: tab.responseScrollTop ?? 0,
@@ -647,8 +669,9 @@ async function restoreTabLayout() {
   }
   if (
     !layout ||
-    layout.workspaceId !== workspaceId.value ||
-    layout.projectId !== projectId.value ||
+    Number(layout.workspaceId) !== Number(workspaceId.value) ||
+    Number(layout.projectId) !== Number(projectId.value) ||
+    !Array.isArray(layout.openInterfaceIds) ||
     !layout.openInterfaceIds.length
   ) {
     return
@@ -658,10 +681,16 @@ async function restoreTabLayout() {
   try {
     clearTabs()
     for (const id of layout.openInterfaceIds) {
-      await onSelectApi(id, { restore: true })
+      try {
+        await onSelectApi(Number(id), { restore: true })
+      } catch {
+        // Interface may have been deleted — skip and keep restoring the rest.
+      }
     }
-    if (layout.activeInterfaceId != null) {
-      const tab = tabs.value.find((x) => x.interfaceId === layout.activeInterfaceId)
+    const activeId =
+      layout.activeInterfaceId != null ? Number(layout.activeInterfaceId) : null
+    if (activeId != null) {
+      const tab = tabs.value.find((x) => x.interfaceId === activeId)
       if (tab) activateTab(tab.id)
     }
   } finally {
@@ -901,21 +930,56 @@ async function onApiDrop(payload: TreeApiDragPayload) {
   }
 }
 
-async function bootstrapWorkspaceContent(isSwitch: boolean) {
-  if (!workspaceId.value || !projectId.value) {
+let lastWorkspaceBootKey = ''
+let workspaceBootInFlight: Promise<void> | null = null
+/** False until the first workspace bootstrap finishes (avoids empty-home flash). */
+const workspaceContentReady = ref(false)
+
+function markSessionReady() {
+  if (workspaceContentReady.value) return
+  workspaceContentReady.value = true
+  window.__NEST_MARK_SESSION_READY__?.()
+  window.__NEST_MARK_SESSION_READY__ = undefined
+}
+
+async function ensureWorkspaceBootstrapped() {
+  const ws = workspaceId.value
+  const proj = projectId.value
+  if (!ws || !proj) {
     tree.value = []
+    // Do not mark ready here — project may still be assigned during init.
     return
   }
-  if (isSwitch) {
+
+  const key = `${ws}:${proj}`
+  if (workspaceBootInFlight) {
+    await workspaceBootInFlight
+    if (lastWorkspaceBootKey === key) return
+  }
+
+  workspaceBootInFlight = (async () => {
+    const prevKey = lastWorkspaceBootKey
+    if (key === lastWorkspaceBootKey) {
+      await reloadTree()
+      return
+    }
+    lastWorkspaceBootKey = key
+    await reloadTree()
+    if (!prevKey) {
+      // First ready workspace/project in this session — restore last tabs.
+      await restoreTabLayout()
+      return
+    }
+    // Switched workspace or project — drop old tabs, restore if saved for this pair.
     clearTabs()
-  }
-  await reloadTree()
-  if (!isSwitch && !contextBootstrapped) {
     await restoreTabLayout()
-    contextBootstrapped = true
-  }
-  if (isSwitch) {
     await persistTabLayout()
+  })()
+
+  try {
+    await workspaceBootInFlight
+  } finally {
+    workspaceBootInFlight = null
   }
 }
 
@@ -1429,13 +1493,8 @@ function onTabsWheel(e: WheelEvent) {
   el.scrollLeft += e.deltaY
 }
 
-watch([workspaceId, projectId], async ([ws, proj], [prevWs, prevProj]) => {
-  if (!ws || !proj) {
-    tree.value = []
-    return
-  }
-  const isSwitch = prevWs != null && (prevWs !== ws || prevProj !== proj)
-  await bootstrapWorkspaceContent(isSwitch)
+watch([workspaceId, projectId], () => {
+  void ensureWorkspaceBootstrapped()
 })
 
 watch([environmentId, envVarsRevision], () => {
@@ -1445,9 +1504,11 @@ watch([environmentId, envVarsRevision], () => {
 onMounted(async () => {
   document.addEventListener('click', hideTabContextMenu)
   await initWorkspaceContext()
-  if (workspaceId.value && projectId.value && !contextBootstrapped) {
-    await bootstrapWorkspaceContent(false)
-  }
+  await ensureWorkspaceBootstrapped()
+  // Let the restored editor paint under the splash before revealing.
+  await nextTick()
+  await nextTick()
+  markSessionReady()
 })
 
 onBeforeUnmount(() => {
@@ -1552,7 +1613,9 @@ async function onSelectApi(id: number, options?: { restore?: boolean }) {
 
 .sidebar-resizer {
   flex-shrink: 0;
-  width: 2px;
+  /* Wide hit target; negative margins keep the flex gap at 2px. */
+  width: 6px;
+  margin: 0 -2px;
   cursor: col-resize;
   position: relative;
   background: transparent;
@@ -1564,8 +1627,9 @@ async function onSelectApi(id: number, options?: { restore?: boolean }) {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: 0;
+  left: 50%;
   width: 1px;
+  transform: translateX(-50%);
   background: var(--color-border);
 }
 
