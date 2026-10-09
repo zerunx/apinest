@@ -84,18 +84,12 @@ func (Service) Export(ctx context.Context, userID int64, params ExportRequest) (
 
 func (Service) Import(ctx context.Context, userID int64, params ImportRequest) (*ImportResult, error) {
 	source := strings.ToLower(strings.TrimSpace(params.Source))
-	if source != SourceApinest {
-		return nil, bizerr.New("this import format is not supported yet")
-	}
 	if _, err := project.RequireAccess(ctx, userID, params.WorkspaceID, params.ProjectID, workspace.ActionProjectCreate); err != nil {
 		return nil, err
 	}
 
-	var doc Document
-	if err := json.Unmarshal(params.Document, &doc); err != nil {
-		return nil, bizerr.New("import file is not valid JSON")
-	}
-	if err := validateDocument(doc); err != nil {
+	doc, err := parseImportDocument(source, params.Document)
+	if err != nil {
 		return nil, err
 	}
 
@@ -133,6 +127,58 @@ func (Service) Import(ctx context.Context, userID int64, params ImportRequest) (
 		return nil, err
 	}
 	return result, nil
+}
+
+func parseImportDocument(source string, raw json.RawMessage) (Document, error) {
+	switch source {
+	case SourceApinest:
+		var doc Document
+		if err := json.Unmarshal(raw, &doc); err != nil {
+			return Document{}, bizerr.New("import file is not valid JSON")
+		}
+		if err := validateDocument(doc); err != nil {
+			return Document{}, err
+		}
+		return doc, nil
+	case SourcePostman:
+		doc, err := ConvertPostmanCollection(raw)
+		if err != nil {
+			return Document{}, err
+		}
+		return *doc, nil
+	case SourceOpenAPI:
+		doc, err := ConvertOpenAPIDocument(raw)
+		if err != nil {
+			return Document{}, err
+		}
+		return *doc, nil
+	case SourceApiPost:
+		doc, err := ConvertApiPostDocument(raw)
+		if err != nil {
+			return Document{}, err
+		}
+		return *doc, nil
+	case SourceEolink:
+		doc, err := ConvertEolinkDocument(raw)
+		if err != nil {
+			return Document{}, err
+		}
+		return *doc, nil
+	case SourceApifox:
+		doc, err := ConvertApifoxDocument(raw)
+		if err != nil {
+			return Document{}, err
+		}
+		return *doc, nil
+	case SourceYApi:
+		doc, err := ConvertYApiDocument(raw)
+		if err != nil {
+			return Document{}, err
+		}
+		return *doc, nil
+	default:
+		return Document{}, bizerr.New("this import format is not supported yet")
+	}
 }
 
 func validateDocument(doc Document) error {

@@ -6,7 +6,7 @@ func Boot() {
 	InitAuth()
 	InitValidator()
 	InitDatabase()
-	InitRedis()
+	// InitRedis()
 	InitScheduler()
 
 	InitHTTP()

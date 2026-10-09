@@ -171,7 +171,7 @@ Build on the target OS (Windows for exe/msi, macOS for app/dmg).
 - [x] WS and gRPC
 - [x] Import proto files and auto-generate mock parameters
 - [x] ApiNest import / export
-- [ ] Import from Postman, Apifox, Eolink, YApi, and similar formats
+- [x] Import from Postman, Apifox, Eolink, YApi, and similar formats
 - [x] Web API-doc view styling
 - [ ] Built-in / multi-database support (PostgreSQL only for now)
 - [x] Dictionary library

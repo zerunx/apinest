@@ -10,6 +10,12 @@ const (
 	FormatApinest = "apinest"
 	Version       = 1
 	SourceApinest = "apinest"
+	SourcePostman = "postman"
+	SourceOpenAPI = "openapi"
+	SourceApiPost = "apipost"
+	SourceEolink  = "eolink"
+	SourceApifox  = "apifox"
+	SourceYApi    = "yapi"
 	ScopeProject  = "project"
 	ScopeFolder   = "folder"
 )

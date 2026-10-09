@@ -83,8 +83,9 @@ pub async fn save_json_file(app: tauri::AppHandle, args: SaveJsonFileArgs) -> Ap
 #[tauri::command]
 pub fn import_apinest(db: State<'_, Db>, args: ImportApisArgs) -> AppResult<ImportApiResult> {
     let source = args.source.trim().to_lowercase();
-    if source != "apinest" {
-        return Err(AppError::msg("该导入格式暂未支持"));
+    match source.as_str() {
+        "apinest" | "postman" | "openapi" | "apipost" | "eolink" | "apifox" | "yapi" => {}
+        _ => return Err(AppError::msg("该导入格式暂未支持")),
     }
     let server_id = current_server_id(&db)?;
     let is_local = is_local_project(&db, server_id, args.project_id)?;
@@ -99,13 +100,23 @@ pub fn import_apinest(db: State<'_, Db>, args: ImportApisArgs) -> AppResult<Impo
             );
         }
     }
+
+    let document = match source.as_str() {
+        "postman" => super::postman::convert_postman_collection(&args.document)?,
+        "openapi" => super::openapi::convert_openapi_document(&args.document)?,
+        "apipost" => super::apipost::convert_apipost_document(&args.document)?,
+        "eolink" => super::eolink::convert_eolink_document(&args.document)?,
+        "apifox" => super::apifox::convert_apifox_document(&args.document)?,
+        "yapi" => super::yapi::convert_yapi_document(&args.document)?,
+        _ => args.document.clone(),
+    };
     db.with_conn(|conn| {
         import_local(
             conn,
             server_id,
             args.workspace_id,
             args.project_id,
-            &args.document,
+            &document,
         )
     })
 }

@@ -169,7 +169,7 @@ pnpm run tauri:build
 - [x] ws grpc 协议
 - [x] proto 文件导入参数，自动生成模拟参数
 - [x] apinest 导入，导出
-- [ ] postman apifox eolink yapi 等接口格式导入
+- [x] postman apifox eolink yapi 等接口格式导入
 - [x] Web端接口查看的样式
 - [ ] 内置 / 多数据库支持（当前仅外部 PostgreSQL）
 - [x] 字典库 

@@ -1,13 +1,19 @@
+mod apifox;
+mod apipost;
 mod auth;
 mod catalog;
 mod dictionary;
+mod eolink;
 mod grpc;
 mod http_send;
 mod importexport;
 mod local;
+mod openapi;
+mod postman;
 mod settings;
 mod sync;
 mod ws_send;
+mod yapi;
 
 pub use auth::*;
 pub use catalog::*;

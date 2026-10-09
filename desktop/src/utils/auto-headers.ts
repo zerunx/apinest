@@ -1,4 +1,4 @@
-export const DEFAULT_USER_AGENT = 'ApiNest/0.3.3'
+export const DEFAULT_USER_AGENT = 'ApiNest/0.3.4'
 
 export type AutoHeader = {
   key: string

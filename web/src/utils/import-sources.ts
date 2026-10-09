@@ -8,11 +8,10 @@ export type ImportSource = {
 
 export const IMPORT_SOURCES: ImportSource[] = [
   { id: 'apinest', name: 'ApiNest', enabled: true, icon: '/nest.png' },
-  { id: 'postman', name: 'Postman', enabled: false, letter: 'P' },
-  { id: 'openapi', name: 'OpenAPI', enabled: false, letter: 'O' },
-  { id: 'apifox', name: 'Apifox', enabled: false, letter: 'A' },
-  { id: 'yapi', name: 'YApi', enabled: false, letter: 'Y' },
-  { id: 'eolink', name: 'Eolink', enabled: false, letter: 'E' },
-  { id: 'har', name: 'HAR', enabled: false, letter: 'H' },
-  { id: 'apipost', name: 'ApiPost', enabled: false, letter: 'A' },
+  { id: 'postman', name: 'Postman', enabled: true, icon: '/import-icons/postman.svg' },
+  { id: 'openapi', name: 'OpenAPI', enabled: true, icon: '/import-icons/openapi.png' },
+  { id: 'apifox', name: 'Apifox', enabled: true, icon: '/import-icons/apifox.png' },
+  { id: 'yapi', name: 'YApi', enabled: true, icon: '/import-icons/yapi.png' },
+  { id: 'eolink', name: 'Eolink', enabled: true, icon: '/import-icons/eolink.png' },
+  { id: 'apipost', name: 'ApiPost', enabled: true, icon: '/import-icons/apipost.png' },
 ]

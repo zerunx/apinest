@@ -39,7 +39,21 @@ watch(
 )
 
 function close() {
+  if (submitting.value) return
   emit('update:open', false)
+}
+
+function onDialogVisible(value: boolean) {
+  if (!value) {
+    close()
+    return
+  }
+  emit('update:open', value)
+}
+
+function handleBeforeClose(done: () => void) {
+  if (submitting.value) return
+  done()
 }
 
 function pickSource(id: string, enabled: boolean) {
@@ -88,18 +102,14 @@ function goNext() {
   step.value = 2
 }
 
-async function startImport() {
-  if (!parsed.value || !selectedSource.value?.enabled) return
+function startImport() {
+  if (submitting.value || !parsed.value || !selectedSource.value?.enabled) return
   submitting.value = true
-  try {
-    emit('submit', {
-      source: selectedSource.value.id,
-      document: parsed.value,
-      filename: file.value?.name ?? 'import.json',
-    })
-  } finally {
-    submitting.value = false
-  }
+  emit('submit', {
+    source: selectedSource.value.id,
+    document: parsed.value,
+    filename: file.value?.name ?? 'import.json',
+  })
 }
 
 defineExpose({
@@ -118,7 +128,11 @@ defineExpose({
     align-center
     class="import-api-dialog"
     destroy-on-close
-    @update:model-value="emit('update:open', $event)"
+    :close-on-click-modal="!submitting"
+    :close-on-press-escape="!submitting"
+    :show-close="!submitting"
+    :before-close="handleBeforeClose"
+    @update:model-value="onDialogVisible"
   >
     <div class="import-steps">
       <span class="import-steps__item" :class="{ 'is-active': step === 1 }">
@@ -184,12 +198,12 @@ defineExpose({
     </div>
 
     <template #footer>
-      <el-button @click="close">{{ t('common.cancel') }}</el-button>
-      <el-button v-if="step === 2" @click="step = 1">{{ t('workspace.importExport.prev') }}</el-button>
+      <el-button :disabled="submitting" @click="close">{{ t('common.cancel') }}</el-button>
+      <el-button v-if="step === 2" :disabled="submitting" @click="step = 1">{{ t('workspace.importExport.prev') }}</el-button>
       <el-button v-if="step === 1" type="primary" :disabled="!canNext" @click="goNext">
         {{ t('workspace.importExport.next') }}
       </el-button>
-      <el-button v-else type="primary" :loading="submitting" @click="startImport">
+      <el-button v-else type="primary" :loading="submitting" :disabled="submitting" @click="startImport">
         {{ t('workspace.importExport.start') }}
       </el-button>
     </template>

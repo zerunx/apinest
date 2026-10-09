@@ -512,6 +512,7 @@ async function runExport(folderId?: number, folderName?: string) {
 async function handleImportSubmit(payload: { source: string; document: unknown }) {
   if (!activeWorkspaceId.value || !activeProjectId.value) {
     ElMessage.warning(t('workspace.importExport.needProject'))
+    importDialogRef.value?.setSubmitting(false)
     return
   }
   importDialogRef.value?.setSubmitting(true)
