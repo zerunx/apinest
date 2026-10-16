@@ -5,6 +5,7 @@ import (
 
 	"nest-api/internal/database"
 	"nest-api/internal/ent"
+	entworkspace "nest-api/internal/ent/workspace"
 	"nest-api/internal/ent/workspacemember"
 	bizerr "nest-api/pkg/errors"
 )
@@ -17,6 +18,18 @@ type Access struct {
 }
 
 func RequireMember(ctx context.Context, userID, workspaceID int64) (*Access, error) {
+	// Soft-deleted workspaces must not be accessible even if membership rows remain.
+	exists, err := database.DB.Workspace.
+		Query().
+		Where(entworkspace.IDEQ(workspaceID)).
+		Exist(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, bizerr.New("workspace not found")
+	}
+
 	member, err := getMembership(ctx, workspaceID, userID)
 	if err != nil {
 		return nil, err

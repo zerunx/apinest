@@ -1,23 +1,30 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, reactive, ref } from 'vue'
+import { nextTick, onMounted, onBeforeUnmount, reactive, ref } from 'vue'
+import { bindOutsidePointerDismiss } from '../composables/useOverlayDismiss'
 
 const emit = defineEmits<{
-  create: [event: MouseEvent]
+  'add-api': [event: MouseEvent]
+  'add-folder': [event: MouseEvent]
   import: []
   export: []
 }>()
 
 defineProps<{
-  createTitle: string
+  addApiLabel: string
+  addFolderLabel: string
   importLabel: string
   exportLabel: string
 }>()
 
-const open = ref(false)
+const createOpen = ref(false)
+const moreOpen = ref(false)
 const rootRef = ref<HTMLElement | null>(null)
-const menuRef = ref<HTMLElement | null>(null)
-const menuStyle = reactive({ left: '0px', top: '0px' })
+const createMenuRef = ref<HTMLElement | null>(null)
+const moreMenuRef = ref<HTMLElement | null>(null)
+const createMenuStyle = reactive({ left: '0px', top: '0px' })
+const moreMenuStyle = reactive({ left: '0px', top: '0px' })
 let closeTimer: ReturnType<typeof setTimeout> | null = null
+let unbindOutside: (() => void) | null = null
 
 function clearCloseTimer() {
   if (closeTimer) {
@@ -26,53 +33,90 @@ function clearCloseTimer() {
   }
 }
 
-function placeMenu() {
+function placeMenu(
+  style: { left: string; top: string },
+  menuEl: HTMLElement | null,
+) {
   const el = rootRef.value
   if (!el) return
   const rect = el.getBoundingClientRect()
-  const width = menuRef.value?.offsetWidth ?? 112
+  const width = menuEl?.offsetWidth ?? 140
   const left = Math.min(Math.max(8, rect.right - width), window.innerWidth - width - 8)
-  menuStyle.left = `${left}px`
-  menuStyle.top = `${rect.bottom + 6}px`
+  style.left = `${left}px`
+  style.top = `${rect.bottom + 6}px`
 }
 
-function showMenu() {
+async function showCreateMenu() {
   clearCloseTimer()
-  open.value = true
-  void nextTick(placeMenu)
+  moreOpen.value = false
+  createOpen.value = !createOpen.value
+  if (!createOpen.value) return
+  await nextTick()
+  placeMenu(createMenuStyle, createMenuRef.value)
+  await nextTick()
+  placeMenu(createMenuStyle, createMenuRef.value)
 }
 
-function hideMenu() {
+function showMoreMenu() {
+  clearCloseTimer()
+  createOpen.value = false
+  moreOpen.value = true
+  void nextTick(() => placeMenu(moreMenuStyle, moreMenuRef.value))
+}
+
+function hideMoreMenu() {
   clearCloseTimer()
   closeTimer = setTimeout(() => {
-    open.value = false
+    moreOpen.value = false
     closeTimer = null
   }, 160)
 }
 
-function onCreate(event: MouseEvent) {
-  open.value = false
-  emit('create', event)
+function onAddApi(event: MouseEvent) {
+  createOpen.value = false
+  emit('add-api', event)
+}
+
+function onAddFolder(event: MouseEvent) {
+  createOpen.value = false
+  emit('add-folder', event)
 }
 
 function onImport() {
-  open.value = false
+  moreOpen.value = false
   emit('import')
 }
 
 function onExport() {
-  open.value = false
+  moreOpen.value = false
   emit('export')
 }
 
+onMounted(() => {
+  unbindOutside = bindOutsidePointerDismiss(
+    () => createOpen.value,
+    () => [rootRef.value, createMenuRef.value],
+    () => {
+      createOpen.value = false
+    },
+  )
+})
+
 onBeforeUnmount(() => {
   clearCloseTimer()
+  unbindOutside?.()
 })
 </script>
 
 <template>
   <div ref="rootRef" class="split-create">
-    <button type="button" class="split-create__plus" :title="createTitle" @click.stop="onCreate">
+    <button
+      type="button"
+      class="split-create__plus"
+      :class="{ 'is-open': createOpen }"
+      :title="addApiLabel"
+      @click.stop="showCreateMenu"
+    >
       <svg
         class="split-create__plus-icon"
         viewBox="0 0 24 24"
@@ -91,11 +135,11 @@ onBeforeUnmount(() => {
     <button
       type="button"
       class="split-create__caret"
-      :class="{ 'is-open': open }"
+      :class="{ 'is-open': moreOpen }"
       aria-label="more"
-      @mouseenter="showMenu"
-      @mouseleave="hideMenu"
-      @click.stop="showMenu"
+      @mouseenter="showMoreMenu"
+      @mouseleave="hideMoreMenu"
+      @click.stop="showMoreMenu"
     >
       <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.6">
         <path d="M6 9l6 6 6-6" />
@@ -105,12 +149,25 @@ onBeforeUnmount(() => {
 
   <Teleport to="body">
     <div
-      v-if="open"
-      ref="menuRef"
+      v-if="createOpen"
+      ref="createMenuRef"
       class="split-create-menu"
-      :style="menuStyle"
-      @mouseenter="showMenu"
-      @mouseleave="hideMenu"
+      :style="createMenuStyle"
+      @click.stop
+    >
+      <button type="button" @click="onAddApi($event)">{{ addApiLabel }}</button>
+      <button type="button" @click="onAddFolder($event)">{{ addFolderLabel }}</button>
+    </div>
+  </Teleport>
+
+  <Teleport to="body">
+    <div
+      v-if="moreOpen"
+      ref="moreMenuRef"
+      class="split-create-menu"
+      :style="moreMenuStyle"
+      @mouseenter="showMoreMenu"
+      @mouseleave="hideMoreMenu"
     >
       <button type="button" @click="onImport">{{ importLabel }}</button>
       <button type="button" @click="onExport">{{ exportLabel }}</button>
@@ -156,6 +213,7 @@ onBeforeUnmount(() => {
 }
 
 .split-create__plus:hover,
+.split-create__plus.is-open,
 .split-create__caret:hover,
 .split-create__caret.is-open {
   background: var(--color-primary-hover);
@@ -172,7 +230,7 @@ onBeforeUnmount(() => {
 .split-create-menu {
   position: fixed;
   z-index: 4000;
-  min-width: 112px;
+  min-width: 140px;
   padding: 6px;
   border-radius: 8px;
   background: var(--color-menu);

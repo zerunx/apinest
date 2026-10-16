@@ -1,4 +1,9 @@
 import { stripJsonComments } from './raw-json-utils'
+import {
+  appendQueryToUrl,
+  authConfigFromPersisted,
+  previewAuthSync,
+} from './auth'
 
 export type CurlHeader = {
   key: string
@@ -104,12 +109,7 @@ type TabDetail = {
       enabled?: boolean
     }>
   }
-  authorization?: {
-    type?: string
-    bearer_token?: string
-    basic_username?: string
-    basic_password?: string
-  }
+  authorization?: Record<string, unknown>
 }
 
 export type CurlTabState = {
@@ -136,26 +136,18 @@ export function buildCurlFromTabState(
     headers.push({ key, value: applyEnvVars(String(h.example ?? ''), vars) })
   }
 
-  const auth = detail.authorization
-  const hasAuthHeader = headers.some((h) => h.key.toLowerCase() === 'authorization')
-  if (!hasAuthHeader && auth) {
-    if (auth.type === 'bearer' && auth.bearer_token?.trim()) {
-      headers.push({
-        key: 'Authorization',
-        value: `Bearer ${applyEnvVars(auth.bearer_token.trim(), vars)}`,
-      })
-    } else if (auth.type === 'basic' && (auth.basic_username || auth.basic_password)) {
-      try {
-        const user = applyEnvVars(auth.basic_username ?? '', vars)
-        const pass = applyEnvVars(auth.basic_password ?? '', vars)
-        headers.push({
-          key: 'Authorization',
-          value: `Basic ${btoa(`${user}:${pass}`)}`,
-        })
-      } catch {
-        // ignore invalid latin1 for btoa
-      }
-    }
+  const authCfg = authConfigFromPersisted(detail.authorization)
+  // Apply env vars to common token fields before sync preview.
+  authCfg.bearerToken = applyEnvVars(authCfg.bearerToken, vars)
+  authCfg.basicUsername = applyEnvVars(authCfg.basicUsername, vars)
+  authCfg.basicPassword = applyEnvVars(authCfg.basicPassword, vars)
+  authCfg.apiKey = applyEnvVars(authCfg.apiKey, vars)
+  authCfg.apiValue = applyEnvVars(authCfg.apiValue, vars)
+  authCfg.oauth2AccessToken = applyEnvVars(authCfg.oauth2AccessToken, vars)
+  const authArts = previewAuthSync(authCfg)
+  for (const h of authArts.headers) {
+    if (headers.some((x) => x.key.toLowerCase() === h.key.toLowerCase())) continue
+    headers.push({ key: h.key, value: h.value })
   }
 
   const body = detail.request_body
@@ -183,7 +175,7 @@ export function buildCurlFromTabState(
 
   return buildCurl({
     method: state.method || 'GET',
-    url: applyEnvVars(state.url || '', vars),
+    url: appendQueryToUrl(applyEnvVars(state.url || '', vars), authArts.query),
     headers,
     body: raw,
     formData,

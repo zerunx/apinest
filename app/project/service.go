@@ -60,16 +60,19 @@ func (Service) List(ctx context.Context, userID int64, params ListRequest) ([]It
 	return items, nil
 }
 
-func (Service) Create(ctx context.Context, userID int64, params CreateRequest) error {
+func (Service) Create(ctx context.Context, userID int64, params CreateRequest) (int64, error) {
 	if _, err := workspace.Require(ctx, userID, params.WorkspaceID, workspace.ActionProjectCreate); err != nil {
-		return err
+		return 0, err
 	}
 
 	p, err := Repo{}.Create(ctx, params.WorkspaceID, userID, params.Name)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	return AddMember(ctx, params.WorkspaceID, p.ID, userID)
+	if err := AddMember(ctx, params.WorkspaceID, p.ID, userID); err != nil {
+		return 0, err
+	}
+	return p.ID, nil
 }
 
 func (Service) Update(ctx context.Context, userID int64, params UpdateRequest) error {

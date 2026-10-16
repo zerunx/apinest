@@ -1,4 +1,6 @@
-export const DEFAULT_USER_AGENT = 'ApiNest/0.3.4'
+import { previewAuthSync, type AuthConfig } from './auth'
+
+export const DEFAULT_USER_AGENT = 'ApiNest/0.4.1'
 
 export type AutoHeader = {
   key: string
@@ -11,10 +13,9 @@ export type AutoHeaderContext = {
   url: string
   bodyFormat: 'none' | 'form-data' | 'raw'
   rawBody: string
-  authType?: 'none' | 'bearer' | 'basic'
-  authBearerToken?: string
-  authBasicUser?: string
-  authBasicPassword?: string
+  authConfig?: AuthConfig
+  /** Extra auth headers already resolved (signed types). */
+  authHeaders?: Array<{ key: string; value: string }>
   userHeaders: Array<{ key: string; enabled?: boolean }>
   /** Lowercase header names the user has unchecked in the hidden-headers UI. */
   disabledAutoHeaders?: Iterable<string>
@@ -54,14 +55,6 @@ function byteLength(text: string): string {
   return String(new TextEncoder().encode(text).length)
 }
 
-function basicAuthValue(user: string, password: string): string | null {
-  try {
-    return `Basic ${btoa(`${user}:${password}`)}`
-  } catch {
-    return null
-  }
-}
-
 export function buildAutoHeaders(ctx: AutoHeaderContext): AutoHeader[] {
   const taken = takenKeys(ctx.userHeaders)
   const headers: AutoHeader[] = []
@@ -83,11 +76,11 @@ export function buildAutoHeaders(ctx: AutoHeaderContext): AutoHeader[] {
     add('Content-Length', byteLength(ctx.rawBody ?? ''), false)
   }
 
-  if (ctx.authType === 'bearer' && ctx.authBearerToken?.trim()) {
-    add('Authorization', `Bearer ${ctx.authBearerToken.trim()}`, true)
-  } else if (ctx.authType === 'basic' && (ctx.authBasicUser || ctx.authBasicPassword)) {
-    const value = basicAuthValue(ctx.authBasicUser ?? '', ctx.authBasicPassword ?? '')
-    if (value) add('Authorization', value, true)
+  const authHeaders =
+    ctx.authHeaders ??
+    (ctx.authConfig ? previewAuthSync(ctx.authConfig).headers : [])
+  for (const h of authHeaders) {
+    add(h.key, h.value, true)
   }
 
   return headers

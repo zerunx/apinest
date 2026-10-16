@@ -113,7 +113,7 @@ type CreateRequest struct {
 	Name             string                `json:"name" binding:"required,min=1,max=100"`
 	Method           string                `json:"method" binding:"required,min=1,max=10"`
 	Protocol         string                `json:"protocol"`
-	URL              string                `json:"url" binding:"max=500"`
+	URL              string                `json:"url" binding:"max=1024"`
 	Status           uint8                 `json:"status"`
 	RequestHeaders   []ParamItem           `json:"request_headers"`
 	RequestBody      RequestBodyConfig     `json:"request_body"`
@@ -131,7 +131,7 @@ type UpdateRequest struct {
 	Name             string                `json:"name" binding:"required,min=1,max=100"`
 	Method           string                `json:"method" binding:"required,min=1,max=10"`
 	Protocol         string                `json:"protocol"`
-	URL              string                `json:"url" binding:"max=500"`
+	URL              string                `json:"url" binding:"max=1024"`
 	Status           uint8                 `json:"status"`
 	RequestHeaders   []ParamItem           `json:"request_headers"`
 	RequestBody      RequestBodyConfig     `json:"request_body"`

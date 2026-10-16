@@ -70,6 +70,7 @@ func (Repo) Create(ctx context.Context, workspaceID, userID int64, name string) 
 func (Repo) UpdateName(ctx context.Context, projectID int64, name string) error {
 	_, err := database.DB.Project.
 		UpdateOneID(projectID).
+		Where(entproject.DeletedAtIsNil()).
 		SetName(name).
 		Save(ctx)
 	return err

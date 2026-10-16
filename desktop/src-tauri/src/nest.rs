@@ -138,8 +138,13 @@ impl NestClient {
         Ok(serde_json::from_value(body.data)?)
     }
 
-    fn post_data<T: DeserializeOwned, B: Serialize>(&self, path: &str, body: &B) -> AppResult<T> {
-        let mut req = self.http.post(self.url(path)).json(body);
+    fn send_json<B: Serialize>(
+        &self,
+        method: reqwest::Method,
+        path: &str,
+        body: &B,
+    ) -> AppResult<ApiEnvelope<Value>> {
+        let mut req = self.http.request(method, self.url(path)).json(body);
         if let Some(token) = &self.token {
             req = req.bearer_auth(token);
         }
@@ -156,7 +161,31 @@ impl NestClient {
         if envelope.code != 0 {
             return Err(AppError::msg(envelope.message));
         }
+        Ok(envelope)
+    }
+
+    fn post_data<T: DeserializeOwned, B: Serialize>(&self, path: &str, body: &B) -> AppResult<T> {
+        let envelope = self.send_json(reqwest::Method::POST, path, body)?;
         Ok(serde_json::from_value(envelope.data)?)
+    }
+
+    fn post_unit<B: Serialize>(&self, path: &str, body: &B) -> AppResult<()> {
+        let _ = self.send_json(reqwest::Method::POST, path, body)?;
+        Ok(())
+    }
+
+    fn put_unit<B: Serialize>(&self, path: &str, body: &B) -> AppResult<()> {
+        let _ = self.send_json(reqwest::Method::PUT, path, body)?;
+        Ok(())
+    }
+
+    fn post_id<B: Serialize>(&self, path: &str, body: &B) -> AppResult<i64> {
+        #[derive(Deserialize)]
+        struct IdData {
+            id: i64,
+        }
+        let data: IdData = self.post_data(path, body)?;
+        Ok(data.id)
     }
 
     pub fn login(&self, account: &str, password: &str) -> AppResult<LoginResult> {
@@ -172,8 +201,115 @@ impl NestClient {
         self.get_data("/api/v1/workspaces")
     }
 
+    pub fn create_workspace(&self, name: &str) -> AppResult<i64> {
+        #[derive(Serialize)]
+        struct Payload<'a> {
+            name: &'a str,
+        }
+        self.post_id("/api/v1/workspaces", &Payload { name })
+    }
+
+    pub fn update_workspace(&self, workspace_id: i64, name: &str) -> AppResult<()> {
+        #[derive(Serialize)]
+        struct Payload<'a> {
+            workspace_id: i64,
+            name: &'a str,
+        }
+        self.put_unit(
+            "/api/v1/workspaces",
+            &Payload { workspace_id, name },
+        )
+    }
+
     pub fn list_projects(&self, workspace_id: i64) -> AppResult<Vec<ProjectItem>> {
         self.get_data(&format!("/api/v1/projects?workspace_id={workspace_id}"))
+    }
+
+    pub fn create_project(&self, workspace_id: i64, name: &str) -> AppResult<i64> {
+        #[derive(Serialize)]
+        struct Payload<'a> {
+            workspace_id: i64,
+            name: &'a str,
+        }
+        self.post_id(
+            "/api/v1/projects",
+            &Payload { workspace_id, name },
+        )
+    }
+
+    pub fn update_project(&self, workspace_id: i64, project_id: i64, name: &str) -> AppResult<()> {
+        #[derive(Serialize)]
+        struct Payload<'a> {
+            workspace_id: i64,
+            project_id: i64,
+            name: &'a str,
+        }
+        self.put_unit(
+            "/api/v1/projects",
+            &Payload {
+                workspace_id,
+                project_id,
+                name,
+            },
+        )
+    }
+
+    pub fn create_folder(
+        &self,
+        workspace_id: i64,
+        project_id: i64,
+        parent_id: i64,
+        name: &str,
+    ) -> AppResult<i64> {
+        #[derive(Serialize)]
+        struct Payload<'a> {
+            workspace_id: i64,
+            project_id: i64,
+            parent_id: i64,
+            name: &'a str,
+        }
+        self.post_id(
+            "/api/v1/folders",
+            &Payload {
+                workspace_id,
+                project_id,
+                parent_id,
+                name,
+            },
+        )
+    }
+
+    pub fn update_folder(
+        &self,
+        workspace_id: i64,
+        project_id: i64,
+        folder_id: i64,
+        name: &str,
+    ) -> AppResult<()> {
+        #[derive(Serialize)]
+        struct Payload<'a> {
+            workspace_id: i64,
+            project_id: i64,
+            folder_id: i64,
+            name: &'a str,
+        }
+        self.put_unit(
+            "/api/v1/folders",
+            &Payload {
+                workspace_id,
+                project_id,
+                folder_id,
+                name,
+            },
+        )
+    }
+
+    pub fn create_interface(&self, body: &Value) -> AppResult<i64> {
+        self.post_id("/api/v1/interfaces", body)
+    }
+
+    pub fn update_interface(&self, body: &Value) -> AppResult<()> {
+        self.put_unit("/api/v1/interfaces", body)
     }
 
     pub fn folder_tree(&self, workspace_id: i64, project_id: i64) -> AppResult<Vec<TreeNode>> {

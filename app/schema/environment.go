@@ -46,7 +46,7 @@ func (Environment) Fields() []ent.Field {
 
 		field.String("remark").
 			StorageKey("base_url").
-			MaxLen(500).
+			MaxLen(1024).
 			Default("").
 			Comment("备注"),
 

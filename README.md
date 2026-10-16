@@ -4,29 +4,32 @@
 
 [English](README.md) | [中文](README_zh.md)
 
-**ApiNest** (Apinest) is a self-hosted API collaboration platform for managing API docs in one place. It is a lightweight alternative to tools such as Postman and Apifox.
+**ApiNest** (Apinest) is a self-hosted API collaboration and debugging platform covering API docs, environments, and local requests.
 
-## What it does
+## Highlights
 
-Put your team in a shared workspace, organize APIs by project and folder, configure environments and variables, invite members to edit together, and share selected APIs via links that visitors can open without logging in.
-
-It replaces scattered spreadsheets and private API lists, keeping API definitions, environment switching, and collaboration permissions in one place.
-
-## Live demo
-
-- URL: [https://nest.lengyuye.top/login](https://nest.lengyuye.top/login)
-- Username: `admin`
-- Password: `123123`
+- **Dual-end sync**: Keep Web and Desktop in sync—no need to rewrite docs after local testing
+- **Absolute security**: Requests are sent from your machine; secrets and API details need not rely on a third-party cloud
+- **Self-hosted control**: Docker-based setup; accounts, permissions, and data stay on your own servers
+- **Open interchange**: Import from Postman, OpenAPI, Eolink, YApi, and more; plus native Apinest import/export
+- **Team collaboration**: Workspace invites and role-based permissions; share links so guests can view selected APIs without signing in
 
 ## Screenshots
 
-### Web
-
-<img src="docs/images/web.png" alt="ApiNest Web" width="800" />
-
-### Desktop
-
-<img src="docs/images/desktop.png" alt="ApiNest Desktop" width="800" />
+<table>
+  <tr>
+    <th align="center">Web</th>
+    <th align="center">Desktop</th>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <img src="docs/images/web.png" alt="ApiNest Web" />
+    </td>
+    <td width="50%" align="center">
+      <img src="docs/images/desktop.png" alt="ApiNest Desktop" />
+    </td>
+  </tr>
+</table>
 
 ## Quick start
 
@@ -137,14 +140,11 @@ In the browser, complete the install wizard (admin account and PostgreSQL). If y
 | Desktop | Tauri 2 · Rust · Vue 3 · SQLite |
 | Infrastructure | Docker · PostgreSQL · Valkey · Caddy |
 
-## Features
+## More capabilities
 
-- **Web and desktop sync**: Web and the desktop client share the same workspaces and API data
-- **Team collaboration**: Invite members to a workspace with role-based edit permissions
-- **Desktop client**: Local sync and requests, with environment variable substitution and request history
-- **API docs**: Folder hierarchy, API CRUD, request/response field management
+- **API docs**: Folder hierarchy, API CRUD, request/response fields and examples
+- **Desktop client**: Env-var substitution, request history, folder-level Headers / Authorization inheritance
 - **Environments and variables**: Multi-environment configs for local / staging / production
-- **Project sharing**: Share records so guests can view selected APIs without login
 - **System**: Install wizard, auth, admin console, Chinese and English UI
 
 ## Build Desktop
@@ -175,6 +175,8 @@ Build on the target OS (Windows for exe/msi, macOS for app/dmg).
 - [x] Web API-doc view styling
 - [ ] Built-in / multi-database support (PostgreSQL only for now)
 - [x] Dictionary library
+- [ ] TCP / UDP support
+- [ ] Pre-request and post-response scripts
 
 ## License
 

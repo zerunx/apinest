@@ -103,11 +103,16 @@
             v-else
             class="btn btn-primary interface-url-actions__send"
             type="button"
-            :class="{ 'is-busy': sending }"
-            :disabled="sending"
-            @click="onSend"
+            :class="{ 'is-busy': sending, 'is-cancel': sending }"
+            @click="sending ? onCancelSend() : onSend()"
           >
-            {{ sending ? t('request.sending') : isGrpc ? t('request.invoke') : t('request.send') }}
+            {{
+              sending
+                ? t('request.cancel')
+                : isGrpc
+                  ? t('request.invoke')
+                  : t('request.send')
+            }}
           </button>
           <button
             class="btn interface-url-actions__save"
@@ -239,12 +244,19 @@
                 :placeholder="t('common.key')"
                 @input="onQueryParamChange(idx)"
               />
-              <input
-                v-model="row.example"
-                class="param-table__cell"
-                :placeholder="t('common.value')"
-                @input="onQueryParamChange(idx)"
-              />
+              <div class="param-table__value">
+                <div class="param-table__value-shell">
+                  <textarea
+                    v-model="row.example"
+                    class="param-table__cell param-table__cell--inner param-table__value-input"
+                    rows="1"
+                    :placeholder="t('common.value')"
+                    @focus="onExpandableValueFocus"
+                    @blur="onExpandableValueBlur"
+                    @input="onQueryParamValueInput(idx, $event)"
+                  />
+                </div>
+              </div>
               <input
                 v-model="row.description"
                 class="param-table__cell"
@@ -267,42 +279,71 @@
               <div class="auth-pane__left">
                 <span class="auth-pane__label">{{ t('request.authType') }}</span>
                 <MenuSelect
-                  v-model="authType"
+                  :model-value="authConfig.type"
                   compact
                   class="auth-pane__type"
-                  :menu-width="168"
+                  :menu-width="200"
                   :options="authTypeOptions"
+                  @update:model-value="onAuthTypeChange"
                 />
-                <p v-if="authType !== 'none'" class="auth-pane__hint muted">{{ authTypeHint }}</p>
+                <p v-if="authConfig.type !== 'none'" class="auth-pane__hint muted">{{ authTypeHint }}</p>
               </div>
               <div class="auth-pane__divider" />
               <div class="auth-pane__right">
-                <template v-if="authType === 'none'">
+                <template v-if="authConfig.type === 'none'">
                   <span class="auth-pane__label auth-pane__label--spacer" aria-hidden="true">&nbsp;</span>
                   <p class="auth-pane__hint auth-pane__hint--none muted">{{ t('request.authNoneHint') }}</p>
                 </template>
-                <template v-else-if="authType === 'bearer'">
-                  <span class="auth-pane__label">{{ t('request.authToken') }}</span>
-                  <input
-                    v-model="authBearerToken"
-                    class="native-input auth-pane__input"
-                    :placeholder="t('request.authToken')"
-                  />
-                </template>
-                <template v-else-if="authType === 'basic'">
-                  <span class="auth-pane__label">{{ t('request.authUsername') }}</span>
-                  <input
-                    v-model="authBasicUser"
-                    class="native-input auth-pane__input"
-                    :placeholder="t('request.authUsername')"
-                  />
-                  <span class="auth-pane__label">{{ t('request.authPassword') }}</span>
-                  <input
-                    v-model="authBasicPassword"
-                    class="native-input auth-pane__input"
-                    type="password"
-                    :placeholder="t('request.authPassword')"
-                  />
+                <template v-else>
+                  <div class="auth-pane__fields">
+                    <template v-for="field in authFields" :key="String(field.key)">
+                      <label
+                        v-if="field.kind === 'checkbox'"
+                        class="auth-pane__check"
+                      >
+                        <input
+                          :checked="authBool(field.key)"
+                          type="checkbox"
+                          @change="
+                            setAuthBool(field.key, ($event.target as HTMLInputElement).checked)
+                          "
+                        />
+                        <span>{{ t(field.labelKey) }}</span>
+                      </label>
+                      <template v-else>
+                        <span class="auth-pane__label">{{ t(field.labelKey) }}</span>
+                        <MenuSelect
+                          v-if="field.kind === 'select'"
+                          :model-value="authString(field.key)"
+                          compact
+                          class="auth-pane__input"
+                          :menu-width="200"
+                          :options="authFieldSelectOptions(field)"
+                          @update:model-value="(v) => setAuthField(field.key, v)"
+                        />
+                        <textarea
+                          v-else-if="field.kind === 'textarea'"
+                          class="native-input auth-pane__textarea"
+                          :rows="field.rows ?? 4"
+                          :value="authString(field.key)"
+                          :placeholder="field.placeholderKey ? t(field.placeholderKey) : ''"
+                          @input="
+                            setAuthField(field.key, ($event.target as HTMLTextAreaElement).value)
+                          "
+                        />
+                        <input
+                          v-else
+                          class="native-input auth-pane__input"
+                          :type="field.kind === 'password' ? 'password' : 'text'"
+                          :value="authString(field.key)"
+                          :placeholder="field.placeholderKey ? t(field.placeholderKey) : ''"
+                          @input="
+                            setAuthField(field.key, ($event.target as HTMLInputElement).value)
+                          "
+                        />
+                      </template>
+                    </template>
+                  </div>
                 </template>
               </div>
             </div>
@@ -404,12 +445,19 @@
                 :placeholder="t('common.key')"
                 @input="onHeaderChange(idx)"
               />
-              <input
-                v-model="row.example"
-                class="param-table__cell"
-                :placeholder="t('common.value')"
-                @input="onHeaderChange(idx)"
-              />
+              <div class="param-table__value">
+                <div class="param-table__value-shell">
+                  <textarea
+                    v-model="row.example"
+                    class="param-table__cell param-table__cell--inner param-table__value-input"
+                    rows="1"
+                    :placeholder="t('common.value')"
+                    @focus="onExpandableValueFocus"
+                    @blur="onExpandableValueBlur"
+                    @input="onHeaderValueInput(idx, $event)"
+                  />
+                </div>
+              </div>
               <input
                 v-model="row.description"
                 class="param-table__cell"
@@ -548,10 +596,10 @@
                       class="param-table__cell param-table__cell--inner param-table__value-input"
                       rows="1"
                       :placeholder="t('common.value')"
-                      @focus="onFormDataValueFocus"
-                      @blur="onFormDataValueBlur"
-                      @input="onFormDataValueInput(idx, $event)"
-                    />
+                    @focus="onExpandableValueFocus"
+                    @blur="onExpandableValueBlur"
+                    @input="onFormDataValueInput(idx, $event)"
+                  />
                   </div>
                   <label v-else class="param-table__file">
                     <input
@@ -809,12 +857,20 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
-import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { useI18n } from '../i18n'
 import { useContainerBoundedResize } from '../composables/useDragResize'
 import { useColumnResize } from '../composables/useColumnResize'
+import {
+  appendWsTabMessage,
+  clearWsMessages as clearWsTabMessages,
+  disconnectWsTab,
+  disposeAllWsTabs,
+  ensureWsEventListener,
+  ensureWsTabSession,
+  type WsMessageItem,
+} from '../composables/wsSessionRegistry'
 import type { ParamRow } from './ParamTable.vue'
 import MenuSelect from './MenuSelect.vue'
 import MethodPicker from './MethodPicker.vue'
@@ -834,6 +890,23 @@ import {
 } from '../utils/dictionary-match'
 import { looksLikeCurl, parseCurl, type ParsedCurl } from '../utils/parse-curl'
 import { buildAutoHeaders, isAutoHeaderEnabled, sendableAutoHeaders } from '../utils/auto-headers'
+import {
+  AUTH_FIELDS,
+  AUTH_TYPE_HINT_KEYS,
+  AUTH_TYPE_LABEL_KEYS,
+  AUTH_TYPE_PRIMARY,
+  AUTH_TYPE_SECONDARY,
+  appendQueryToUrl,
+  applyAuth,
+  authConfigFromPersisted,
+  authConfigToPersisted,
+  emptyAuthConfig,
+  mergeAuthArtifacts,
+  previewAuthSync,
+  type AuthConfig,
+  type AuthFieldDef,
+  type AuthType,
+} from '../utils/auth'
 import {
   compactGrpcMetadata,
   fillGrpcMessageSamples,
@@ -863,24 +936,6 @@ export type FolderOption = { id: number; name: string; parent_id: number; label:
 
 type QueryParamRow = ParamRow & { enabled: boolean }
 
-type WsMessageItem = {
-  id: string
-  direction: 'in' | 'out' | 'system'
-  kind: string
-  messageType: string
-  data: string
-  at: number
-}
-
-type WsSessionEventPayload = {
-  session_id: string
-  kind: 'connected' | 'sent' | 'message' | 'error' | 'closed'
-  direction: string
-  data: string
-  message_type: string
-  at_ms: number
-}
-
 type WsConnectResult = {
   session_id: string
   status: number
@@ -897,6 +952,7 @@ const props = defineProps<{
   mode: 'create' | 'edit'
   workspaceId: number
   projectId: number
+  tabId: string
   interfaceId?: number | null
   initial?: {
     name?: string
@@ -1299,11 +1355,17 @@ const headerKeySuggestions = [
   'X-Requested-With',
 ]
 
-const authTypeOptions = computed(() => [
-  { value: 'none', label: t('request.authNone') },
-  { value: 'bearer', label: t('request.authBearer') },
-  { value: 'basic', label: t('request.authBasic') },
-])
+const authTypeOptions = computed(() => {
+  const primary = AUTH_TYPE_PRIMARY.map((value) => ({
+    value,
+    label: t(AUTH_TYPE_LABEL_KEYS[value]),
+  }))
+  const secondary = AUTH_TYPE_SECONDARY.map((value) => ({
+    value,
+    label: t(AUTH_TYPE_LABEL_KEYS[value]),
+  }))
+  return [...primary, { separator: true }, ...secondary]
+})
 
 const bodyFormats = computed(() => {
   if (isWs.value) {
@@ -1365,18 +1427,68 @@ watch(
 const folders = ref<FolderOption[]>([])
 const saveUi = ref<'idle' | 'saving' | 'saved'>('idle')
 const sending = ref(false)
-const wsConnected = ref(false)
-const wsConnecting = ref(false)
-const wsDisconnecting = ref(false)
-const wsSending = ref(false)
-const wsSessionId = ref<string | null>(null)
-const wsMessages = ref<WsMessageItem[]>([])
-const wsResponseHeaders = ref<HeaderPair[]>([])
-const wsStatusText = ref('')
-const wsConnectError = ref(false)
+const activeRequestId = ref<string | null>(null)
+/** Bumped on Cancel so a late gRPC/HTTP result is ignored. */
+let sendGeneration = 0
+
+function newRequestId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return `req-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+}
+
+function isRequestCancelled(e: unknown): boolean {
+  const msg = invokeErrorMessage(e).toLowerCase()
+  return msg.includes('request cancelled') || msg.includes('canceled')
+}
+
+async function onCancelSend() {
+  if (!sending.value) return
+  sendGeneration += 1
+  const id = activeRequestId.value
+  activeRequestId.value = null
+  if (id) {
+    try {
+      await invoke('cancel_http_request', { requestId: id })
+    } catch {
+      // Request may have already finished.
+    }
+  }
+  sending.value = false
+  emit('state-change')
+}
+const wsSession = computed(() => ensureWsTabSession(props.tabId))
+const wsConnected = computed(() => wsSession.value.connected)
+const wsConnecting = computed(() => wsSession.value.connecting)
+const wsDisconnecting = computed(() => wsSession.value.disconnecting)
+const wsSending = computed({
+  get: () => wsSession.value.sending,
+  set: (v: boolean) => {
+    wsSession.value.sending = v
+  },
+})
+const wsSessionId = computed(() => wsSession.value.sessionId)
+const wsMessages = computed(() => wsSession.value.messages)
+const wsResponseHeaders = computed({
+  get: () => wsSession.value.responseHeaders,
+  set: (v: HeaderPair[]) => {
+    wsSession.value.responseHeaders = v
+  },
+})
+const wsStatusText = computed({
+  get: () => wsSession.value.statusText,
+  set: (v: string) => {
+    wsSession.value.statusText = v
+  },
+})
+const wsConnectError = computed({
+  get: () => wsSession.value.connectError,
+  set: (v: boolean) => {
+    wsSession.value.connectError = v
+  },
+})
 const wsMessageListRef = ref<HTMLElement | null>(null)
-let wsEventUnlisten: UnlistenFn | null = null
-let wsMsgSeq = 0
 let saveUiTimer: ReturnType<typeof setTimeout> | null = null
 const protocol = ref<Protocol>('HTTP')
 const method = ref('POST')
@@ -1397,7 +1509,12 @@ function onProtocolChange(value: string | number | null) {
     const allowed = switchableProtocols(protocol.value, false)
     if (!allowed.includes(next)) return
   }
+  const prevFamily = protocolFamily(protocol.value)
   protocol.value = next
+  // Only user-driven protocol changes disconnect; tab switches must keep the socket.
+  if (prevFamily === 'ws' && protocolFamily(next) !== 'ws') {
+    void disconnectWsSession(true)
+  }
 }
 
 // Keep method valid when protocol changes (picker or URL scheme).
@@ -1405,9 +1522,6 @@ watch(protocol, (next) => {
   const allowed = methodsForProtocol(next)
   if (!allowed.includes(method.value)) {
     method.value = allowed[0] ?? 'GET'
-  }
-  if (protocolFamily(next) !== 'ws' && (wsConnected.value || wsSessionId.value)) {
-    void disconnectWsSession(true)
   }
   if (protocolFamily(next) === 'grpc') {
     if (requestTab.value !== 'message' && requestTab.value !== 'metadata') {
@@ -1609,26 +1723,96 @@ const exampleName = ref('')
 const exampleStatus = ref('200')
 const exampleBody = ref('')
 
-const authType = ref<'none' | 'bearer' | 'basic'>('none')
-const authBearerToken = ref('')
-const authBasicUser = ref('')
-const authBasicPassword = ref('')
+const authConfig = reactive<AuthConfig>(emptyAuthConfig())
+const folderAuthConfig = reactive<AuthConfig>(emptyAuthConfig())
+const folderAuthLoadedFor = ref<number | null>(null)
+const authSignedHeaders = ref<Array<{ key: string; value: string }>>([])
 
-const authTypeHint = computed(() => {
-  if (authType.value === 'bearer') return t('request.authBearerHint')
-  if (authType.value === 'basic') return t('request.authBasicHint')
-  return t('request.authNoneHint')
-})
+const authFields = computed(() => AUTH_FIELDS[authConfig.type] ?? [])
+
+const authTypeHint = computed(() => t(AUTH_TYPE_HINT_KEYS[authConfig.type]))
+
+function onAuthTypeChange(value: string | number | null) {
+  const next = String(value ?? 'none') as AuthType
+  authConfig.type = next
+}
+
+function authFieldSelectOptions(field: AuthFieldDef) {
+  return (field.options ?? []).map((o) => ({
+    value: o.value,
+    label: t(o.labelKey),
+  }))
+}
+
+function authString(key: keyof AuthConfig): string {
+  const v = authConfig[key]
+  return v == null ? '' : String(v)
+}
+
+function authBool(key: keyof AuthConfig): boolean {
+  return Boolean(authConfig[key])
+}
+
+function setAuthField(key: keyof AuthConfig, value: string | number | null) {
+  ;(authConfig as Record<string, unknown>)[key as string] = value == null ? '' : String(value)
+}
+
+function setAuthBool(key: keyof AuthConfig, value: boolean) {
+  ;(authConfig as Record<string, unknown>)[key as string] = value
+}
+
+function resetAuthConfig() {
+  Object.assign(authConfig, emptyAuthConfig())
+  authSignedHeaders.value = []
+}
+
+function resolvedFolderIdNum(): number | null {
+  const fid =
+    folderId.value == null || folderId.value === '' ? null : Number(folderId.value)
+  if (fid == null || !Number.isFinite(fid) || fid === 0) return null
+  return fid
+}
+
+async function ensureFolderAuth(force = false) {
+  const fid = resolvedFolderIdNum()
+  if (fid == null) {
+    Object.assign(folderAuthConfig, emptyAuthConfig())
+    folderAuthLoadedFor.value = null
+    return
+  }
+  if (!force && folderAuthLoadedFor.value === fid) return
+  try {
+    const settings = await invoke<{ authorization?: Record<string, unknown> }>(
+      'get_folder_settings',
+      { folderId: fid },
+    )
+    Object.assign(folderAuthConfig, authConfigFromPersisted(settings.authorization))
+    folderAuthLoadedFor.value = fid
+  } catch {
+    Object.assign(folderAuthConfig, emptyAuthConfig())
+    folderAuthLoadedFor.value = fid
+  }
+}
+
+watch(
+  () => resolvedFolderIdNum(),
+  () => {
+    void ensureFolderAuth(true)
+  },
+  { immediate: true },
+)
 
 function autoHeaderContext() {
+  const syncAuth = mergeAuthArtifacts(
+    previewAuthSync(folderAuthConfig),
+    previewAuthSync(authConfig),
+  )
   return {
     url: applyEnvVars(displayUrl.value.trim(), envVarMap.value),
     bodyFormat: bodyFormat.value,
     rawBody: bodyFormat.value === 'raw' ? stripJsonComments(bodyRaw.value) : bodyRaw.value,
-    authType: authType.value,
-    authBearerToken: authBearerToken.value,
-    authBasicUser: authBasicUser.value,
-    authBasicPassword: authBasicPassword.value,
+    authConfig,
+    authHeaders: authSignedHeaders.value.length ? authSignedHeaders.value : syncAuth.headers,
     userHeaders: requestHeaders.value.map((h) => ({
       key: h.name,
       enabled: h.enabled,
@@ -1907,20 +2091,36 @@ function resizeFormDataValueInput(el: HTMLTextAreaElement, expanded: boolean) {
   el.style.overflowY = needed > FORM_DATA_VALUE_MAX_HEIGHT ? 'auto' : 'hidden'
 }
 
-function onFormDataValueFocus(event: FocusEvent) {
+function onExpandableValueFocus(event: FocusEvent) {
   const el = event.target as HTMLTextAreaElement
   requestAnimationFrame(() => {
     if (document.activeElement === el) resizeFormDataValueInput(el, true)
   })
 }
 
-function onFormDataValueBlur(event: FocusEvent) {
+function onExpandableValueBlur(event: FocusEvent) {
   const el = event.target as HTMLTextAreaElement
   resizeFormDataValueInput(el, false)
 }
 
 function onFormDataValueInput(idx: number, event: Event) {
   onFormDataChange(idx)
+  const el = event.target as HTMLTextAreaElement
+  if (document.activeElement === el) {
+    resizeFormDataValueInput(el, true)
+  }
+}
+
+function onQueryParamValueInput(idx: number, event: Event) {
+  onQueryParamChange(idx)
+  const el = event.target as HTMLTextAreaElement
+  if (document.activeElement === el) {
+    resizeFormDataValueInput(el, true)
+  }
+}
+
+function onHeaderValueInput(idx: number, event: Event) {
+  onHeaderChange(idx)
   const el = event.target as HTMLTextAreaElement
   if (document.activeElement === el) {
     resizeFormDataValueInput(el, true)
@@ -2176,10 +2376,7 @@ function applyParsedCurl(parsed: ParsedCurl) {
   normalizeRequestHeaders()
 
   // Prefer explicit Authorization header from curl over auth pane to avoid duplicates.
-  authType.value = 'none'
-  authBearerToken.value = ''
-  authBasicUser.value = ''
-  authBasicPassword.value = ''
+  resetAuthConfig()
 
   if (parsed.formData?.length) {
     bodyFormat.value = 'form-data'
@@ -2265,8 +2462,13 @@ function parseUrlInput(raw: string) {
     // Keep scheme in the URL bar; only update protocol metadata.
     // After create, only allow same-family protocol changes.
     const setProtocolFromUrl = (next: Protocol) => {
-      if (isCreateMode.value || switchableProtocols(protocol.value, false).includes(next)) {
-        protocol.value = next
+      if (!(isCreateMode.value || switchableProtocols(protocol.value, false).includes(next))) {
+        return
+      }
+      const prevFamily = protocolFamily(protocol.value)
+      protocol.value = next
+      if (prevFamily === 'ws' && protocolFamily(next) !== 'ws') {
+        void disconnectWsSession(true)
       }
     }
     if (/^https:\/\//i.test(raw)) {
@@ -2418,15 +2620,7 @@ const wsCanSend = computed(() => {
 })
 
 function appendWsMessage(partial: Omit<WsMessageItem, 'id' | 'at'> & { at?: number }) {
-  wsMsgSeq += 1
-  wsMessages.value.push({
-    id: `m-${wsMsgSeq}`,
-    at: partial.at ?? Date.now(),
-    direction: partial.direction,
-    kind: partial.kind,
-    messageType: partial.messageType,
-    data: partial.data,
-  })
+  appendWsTabMessage(props.tabId, partial)
   void nextTick(() => {
     const el = wsMessageListRef.value
     if (el) el.scrollTop = el.scrollHeight
@@ -2434,7 +2628,7 @@ function appendWsMessage(partial: Omit<WsMessageItem, 'id' | 'at'> & { at?: numb
 }
 
 function clearWsMessages() {
-  wsMessages.value = []
+  clearWsTabMessages(props.tabId)
 }
 
 function formatWsTime(at: number) {
@@ -2451,108 +2645,13 @@ function wsDirectionLabel(direction: WsMessageItem['direction']) {
   return t('response.wsSystem')
 }
 
-function resetWsUiState() {
-  wsConnected.value = false
-  wsConnecting.value = false
-  wsDisconnecting.value = false
-  wsSending.value = false
-  wsSessionId.value = null
-  wsStatusText.value = ''
-}
-
-async function ensureWsEventListener() {
-  if (wsEventUnlisten) return
-  wsEventUnlisten = await listen<WsSessionEventPayload>('ws-session-event', (event) => {
-    const payload = event.payload
-    if (!payload?.session_id) return
-    if (wsSessionId.value && payload.session_id !== wsSessionId.value) return
-
-    const direction =
-      payload.direction === 'in' || payload.direction === 'out' || payload.direction === 'system'
-        ? payload.direction
-        : 'system'
-
-    if (payload.kind === 'connected') {
-      wsConnected.value = true
-      wsConnecting.value = false
-      wsConnectError.value = false
-      appendWsMessage({
-        direction: 'system',
-        kind: payload.kind,
-        messageType: payload.message_type || 'system',
-        data: payload.data,
-      })
-      return
-    }
-
-    if (payload.kind === 'sent' || payload.kind === 'message') {
-      appendWsMessage({
-        direction,
-        kind: payload.kind,
-        messageType: payload.message_type || 'text',
-        data: payload.data,
-      })
-      return
-    }
-
-    if (payload.kind === 'error') {
-      wsConnectError.value = true
-      appendWsMessage({
-        direction: 'system',
-        kind: payload.kind,
-        messageType: 'error',
-        data: payload.data,
-      })
-      return
-    }
-
-    if (payload.kind === 'closed') {
-      appendWsMessage({
-        direction: 'system',
-        kind: payload.kind,
-        messageType: payload.message_type || 'system',
-        data: payload.data || t('request.wsDisconnected'),
-      })
-      wsConnected.value = false
-      wsConnecting.value = false
-      wsDisconnecting.value = false
-      wsSending.value = false
-      wsSessionId.value = null
-      if (!wsStatusText.value.includes('101')) {
-        wsStatusText.value = payload.data || t('request.wsDisconnected')
-      }
-    }
-  })
-}
-
-async function disconnectWsSession(silent = false) {
-  const sessionId = wsSessionId.value
-  if (!sessionId) {
-    resetWsUiState()
-    return
-  }
-  wsDisconnecting.value = true
-  try {
-    await invoke('ws_disconnect', { args: { session_id: sessionId } })
-  } catch (e) {
-    if (!silent) {
-      appendWsMessage({
-        direction: 'system',
-        kind: 'error',
-        messageType: 'error',
-        data: invokeErrorMessage(e),
-      })
-    }
-  } finally {
-    // Closed event will clear session; fall back if it never arrives.
-    window.setTimeout(() => {
-      if (wsSessionId.value === sessionId) resetWsUiState()
-    }, 800)
-  }
+async function disconnectWsSession(_silent = false) {
+  await disconnectWsTab(props.tabId)
 }
 
 async function onWsConnectToggle() {
-  if (wsConnected.value || wsSessionId.value) {
+  const session = wsSession.value
+  if (session.connected || session.sessionId) {
     await disconnectWsSession()
     return
   }
@@ -2563,33 +2662,34 @@ async function onWsConnectToggle() {
     showToast(t('request.invalidUrl'), 1500, 'warning')
     return
   }
-  await ensureWsEventListener()
-  wsConnecting.value = true
-  wsConnectError.value = false
-  wsStatusText.value = ''
+  await ensureWsEventListener(t('request.wsDisconnected'))
+  session.connecting = true
+  session.connectError = false
+  session.statusText = ''
   responseTab.value = 'body'
   try {
+    const auth = await resolveAuthArtifacts(url)
     const result = await invoke<WsConnectResult>('ws_connect', {
       args: {
-        url: toWebSocketUrl(url),
-        headers: buildSendHeaders(),
+        url: toWebSocketUrl(appendQueryToUrl(url, auth.query)),
+        headers: buildSendHeaders(auth.headers),
         variables: Object.keys(envVarMap.value).length ? envVarMap.value : null,
       },
     })
-    wsSessionId.value = result.session_id
-    wsResponseHeaders.value = result.headers ?? []
-    wsStatusText.value = result.status
+    session.sessionId = result.session_id
+    session.responseHeaders = result.headers ?? []
+    session.statusText = result.status
       ? `${result.status} ${result.status_text}`
       : result.status_text
-    wsConnected.value = true
-    wsConnectError.value = false
+    session.connected = true
+    session.connectError = false
     // Connected system line also comes from backend event; keep UI responsive immediately.
   } catch (e) {
-    wsConnectError.value = true
-    wsConnected.value = false
-    wsSessionId.value = null
+    session.connectError = true
+    session.connected = false
+    session.sessionId = null
     const msg = invokeErrorMessage(e)
-    wsStatusText.value = msg
+    session.statusText = msg
     appendWsMessage({
       direction: 'system',
       kind: 'error',
@@ -2597,7 +2697,7 @@ async function onWsConnectToggle() {
       data: msg,
     })
   } finally {
-    wsConnecting.value = false
+    session.connecting = false
     emit('state-change')
   }
 }
@@ -2830,12 +2930,7 @@ function buildDetail() {
       data_type: 'Object',
       fields: compactFormDataFields(formDataFields.value),
     },
-    authorization: {
-      type: authType.value,
-      bearer_token: authBearerToken.value,
-      basic_username: authBasicUser.value,
-      basic_password: authBasicPassword.value,
-    },
+    authorization: authConfigToPersisted(authConfig),
     response_headers: compactParams(responseHeaders.value),
     response_results: [
       {
@@ -2858,7 +2953,7 @@ function buildDetail() {
   }
 }
 
-function buildSendHeaders() {
+function buildSendHeaders(authHeaders: Array<{ key: string; value: string }> = []) {
   let headers = requestHeaders.value
     .filter((h) => h.enabled !== false && h.name.trim())
     .map((h) => ({
@@ -2874,31 +2969,19 @@ function buildSendHeaders() {
     })
   }
 
-  if (
-    autoHeaderEnabled('Authorization') &&
-    authType.value === 'bearer' &&
-    authBearerToken.value.trim()
-  ) {
-    headers.push({
-      key: 'Authorization',
-      value: `Bearer ${authBearerToken.value.trim()}`,
-      enabled: true,
-    })
-  } else if (
-    autoHeaderEnabled('Authorization') &&
-    authType.value === 'basic' &&
-    (authBasicUser.value || authBasicPassword.value)
-  ) {
-    const token = btoa(`${authBasicUser.value}:${authBasicPassword.value}`)
-    headers.push({
-      key: 'Authorization',
-      value: `Basic ${token}`,
-      enabled: true,
-    })
+  for (const h of authHeaders) {
+    const keyLc = h.key.toLowerCase()
+    if (keyLc === 'authorization' && !autoHeaderEnabled('Authorization')) continue
+    if (headers.some((x) => x.key.toLowerCase() === keyLc)) continue
+    headers.push({ key: h.key, value: h.value, enabled: true })
   }
 
   if (!isGrpc.value) {
-    for (const h of sendableAutoHeaders(autoHeaderContext())) {
+    const ctx = {
+      ...autoHeaderContext(),
+      authHeaders,
+    }
+    for (const h of sendableAutoHeaders(ctx)) {
       if (!headers.some((x) => x.key.toLowerCase() === h.key.toLowerCase())) {
         headers.push({ key: h.key, value: h.value, enabled: true })
       }
@@ -2906,6 +2989,34 @@ function buildSendHeaders() {
   }
 
   return headers
+}
+
+async function resolveAuthArtifacts(url: string) {
+  const body =
+    bodyFormat.value === 'raw'
+      ? stripJsonComments(bodyRaw.value)
+      : bodyFormat.value === 'form-data'
+        ? ''
+        : ''
+  const contentType =
+    bodyFormat.value === 'raw'
+      ? 'application/json'
+      : bodyFormat.value === 'form-data'
+        ? 'multipart/form-data'
+        : undefined
+  const ctx = {
+    method: method.value,
+    url,
+    body,
+    contentType,
+  }
+  await ensureFolderAuth(true)
+  const folderArts =
+    folderAuthConfig.type === 'none'
+      ? { headers: [], query: [] }
+      : await applyAuth(folderAuthConfig, ctx)
+  const interfaceArts = await applyAuth(authConfig, ctx)
+  return mergeAuthArtifacts(folderArts, interfaceArts)
 }
 
 function applyInitial(resetUi = false) {
@@ -3028,19 +3139,10 @@ function applyInitial(resetUi = false) {
       normalizeFormDataFields()
       bodyFormat.value = 'none'
     }
-    const auth = d.authorization as Record<string, unknown> | undefined
-    if (auth) {
-      const type = String(auth.type ?? 'none')
-      authType.value = type === 'bearer' || type === 'basic' ? type : 'none'
-      authBearerToken.value = String(auth.bearer_token ?? '')
-      authBasicUser.value = String(auth.basic_username ?? '')
-      authBasicPassword.value = String(auth.basic_password ?? '')
-    } else {
-      authType.value = 'none'
-      authBearerToken.value = ''
-      authBasicUser.value = ''
-      authBasicPassword.value = ''
-    }
+    Object.assign(
+      authConfig,
+      authConfigFromPersisted(d.authorization as Record<string, unknown> | undefined),
+    )
     const results = d.response_results as any[] | undefined
     if (results?.[0]) {
       resultName.value = String(results[0].name ?? '')
@@ -3062,10 +3164,7 @@ function applyInitial(resetUi = false) {
     bodyRaw.value = ''
     formDataFields.value = [emptyParamRow()]
     normalizeFormDataFields()
-    authType.value = 'none'
-    authBearerToken.value = ''
-    authBasicUser.value = ''
-    authBasicPassword.value = ''
+    resetAuthConfig()
     resultName.value = t('create.defaultSuccess')
     exampleName.value = t('create.successExample')
   }
@@ -3134,34 +3233,42 @@ async function onSend() {
       showToast(t('grpc.streamingUnsupported'), 1800, 'warning')
       return
     }
+    const gen = ++sendGeneration
+    activeRequestId.value = null
     sending.value = true
     responseScrollTop.value = 0
     response.value = null
     responseTab.value = 'body'
     const grpcStarted = Date.now()
     try {
+      const auth = await resolveAuthArtifacts(url)
       const result = await invoke<SendResponse>('invoke_grpc', {
         args: {
-          endpoint: url,
+          endpoint: appendQueryToUrl(url, auth.query),
           rpc_path: grpcSelectedRpc.value,
           proto_source: grpcProtoSource.value,
           proto_name: grpcProtoName.value || null,
           message_json: stripJsonComments(bodyRaw.value),
-          metadata: buildSendHeaders(),
+          metadata: buildSendHeaders(auth.headers),
           tls: false,
           interface_id: props.interfaceId ?? null,
           variables: Object.keys(envVarMap.value).length ? envVarMap.value : null,
         },
       })
+      if (gen !== sendGeneration) return
       responseScrollTop.value = 0
       response.value = result
       responseBodyType.value = detectResponseBodyType(result.body ?? '')
       responseTab.value = 'body'
     } catch (e) {
+      if (gen !== sendGeneration || isRequestCancelled(e)) return
       applySendError(e, Date.now() - grpcStarted)
     } finally {
-      sending.value = false
-      emit('state-change')
+      if (gen === sendGeneration) {
+        sending.value = false
+        activeRequestId.value = null
+        emit('state-change')
+      }
     }
     return
   }
@@ -3174,32 +3281,50 @@ async function onSend() {
       return
     }
   }
+  const gen = ++sendGeneration
+  const requestId = newRequestId()
+  activeRequestId.value = requestId
   sending.value = true
   responseScrollTop.value = 0
   response.value = null
   responseTab.value = 'body'
   const started = Date.now()
   try {
+    const auth = await resolveAuthArtifacts(url)
+    if (gen !== sendGeneration) return
+    authSignedHeaders.value = auth.headers
+    const folderIdNum =
+      folderId.value == null || folderId.value === '' ? null : Number(folderId.value)
     const result = await invoke<SendResponse>('send_http_request', {
       args: {
         method: method.value,
-        url,
-        headers: buildSendHeaders(),
+        url: appendQueryToUrl(url, auth.query),
+        headers: buildSendHeaders(auth.headers),
         body: buildRequestBodyForSend(),
         form_data: formData,
         interface_id: props.interfaceId ?? null,
+        folder_id:
+          folderIdNum != null && Number.isFinite(folderIdNum) && folderIdNum !== 0
+            ? folderIdNum
+            : null,
         variables: Object.keys(envVarMap.value).length ? envVarMap.value : null,
+        request_id: requestId,
       },
     })
+    if (gen !== sendGeneration) return
     responseScrollTop.value = 0
     response.value = result
     responseBodyType.value = detectResponseBodyType(result.body ?? '')
     responseTab.value = 'body'
   } catch (e) {
+    if (gen !== sendGeneration || isRequestCancelled(e)) return
     applySendError(e, Date.now() - started)
   } finally {
-    sending.value = false
-    emit('state-change')
+    if (gen === sendGeneration) {
+      sending.value = false
+      activeRequestId.value = null
+      emit('state-change')
+    }
   }
 }
 
@@ -3365,12 +3490,20 @@ onUnmounted(() => {
     clearTimeout(saveUiTimer)
     saveUiTimer = null
   }
-  void disconnectWsSession(true)
-  if (wsEventUnlisten) {
-    wsEventUnlisten()
-    wsEventUnlisten = null
-  }
+  // Editor teardown (leave workspace/project) — not tab switches, which keep the same instance.
+  void disposeAllWsTabs()
 })
+
+watch(
+  () => wsMessages.value.length,
+  () => {
+    if (!isWs.value) return
+    void nextTick(() => {
+      const el = wsMessageListRef.value
+      if (el) el.scrollTop = el.scrollHeight
+    })
+  },
+)
 
 watch(
   () => [props.workspaceId, props.projectId, props.initial],
@@ -3851,8 +3984,12 @@ watch(
   align-items: flex-start;
 }
 
+.param-table:has(.param-table__value-shell:focus-within) {
+  overflow: visible;
+}
+
 .param-table__row:has(.param-table__value-shell:focus-within) {
-  z-index: 3;
+  z-index: 40;
 }
 
 .param-table__cell--inner {
@@ -3878,7 +4015,7 @@ watch(
   position: absolute;
   left: 6px;
   top: 3px;
-  z-index: 3;
+  z-index: 41;
   width: calc(100% - 12px);
   height: auto;
   min-height: 34px;
@@ -4183,6 +4320,14 @@ watch(
   flex-direction: column;
   gap: 8px;
   padding-left: 20px;
+  overflow: auto;
+}
+
+.auth-pane__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 12px;
 }
 
 .auth-pane__label {
@@ -4210,6 +4355,28 @@ watch(
 .auth-pane__input::placeholder {
   color: var(--color-interface-placeholder);
   opacity: 1;
+}
+
+.auth-pane__textarea {
+  width: 100%;
+  max-width: 520px;
+  min-height: 72px;
+  resize: vertical;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+  font-size: 12px;
+  line-height: 1.45;
+  padding: 8px 10px;
+}
+
+.auth-pane__check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--color-interface-field-text);
+  cursor: pointer;
+  user-select: none;
 }
 
 .auth-pane__hint {

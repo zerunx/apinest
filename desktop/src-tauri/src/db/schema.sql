@@ -60,9 +60,15 @@ CREATE TABLE IF NOT EXISTS folders (
   project_id INTEGER NOT NULL,
   parent_id INTEGER NOT NULL DEFAULT 0,
   name TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  headers_json TEXT NOT NULL DEFAULT '[]',
+  auth_json TEXT NOT NULL DEFAULT '{}',
   sort_order INTEGER NOT NULL DEFAULT 0,
   synced_at TEXT NOT NULL,
   is_local INTEGER NOT NULL DEFAULT 0,
+  -- NULL = inherit global app setting; 0 = no timeout; 1–1800 = seconds
+  request_timeout_secs INTEGER,
+  http_version TEXT NOT NULL DEFAULT 'auto',
   PRIMARY KEY (server_id, id)
 );
 

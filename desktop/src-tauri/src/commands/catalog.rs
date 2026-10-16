@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use rusqlite::params;
 use serde::Serialize;
 use serde_json::Value;
@@ -7,6 +9,56 @@ use crate::commands::auth::{current_auth, current_server_id};
 use crate::db::{now_iso, get_setting, set_setting, Db};
 use crate::error::{AppError, AppResult};
 use crate::nest::NestClient;
+
+/// Case-insensitive natural (alphanumeric) comparison: `a2` < `a10`.
+pub(crate) fn natural_cmp(a: &str, b: &str) -> Ordering {
+    let a_chars: Vec<char> = a.chars().flat_map(|c| c.to_lowercase()).collect();
+    let b_chars: Vec<char> = b.chars().flat_map(|c| c.to_lowercase()).collect();
+    let mut i = 0;
+    let mut j = 0;
+    while i < a_chars.len() && j < b_chars.len() {
+        let ac = a_chars[i];
+        let bc = b_chars[j];
+        if ac.is_ascii_digit() && bc.is_ascii_digit() {
+            let (an, ni) = read_natural_num(&a_chars, i);
+            let (bn, nj) = read_natural_num(&b_chars, j);
+            match an.cmp(&bn) {
+                Ordering::Equal => {
+                    // Same value: shorter digit run (fewer leading zeros) first.
+                    let alen = ni - i;
+                    let blen = nj - j;
+                    if alen != blen {
+                        return alen.cmp(&blen);
+                    }
+                    i = ni;
+                    j = nj;
+                }
+                other => return other,
+            }
+        } else {
+            match ac.cmp(&bc) {
+                Ordering::Equal => {
+                    i += 1;
+                    j += 1;
+                }
+                other => return other,
+            }
+        }
+    }
+    a_chars.len().cmp(&b_chars.len())
+}
+
+fn read_natural_num(chars: &[char], start: usize) -> (u64, usize) {
+    let mut n = 0u64;
+    let mut i = start;
+    while i < chars.len() && chars[i].is_ascii_digit() {
+        n = n
+            .saturating_mul(10)
+            .saturating_add(u64::from(chars[i].to_digit(10).unwrap_or(0)));
+        i += 1;
+    }
+    (n, i)
+}
 
 #[derive(Debug, Serialize)]
 pub struct WorkspaceRow {
@@ -124,14 +176,14 @@ pub fn get_local_tree(
     db.with_conn(|conn| {
         let mut folder_stmt = conn.prepare(
             "SELECT id, parent_id, name FROM folders
-             WHERE server_id = ?1 AND workspace_id = ?2 AND project_id = ?3
-             ORDER BY sort_order, id",
+             WHERE server_id = ?1 AND workspace_id = ?2 AND project_id = ?3",
         )?;
-        let folders: Vec<(i64, i64, String)> = folder_stmt
+        let mut folders: Vec<(i64, i64, String)> = folder_stmt
             .query_map(params![server_id, workspace_id, project_id], |r| {
                 Ok((r.get(0)?, r.get(1)?, r.get(2)?))
             })?
             .collect::<Result<Vec<_>, _>>()?;
+        folders.sort_by(|a, b| natural_cmp(&a.2, &b.2).then_with(|| a.0.cmp(&b.0)));
 
         let mut api_stmt = conn.prepare(
             "SELECT id, folder_id, name, method, url FROM interfaces

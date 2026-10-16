@@ -18,12 +18,13 @@ func (*Handler) Create(c *gin.Context) {
 		return
 	}
 
-	if err := (Service{}).Create(c.Request.Context(), utils.GetUserID(c), params); err != nil {
+	id, err := (Service{}).Create(c.Request.Context(), utils.GetUserID(c), params)
+	if err != nil {
 		logger.Error("workspace create failed", err)
 		response.Fail(c, err)
 		return
 	}
-	response.Success(c, nil)
+	response.Success(c, gin.H{"id": id})
 }
 
 func (*Handler) List(c *gin.Context) {

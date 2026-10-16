@@ -123,7 +123,7 @@ pub async fn invoke_grpc(db: State<'_, Db>, args: InvokeGrpcArgs) -> AppResult<S
         let secs = get_setting(conn, "request_timeout_secs")?
             .and_then(|s| s.parse::<u64>().ok())
             .unwrap_or(DEFAULT_TIMEOUT_SECS)
-            .clamp(1, 600);
+            .min(crate::commands::http_send::MAX_TIMEOUT_SECS);
         Ok(secs)
     })?;
 
@@ -152,13 +152,19 @@ pub async fn invoke_grpc(db: State<'_, Db>, args: InvokeGrpcArgs) -> AppResult<S
     let pool = compile_descriptor_pool(&proto_name, &args.proto_source)?;
     let method = find_method(&pool, &rpc_path)?;
     let body = encode_message_json(&method, &message_json)?;
+    // 0 means "no timeout" in settings; tonic still needs a Duration, so use a week.
+    let effective_timeout = if timeout_secs == 0 {
+        7 * 24 * 3600
+    } else {
+        timeout_secs.max(1)
+    };
     let result = invoke_unary(
         &endpoint,
         &rpc_path,
         &method,
         body,
         &call_metadata,
-        timeout_secs,
+        effective_timeout,
         CONNECT_TIMEOUT_SECS,
     )
     .await?;

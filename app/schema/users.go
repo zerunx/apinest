@@ -49,7 +49,7 @@ func (User) Fields() []ent.Field {
 			Comment("邮箱"),
 
 		field.String("avatar").
-			MaxLen(500).
+			MaxLen(1024).
 			Default("").
 			Comment("头像地址"),
 

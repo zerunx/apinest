@@ -10,6 +10,7 @@ import (
 	"nest-api/app/workspace"
 	"nest-api/internal/database"
 	"nest-api/internal/ent"
+	"nest-api/internal/ent/api"
 	"nest-api/internal/utils"
 	bizerr "nest-api/pkg/errors"
 )
@@ -128,8 +129,8 @@ func InsertInTx(ctx context.Context, tx *ent.Tx, userID, projectID, folderID int
 		name = string([]rune(name)[:100])
 	}
 	url := params.URL
-	if len(url) > 500 {
-		url = url[:500]
+	if len(url) > 1024 {
+		url = url[:1024]
 	}
 
 	row, err := tx.API.
@@ -205,6 +206,7 @@ func (Service) Update(ctx context.Context, userID int64, params UpdateRequest) e
 
 	updater := tx.API.
 		UpdateOneID(params.InterfaceID).
+		Where(api.DeletedAtIsNil()).
 		SetName(params.Name).
 		SetMethod(strings.ToUpper(params.Method)).
 		SetProtocol(normalizeProtocol(params.Protocol, params.Method, params.URL)).

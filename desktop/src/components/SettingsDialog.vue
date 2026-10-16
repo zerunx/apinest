@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <Teleport to="body">
     <div
       v-if="settingsOpen"
@@ -61,12 +61,43 @@
                   v-model.number="timeoutSecs"
                   class="input timeout-input"
                   type="number"
-                  min="1"
-                  max="600"
+                  min="0"
+                  max="1800"
                   step="1"
                   @change="saveTimeout"
                 />
                 <span class="muted">s</span>
+              </div>
+            </div>
+
+            <div class="block">
+              <h3>{{ t('settings.httpVersion') }}</h3>
+              <p class="muted">{{ t('settings.httpVersionHint') }}</p>
+              <div class="row">
+                <button
+                  class="btn"
+                  type="button"
+                  :class="{ active: httpVersion === 'auto' }"
+                  @click="setHttpVersion('auto')"
+                >
+                  {{ t('settings.httpVersionAuto') }}
+                </button>
+                <button
+                  class="btn"
+                  type="button"
+                  :class="{ active: httpVersion === 'http1.1' }"
+                  @click="setHttpVersion('http1.1')"
+                >
+                  HTTP/1.1
+                </button>
+                <button
+                  class="btn"
+                  type="button"
+                  :class="{ active: httpVersion === 'http2' }"
+                  @click="setHttpVersion('http2')"
+                >
+                  HTTP/2
+                </button>
               </div>
             </div>
           </div>
@@ -110,31 +141,43 @@
                   <p v-if="!loggedIn" class="muted">{{ t('settings.loginRequired') }}</p>
                   <p v-else class="muted">{{ t('settings.syncHint') }}</p>
                 </div>
-                <div class="row">
-                  <button
-                    class="btn"
-                    type="button"
-                    :disabled="busy || !loggedIn"
-                    @click="onTest"
-                  >
-                    {{ testing ? t('settings.testing') : t('settings.test') }}
-                  </button>
-                  <button
-                    class="btn btn-primary"
-                    type="button"
-                    :disabled="busy || !loggedIn"
-                    @click="onSync"
-                  >
-                    {{ syncing ? t('settings.syncing') : t('settings.syncNow') }}
-                  </button>
-                  <button
-                    v-if="!loggedIn"
-                    class="btn"
-                    type="button"
-                    @click="goLoginFromSettings"
-                  >
-                    {{ t('nav.login') }}
-                  </button>
+                <div class="sync-actions">
+                  <div class="row">
+                    <button
+                      class="btn"
+                      type="button"
+                      :disabled="!canLogin"
+                      @click="goLoginFromSettings"
+                    >
+                      {{ t('nav.login') }}
+                    </button>
+                    <button
+                      class="btn"
+                      type="button"
+                      :disabled="busy || !loggedIn"
+                      @click="onTest"
+                    >
+                      {{ testing ? t('settings.testing') : t('settings.test') }}
+                    </button>
+                  </div>
+                  <div class="row">
+                    <button
+                      class="btn btn-primary"
+                      type="button"
+                      :disabled="syncDisabled"
+                      @click="onSyncDownload"
+                    >
+                      {{ syncingDownload ? t('settings.syncingDownload') : t('settings.syncDownload') }}
+                    </button>
+                    <button
+                      class="btn btn-primary"
+                      type="button"
+                      :disabled="syncDisabled"
+                      @click="onSyncUpload"
+                    >
+                      {{ syncingUpload ? t('settings.syncingUpload') : t('settings.syncUpload') }}
+                    </button>
+                  </div>
                 </div>
               </div>
               <aside class="sync-aside">
@@ -153,16 +196,35 @@
             </div>
 
             <div class="data-card">
+              <h3>{{ t('settings.dbPath') }}</h3>
+              <code class="path">{{ dbPath }}</code>
+              <p class="muted data-desc">{{ t('settings.dbBackupHint') }}</p>
+              <div class="row">
+                <button
+                  class="btn"
+                  type="button"
+                  :disabled="busy || dbBusy"
+                  @click="onExportDb"
+                >
+                  {{ dbExporting ? t('settings.exportingDb') : t('settings.exportDb') }}
+                </button>
+                <button
+                  class="btn"
+                  type="button"
+                  :disabled="busy || dbBusy"
+                  @click="importConfirmOpen = true"
+                >
+                  {{ t('settings.importDb') }}
+                </button>
+              </div>
+            </div>
+
+            <div class="data-card">
               <h3>{{ t('settings.clearCache') }}</h3>
               <p class="muted data-desc">{{ t('settings.clearHint') }}</p>
               <button class="btn btn-danger" type="button" :disabled="busy" @click="onClear">
                 {{ t('settings.clearCache') }}
               </button>
-            </div>
-
-            <div class="data-card">
-              <h3>{{ t('settings.dbPath') }}</h3>
-              <code class="path">{{ dbPath }}</code>
             </div>
           </div>
 
@@ -194,10 +256,10 @@
             <p class="muted">{{ t('settings.comingSoon') }}</p>
           </div>
 
-          <!-- Update (reserved) -->
+          <!-- Update -->
           <div v-else-if="active === 'update'" class="panel-inner panel-placeholder">
             <h2>{{ t('settings.nav.update') }}</h2>
-            <p class="muted">{{ t('settings.comingSoon') }}</p>
+            <p class="muted">{{ t('settings.updateHint') }}</p>
           </div>
 
           <!-- About -->
@@ -231,6 +293,14 @@
       variant="danger"
       @confirm="confirmClearCache"
     />
+    <ConfirmDialog
+      v-model:open="importConfirmOpen"
+      :title="t('settings.importDb')"
+      :message="t('settings.importDbHint')"
+      :confirm-label="t('settings.importDb')"
+      variant="danger"
+      @confirm="confirmImportDb"
+    />
   </Teleport>
 </template>
 
@@ -257,26 +327,45 @@ type MenuId = 'general' | 'themes' | 'data' | 'shortcuts' | 'proxy' | 'update' |
 
 const { t, locale, setLocale } = useI18n()
 const { settingsOpen, closeSettings, session, refreshSession, openLogin } = useAppUi()
-const { onOverlayMouseDown, onOverlayMouseUp } = useOverlayDismiss(settingsOpen, closeSettings, {
-  escape: () => !clearConfirmOpen.value,
-})
 const clearConfirmOpen = ref(false)
+const importConfirmOpen = ref(false)
+const { onOverlayMouseDown, onOverlayMouseUp } = useOverlayDismiss(settingsOpen, closeSettings, {
+  escape: () => !clearConfirmOpen.value && !importConfirmOpen.value,
+})
 const { showToast } = useToast()
 const { theme, setTheme } = useTheme()
 const { refreshAfterSync } = useWorkspaceContext()
 
 const active = ref<MenuId>('general')
 const testing = ref(false)
-const syncing = ref(false)
+const syncingDownload = ref(false)
+const syncingUpload = ref(false)
+const dbExporting = ref(false)
+const dbImporting = ref(false)
 const lastSync = ref('')
 const lastSyncStats = ref<SyncStats | null>(null)
 const dbPath = ref('')
 const timeoutSecs = ref(60)
-const appVersion = '0.3.4'
+type HttpVersion = 'auto' | 'http1.1' | 'http2'
+const httpVersion = ref<HttpVersion>('auto')
+const dbBusy = computed(() => dbExporting.value || dbImporting.value)
+
+function normalizeHttpVersion(raw: string | null | undefined): HttpVersion {
+  if (raw === 'http2') return 'http2'
+  if (raw === 'http1.1') return 'http1.1'
+  return 'auto'
+}
+const appVersion = '0.4.1'
 const platformLabel = ref('—')
 const archLabel = ref('—')
-const busy = computed(() => testing.value || syncing.value)
+const busy = computed(
+  () => testing.value || syncingDownload.value || syncingUpload.value,
+)
 const loggedIn = computed(() => !!session.value?.logged_in)
+const connectionOk = ref(false)
+const connectionChecked = ref(false)
+const canLogin = computed(() => connectionChecked.value && !connectionOk.value)
+const syncDisabled = computed(() => busy.value || !loggedIn.value || !connectionOk.value)
 const modKey = computed(() => (isMacOS() ? '⌘' : 'Ctrl'))
 
 const syncStatItems = computed(() => {
@@ -350,9 +439,19 @@ const menu: { id: MenuId; labelKey: string; icon: string }[] = [
   },
 ]
 
+watch(active, (id) => {
+  if (!settingsOpen.value || id !== 'data') return
+  void probeConnection(false)
+})
+
 watch(settingsOpen, async (open) => {
-  if (!open) return
+  if (!open) {
+    probeSeq += 1
+    return
+  }
   active.value = 'general'
+  connectionOk.value = false
+  connectionChecked.value = false
   await refreshSession()
   try {
     dbPath.value = await invoke('get_db_path')
@@ -365,7 +464,11 @@ watch(settingsOpen, async (open) => {
     })
     const parsed = timeoutSaved ? Number(timeoutSaved) : 60
     timeoutSecs.value =
-      Number.isFinite(parsed) && parsed > 0 ? Math.min(600, Math.floor(parsed)) : 60
+      Number.isFinite(parsed) && parsed >= 0 ? Math.min(1800, Math.floor(parsed)) : 60
+    const httpSaved = await invoke<string | null>('get_setting_value', {
+      key: 'http_version',
+    })
+    httpVersion.value = normalizeHttpVersion(httpSaved)
   } catch {
     dbPath.value = '—'
   }
@@ -390,13 +493,25 @@ function goLoginFromSettings() {
 
 async function saveTimeout() {
   let secs = Number(timeoutSecs.value)
-  if (!Number.isFinite(secs) || secs < 1) secs = 60
-  if (secs > 600) secs = 600
+  if (!Number.isFinite(secs) || secs < 0) secs = 60
+  if (secs > 1800) secs = 1800
   timeoutSecs.value = Math.floor(secs)
   try {
     await invoke('set_setting_value', {
       key: 'request_timeout_secs',
       value: String(timeoutSecs.value),
+    })
+  } catch {
+    // browser preview
+  }
+}
+
+async function setHttpVersion(next: HttpVersion) {
+  httpVersion.value = next
+  try {
+    await invoke('set_setting_value', {
+      key: 'http_version',
+      value: next,
     })
   } catch {
     // browser preview
@@ -420,48 +535,95 @@ function parseSyncStats(raw: string | null): SyncStats | null {
   }
 }
 
-async function onTest() {
-  if (!loggedIn.value) return
+let probeSeq = 0
+
+async function probeConnection(notify: boolean) {
+  const seq = ++probeSeq
+  if (!loggedIn.value) {
+    connectionOk.value = false
+    connectionChecked.value = true
+    return
+  }
+  connectionOk.value = false
+  connectionChecked.value = false
   testing.value = true
   try {
     const count = await invoke<number>('test_connection')
-    showToast(
-      `${t('settings.testOk')} · ${t('settings.testOkHint', { count })}`,
-      2200,
-      'success',
-    )
+    if (seq !== probeSeq) return
+    connectionOk.value = true
+    connectionChecked.value = true
+    if (notify) {
+      showToast(
+        `${t('settings.testOk')} · ${t('settings.testOkHint', { count })}`,
+        2200,
+        'success',
+      )
+    }
   } catch (e) {
-    showToast(String(e), undefined, 'error')
+    if (seq !== probeSeq) return
+    connectionOk.value = false
+    connectionChecked.value = true
+    if (notify) showToast(String(e), undefined, 'error')
   } finally {
-    testing.value = false
+    if (seq === probeSeq) testing.value = false
   }
 }
 
-async function onSync() {
+async function onTest() {
   if (!loggedIn.value) return
-  syncing.value = true
+  await probeConnection(true)
+}
+
+async function applySyncResult(result: SyncResult, kind: 'download' | 'upload') {
+  lastSync.value = result.synced_at
+  lastSyncStats.value = {
+    workspaces: result.workspaces,
+    projects: result.projects,
+    folders: result.folders,
+    interfaces: result.interfaces,
+    environments: result.environments,
+  }
+  await invoke('set_setting_value', { key: 'last_sync_at', value: result.synced_at })
+  await invoke('set_setting_value', {
+    key: 'last_sync_stats',
+    value: JSON.stringify(lastSyncStats.value),
+  })
+  await invoke('set_setting_value', { key: 'last_sync_kind', value: kind })
+  await refreshAfterSync()
+  showToast(
+    kind === 'download' ? t('settings.syncDownloadDone') : t('settings.syncUploadDone'),
+    1600,
+    'success',
+  )
+}
+
+async function onSyncDownload() {
+  if (syncDisabled.value) return
+  syncingDownload.value = true
   try {
     const result = await invoke<SyncResult>('sync_now', {
       args: { workspace_id: null },
     })
-    lastSync.value = result.synced_at
-    lastSyncStats.value = {
-      workspaces: result.workspaces,
-      projects: result.projects,
-      folders: result.folders,
-      interfaces: result.interfaces,
-      environments: result.environments,
-    }
-    await invoke('set_setting_value', { key: 'last_sync_at', value: result.synced_at })
-    await invoke('set_setting_value', {
-      key: 'last_sync_stats',
-      value: JSON.stringify(lastSyncStats.value),
-    })
-    await refreshAfterSync()
+    await applySyncResult(result, 'download')
   } catch (e) {
     showToast(String(e), undefined, 'error')
   } finally {
-    syncing.value = false
+    syncingDownload.value = false
+  }
+}
+
+async function onSyncUpload() {
+  if (syncDisabled.value) return
+  syncingUpload.value = true
+  try {
+    const result = await invoke<SyncResult>('sync_upload', {
+      args: { workspace_id: null },
+    })
+    await applySyncResult(result, 'upload')
+  } catch (e) {
+    showToast(String(e), undefined, 'error')
+  } finally {
+    syncingUpload.value = false
   }
 }
 
@@ -477,8 +639,43 @@ async function confirmClearCache() {
     lastSyncStats.value = null
     await invoke('set_setting_value', { key: 'last_sync_at', value: '' })
     await invoke('set_setting_value', { key: 'last_sync_stats', value: '' })
+    showToast(t('settings.clearDone'), 1500, 'success')
   } catch (e) {
     showToast(String(e), undefined, 'error')
+  }
+}
+
+async function onExportDb() {
+  dbExporting.value = true
+  try {
+    const ok = await invoke<boolean>('export_local_database')
+    if (ok) showToast(t('settings.exportDbDone'), 1600, 'success')
+  } catch (e) {
+    showToast(String(e), undefined, 'error')
+  } finally {
+    dbExporting.value = false
+  }
+}
+
+async function confirmImportDb() {
+  dbImporting.value = true
+  try {
+    const ok = await invoke<boolean>('import_local_database')
+    if (!ok) return
+    await refreshAfterSync()
+    try {
+      dbPath.value = await invoke('get_db_path')
+      lastSync.value = (await invoke<string | null>('get_setting_value', { key: 'last_sync_at' })) || ''
+      const statsRaw = await invoke<string | null>('get_setting_value', { key: 'last_sync_stats' })
+      lastSyncStats.value = statsRaw ? (JSON.parse(statsRaw) as SyncStats) : null
+    } catch {
+      /* ignore refresh meta errors */
+    }
+    showToast(t('settings.importDbDone'), 1800, 'success')
+  } catch (e) {
+    showToast(String(e), undefined, 'error')
+  } finally {
+    dbImporting.value = false
   }
 }
 </script>
@@ -769,6 +966,17 @@ async function confirmClearCache() {
 }
 
 .data-card .row {
+  margin-top: 0;
+}
+
+.sync-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.sync-actions .row {
   margin-top: 0;
 }
 

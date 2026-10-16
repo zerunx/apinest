@@ -7,7 +7,10 @@ use crate::commands::auth::current_server_id;
 use crate::commands::catalog::{
     EnvironmentRow, EnvironmentVariableRow, InterfaceRow, ProjectRow, WorkspaceRow,
 };
-use crate::db::{ensure_catalog_server, next_local_id, now_iso, Db};
+use crate::commands::http_send::{
+    clamp_timeout_secs, HeaderPair, HttpVersionPref, DEFAULT_TIMEOUT_SECS,
+};
+use crate::db::{ensure_catalog_server, get_setting, next_local_id, now_iso, Db};
 use crate::error::{AppError, AppResult};
 use crate::grpc::store::{delete_grpc_rpcs, delete_grpc_rpcs_for_folder, replace_grpc_rpcs_from_detail};
 
@@ -612,14 +615,16 @@ pub fn list_local_folders(
     db.with_conn(|conn| {
         let mut stmt = conn.prepare(
             "SELECT id, parent_id, name FROM folders
-             WHERE server_id = ?1 AND workspace_id = ?2 AND project_id = ?3
-             ORDER BY sort_order, id",
+             WHERE server_id = ?1 AND workspace_id = ?2 AND project_id = ?3",
         )?;
-        let rows: Vec<(i64, i64, String)> = stmt
+        let mut rows: Vec<(i64, i64, String)> = stmt
             .query_map(params![server_id, workspace_id, project_id], |r| {
                 Ok((r.get(0)?, r.get(1)?, r.get(2)?))
             })?
             .collect::<Result<Vec<_>, _>>()?;
+        rows.sort_by(|a, b| {
+            super::catalog::natural_cmp(&a.2, &b.2).then_with(|| a.0.cmp(&b.0))
+        });
 
         let mut options = Vec::new();
         fn walk(
@@ -676,6 +681,184 @@ pub fn rename_local_folder(db: State<'_, Db>, args: RenameFolderArgs) -> AppResu
             "UPDATE folders SET name = ?1, synced_at = ?2, is_local = 1
              WHERE server_id = ?3 AND id = ?4",
             params![name, now, server_id, args.id],
+        )?;
+        if n == 0 {
+            return Err(AppError::msg("文件夹不存在"));
+        }
+        Ok(())
+    })
+}
+
+#[derive(Debug, Serialize)]
+pub struct FolderSettings {
+    pub id: i64,
+    pub name: String,
+    pub description: String,
+    pub headers: Vec<HeaderPair>,
+    #[serde(default)]
+    pub authorization: Value,
+    /// Effective timeout shown in UI (folder override or global).
+    pub request_timeout_secs: u64,
+    /// Whether the folder stores its own timeout (false = inheriting global until saved).
+    pub timeout_override: bool,
+    pub http_version: String,
+    pub global_timeout_secs: u64,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateFolderSettingsArgs {
+    pub id: i64,
+    pub name: String,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub headers: Vec<HeaderPair>,
+    #[serde(default)]
+    pub authorization: Option<Value>,
+    pub request_timeout_secs: u64,
+    pub http_version: String,
+}
+
+fn parse_headers_json(raw: &str) -> Vec<HeaderPair> {
+    serde_json::from_str::<Vec<HeaderPair>>(raw).unwrap_or_default()
+}
+
+fn serialize_headers(headers: &[HeaderPair]) -> AppResult<String> {
+    let cleaned: Vec<HeaderPair> = headers
+        .iter()
+        .filter(|h| !h.key.trim().is_empty())
+        .map(|h| HeaderPair {
+            key: h.key.trim().to_string(),
+            value: h.value.clone(),
+            enabled: Some(h.enabled != Some(false)),
+        })
+        .collect();
+    Ok(serde_json::to_string(&cleaned)?)
+}
+
+fn parse_auth_json(raw: &str) -> Value {
+    serde_json::from_str(raw).unwrap_or_else(|_| serde_json::json!({ "type": "none" }))
+}
+
+fn serialize_auth(authorization: &Option<Value>) -> AppResult<String> {
+    let value = match authorization {
+        Some(v) if !v.is_null() => v.clone(),
+        _ => serde_json::json!({ "type": "none" }),
+    };
+    Ok(serde_json::to_string(&value)?)
+}
+
+#[tauri::command]
+pub fn get_folder_settings(db: State<'_, Db>, folder_id: i64) -> AppResult<FolderSettings> {
+    let server_id = current_server_id(&db)?;
+    db.with_conn(|conn| {
+        let global_timeout = clamp_timeout_secs(
+            get_setting(conn, "request_timeout_secs")?
+                .and_then(|s| s.parse::<u64>().ok())
+                .unwrap_or(DEFAULT_TIMEOUT_SECS),
+        );
+        let (name, description, headers_json, auth_json, stored_timeout, http_version): (
+            String,
+            String,
+            String,
+            String,
+            Option<i64>,
+            String,
+        ) = conn
+            .query_row(
+                "SELECT name,
+                        IFNULL(description, ''),
+                        IFNULL(headers_json, '[]'),
+                        IFNULL(auth_json, '{}'),
+                        request_timeout_secs,
+                        http_version
+                 FROM folders
+                 WHERE server_id = ?1 AND id = ?2",
+                params![server_id, folder_id],
+                |r| {
+                    Ok((
+                        r.get(0)?,
+                        r.get::<_, Option<String>>(1)?.unwrap_or_default(),
+                        r.get::<_, Option<String>>(2)?
+                            .unwrap_or_else(|| "[]".into()),
+                        r.get::<_, Option<String>>(3)?
+                            .unwrap_or_else(|| "{}".into()),
+                        r.get(4)?,
+                        r.get::<_, Option<String>>(5)?
+                            .unwrap_or_else(|| "auto".into()),
+                    ))
+                },
+            )
+            .map_err(|_| AppError::msg("文件夹不存在"))?;
+
+        let timeout_override = stored_timeout.is_some();
+        let request_timeout_secs = stored_timeout
+            .map(|s| clamp_timeout_secs(s.max(0) as u64))
+            .unwrap_or(global_timeout);
+        let http_version = HttpVersionPref::parse(&http_version).as_str().to_string();
+        let mut headers = parse_headers_json(&headers_json);
+        if headers.is_empty() {
+            headers.push(HeaderPair {
+                key: String::new(),
+                value: String::new(),
+                enabled: Some(true),
+            });
+        }
+        let authorization = parse_auth_json(&auth_json);
+
+        Ok(FolderSettings {
+            id: folder_id,
+            name,
+            description,
+            headers,
+            authorization,
+            request_timeout_secs,
+            timeout_override,
+            http_version,
+            global_timeout_secs: global_timeout,
+        })
+    })
+}
+
+#[tauri::command]
+pub fn update_folder_settings(
+    db: State<'_, Db>,
+    args: UpdateFolderSettingsArgs,
+) -> AppResult<()> {
+    let name = args.name.trim().to_string();
+    if name.is_empty() {
+        return Err(AppError::msg("文件夹名称不能为空"));
+    }
+    let description = args.description.trim().to_string();
+    let headers_json = serialize_headers(&args.headers)?;
+    let auth_json = serialize_auth(&args.authorization)?;
+    let timeout = clamp_timeout_secs(args.request_timeout_secs);
+    let http_version = HttpVersionPref::parse(&args.http_version).as_str();
+    let server_id = current_server_id(&db)?;
+    db.with_conn(|conn| {
+        let now = now_iso();
+        let n = conn.execute(
+            "UPDATE folders SET
+               name = ?1,
+               description = ?2,
+               headers_json = ?3,
+               auth_json = ?4,
+               request_timeout_secs = ?5,
+               http_version = ?6,
+               synced_at = ?7,
+               is_local = 1
+             WHERE server_id = ?8 AND id = ?9",
+            params![
+                name,
+                description,
+                headers_json,
+                auth_json,
+                timeout as i64,
+                http_version,
+                now,
+                server_id,
+                args.id
+            ],
         )?;
         if n == 0 {
             return Err(AppError::msg("文件夹不存在"));

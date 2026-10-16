@@ -1,21 +1,96 @@
 use std::collections::HashMap;
 use std::error::Error as StdError;
+use std::sync::Mutex;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use base64::Engine;
-use reqwest::blocking::Client;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue, CONTENT_LENGTH, CONTENT_TYPE};
+use reqwest::Client;
 use reqwest::Method;
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use tauri::State;
+use tokio::sync::oneshot;
 use url::Url;
 
 use crate::db::{get_setting, now_iso, Db};
 use crate::error::{AppError, AppResult};
 
-pub(crate) const DEFAULT_TIMEOUT_SECS: u64 = 30;
+pub const REQUEST_CANCELLED: &str = "request cancelled";
+
+/// In-flight HTTP request cancel registry (request_id → oneshot).
+pub struct HttpRequestHub {
+    inner: Mutex<HashMap<String, oneshot::Sender<()>>>,
+}
+
+impl HttpRequestHub {
+    pub fn new() -> Self {
+        Self {
+            inner: Mutex::new(HashMap::new()),
+        }
+    }
+
+    fn register(&self, request_id: &str) -> oneshot::Receiver<()> {
+        let (tx, rx) = oneshot::channel();
+        if let Ok(mut map) = self.inner.lock() {
+            if let Some(prev) = map.insert(request_id.to_string(), tx) {
+                let _ = prev.send(());
+            }
+        }
+        rx
+    }
+
+    fn unregister(&self, request_id: &str) {
+        if let Ok(mut map) = self.inner.lock() {
+            map.remove(request_id);
+        }
+    }
+
+    fn cancel(&self, request_id: &str) -> bool {
+        if let Ok(mut map) = self.inner.lock() {
+            if let Some(tx) = map.remove(request_id) {
+                let _ = tx.send(());
+                return true;
+            }
+        }
+        false
+    }
+}
+
+pub(crate) const DEFAULT_TIMEOUT_SECS: u64 = 60;
 pub(crate) const CONNECT_TIMEOUT_SECS: u64 = 10;
+pub(crate) const MAX_TIMEOUT_SECS: u64 = 1800;
+
+/// Clamp to 0..=1800. `0` means no request timeout.
+pub(crate) fn clamp_timeout_secs(secs: u64) -> u64 {
+    secs.min(MAX_TIMEOUT_SECS)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum HttpVersionPref {
+    /// ALPN negotiate (HTTP/2 when available, otherwise HTTP/1.1).
+    Auto,
+    Http11,
+    Http2,
+}
+
+impl HttpVersionPref {
+    pub(crate) fn parse(raw: &str) -> Self {
+        match raw.trim().to_ascii_lowercase().as_str() {
+            "http1.1" | "http1" | "h1" | "1.1" | "1" => Self::Http11,
+            "http2" | "h2" | "2" => Self::Http2,
+            _ => Self::Auto,
+        }
+    }
+
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Auto => "auto",
+            Self::Http11 => "http1.1",
+            Self::Http2 => "http2",
+        }
+    }
+}
 
 fn error_chain(err: &dyn StdError) -> String {
     let mut out = err.to_string();
@@ -56,7 +131,13 @@ pub struct SendRequestArgs {
     #[serde(default)]
     pub form_data: Option<Vec<FormDataField>>,
     pub interface_id: Option<i64>,
+    /// Preferred folder for per-folder timeout / HTTP version; falls back to interface lookup.
+    #[serde(default)]
+    pub folder_id: Option<i64>,
     pub variables: Option<HashMap<String, String>>,
+    /// Optional id so the frontend can cancel this in-flight request.
+    #[serde(default)]
+    pub request_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -86,6 +167,7 @@ struct PreparedRequest {
     body_bytes: Option<Vec<u8>>,
     header_map: HeaderMap,
     timeout_secs: u64,
+    http_version: HttpVersionPref,
 }
 
 pub(crate) fn apply_vars(input: &str, vars: &HashMap<String, String>) -> String {
@@ -207,7 +289,11 @@ fn build_multipart_body(
     Ok((content_type, body))
 }
 
-fn prepare_request(args: &SendRequestArgs, timeout_secs: u64) -> AppResult<PreparedRequest> {
+fn prepare_request(
+    args: &SendRequestArgs,
+    timeout_secs: u64,
+    http_version: HttpVersionPref,
+) -> AppResult<PreparedRequest> {
     let vars = args.variables.clone().unwrap_or_default();
     let url = apply_vars(&args.url, &vars);
     validate_request_url(&url)?;
@@ -269,18 +355,51 @@ fn prepare_request(args: &SendRequestArgs, timeout_secs: u64) -> AppResult<Prepa
         body_bytes,
         header_map,
         timeout_secs,
+        http_version,
     })
 }
 
-fn execute_http_request(
+fn map_reqwest_error(e: reqwest::Error, timeout_secs: u64) -> AppError {
+    let detail = error_chain(&e);
+    if e.is_timeout() {
+        let timeout_label = if timeout_secs == 0 {
+            "disabled".to_string()
+        } else {
+            format!("{timeout_secs}s")
+        };
+        AppError::msg(format!(
+            "request timed out after {timeout_label} (connect limit {}s): {detail}",
+            CONNECT_TIMEOUT_SECS
+        ))
+    } else if e.is_connect() {
+        AppError::msg(format!("connection failed: {detail}"))
+    } else if e.is_body() {
+        AppError::msg(format!(
+            "request failed: {detail} (peer closed the connection while the body was being sent)"
+        ))
+    } else {
+        AppError::msg(format!("request failed: {detail}"))
+    }
+}
+
+async fn execute_http_request(
     prepared: PreparedRequest,
 ) -> AppResult<(u16, String, Vec<HeaderPair>, String, u128)> {
     // native-tls (SChannel on Windows) matches Postman/browser TLS more closely than rustls.
-    let client = Client::builder()
-        .timeout(Duration::from_secs(prepared.timeout_secs))
+    let mut builder = Client::builder()
         .connect_timeout(Duration::from_secs(CONNECT_TIMEOUT_SECS))
-        .redirect(reqwest::redirect::Policy::limited(10))
-        .build()?;
+        .redirect(reqwest::redirect::Policy::limited(10));
+    // 0 = wait indefinitely (still bounded by connect_timeout for the TCP handshake).
+    // Async ClientBuilder has no timeout(None); omit the call to disable.
+    if prepared.timeout_secs > 0 {
+        builder = builder.timeout(Duration::from_secs(prepared.timeout_secs));
+    }
+    builder = match prepared.http_version {
+        HttpVersionPref::Http11 => builder.http1_only(),
+        // Auto / HTTP/2: allow ALPN to pick HTTP/2 when the peer supports it.
+        HttpVersionPref::Auto | HttpVersionPref::Http2 => builder,
+    };
+    let client = builder.build()?;
 
     let mut req = client
         .request(prepared.method, &prepared.url)
@@ -290,23 +409,11 @@ fn execute_http_request(
     }
 
     let started = Instant::now();
-    let resp = req.send().map_err(|e| {
-        let detail = error_chain(&e);
-        if e.is_timeout() {
-            AppError::msg(format!(
-                "request timed out after {}s (connect limit {}s): {detail}",
-                prepared.timeout_secs, CONNECT_TIMEOUT_SECS
-            ))
-        } else if e.is_connect() {
-            AppError::msg(format!("connection failed: {detail}"))
-        } else if e.is_body() {
-            AppError::msg(format!(
-                "request failed: {detail} (peer closed the connection while the body was being sent)"
-            ))
-        } else {
-            AppError::msg(format!("request failed: {detail}"))
-        }
-    })?;
+    let timeout_secs = prepared.timeout_secs;
+    let resp = req
+        .send()
+        .await
+        .map_err(|e| map_reqwest_error(e, timeout_secs))?;
     let duration_ms = started.elapsed().as_millis();
     let status = resp.status();
     let status_text = status.canonical_reason().unwrap_or("").to_string();
@@ -320,7 +427,7 @@ fn execute_http_request(
             enabled: Some(true),
         });
     }
-    let resp_body = resp.text().unwrap_or_default();
+    let resp_body = resp.text().await.unwrap_or_default();
 
     Ok((status_code, status_text, resp_headers, resp_body, duration_ms))
 }
@@ -346,28 +453,164 @@ fn sanitize_form_data_for_history(fields: &[FormDataField]) -> Vec<serde_json::V
         .collect()
 }
 
+/// Folder headers first; interface headers override same key (case-insensitive).
+pub(crate) fn merge_headers(folder: &[HeaderPair], interface: &[HeaderPair]) -> Vec<HeaderPair> {
+    let mut out: Vec<HeaderPair> = Vec::new();
+    for h in folder {
+        if h.enabled == Some(false) || h.key.trim().is_empty() {
+            continue;
+        }
+        out.push(HeaderPair {
+            key: h.key.trim().to_string(),
+            value: h.value.clone(),
+            enabled: Some(true),
+        });
+    }
+    for h in interface {
+        if h.enabled == Some(false) || h.key.trim().is_empty() {
+            continue;
+        }
+        let key = h.key.trim().to_string();
+        let next = HeaderPair {
+            key: key.clone(),
+            value: h.value.clone(),
+            enabled: Some(true),
+        };
+        if let Some(pos) = out.iter().position(|x| x.key.eq_ignore_ascii_case(&key)) {
+            out[pos] = next;
+        } else {
+            out.push(next);
+        }
+    }
+    out
+}
+
+fn parse_folder_headers_json(raw: &str) -> Vec<HeaderPair> {
+    serde_json::from_str::<Vec<HeaderPair>>(raw).unwrap_or_default()
+}
+
+fn resolve_request_options(
+    conn: &rusqlite::Connection,
+    folder_id: Option<i64>,
+    interface_id: Option<i64>,
+) -> AppResult<(u64, HttpVersionPref, Vec<HeaderPair>)> {
+    let global_timeout = get_setting(conn, "request_timeout_secs")?
+        .and_then(|s| s.parse::<u64>().ok())
+        .unwrap_or(DEFAULT_TIMEOUT_SECS);
+    let global_timeout = clamp_timeout_secs(global_timeout);
+
+    let server_id: Option<i64> = get_setting(conn, "active_server_id")?
+        .and_then(|s| s.parse().ok());
+
+    let global_http = HttpVersionPref::parse(
+        &get_setting(conn, "http_version")?.unwrap_or_else(|| "auto".into()),
+    );
+
+    let mut folder_timeout: Option<u64> = None;
+    let mut folder_http: Option<HttpVersionPref> = None;
+    let mut folder_headers: Vec<HeaderPair> = Vec::new();
+
+    let resolved_folder_id = if let Some(fid) = folder_id.filter(|id| *id != 0) {
+        Some(fid)
+    } else if let (Some(sid), Some(iid)) = (server_id, interface_id) {
+        conn.query_row(
+            "SELECT folder_id FROM interfaces WHERE server_id = ?1 AND id = ?2",
+            params![sid, iid],
+            |r| r.get::<_, i64>(0),
+        )
+        .ok()
+        .filter(|id| *id != 0)
+    } else {
+        None
+    };
+
+    if let (Some(sid), Some(fid)) = (server_id, resolved_folder_id) {
+        let row = conn.query_row(
+            "SELECT request_timeout_secs, http_version, IFNULL(headers_json, '[]')
+             FROM folders
+             WHERE server_id = ?1 AND id = ?2",
+            params![sid, fid],
+            |r| {
+                Ok((
+                    r.get::<_, Option<i64>>(0)?,
+                    r.get::<_, Option<String>>(1)?,
+                    r.get::<_, String>(2)?,
+                ))
+            },
+        );
+        if let Ok((timeout, version, headers_json)) = row {
+            if let Some(secs) = timeout {
+                if secs >= 0 {
+                    folder_timeout = Some(clamp_timeout_secs(secs as u64));
+                }
+            }
+            if let Some(version) = version.filter(|v| !v.trim().is_empty()) {
+                folder_http = Some(HttpVersionPref::parse(&version));
+            }
+            folder_headers = parse_folder_headers_json(&headers_json);
+        }
+    }
+
+    Ok((
+        folder_timeout.unwrap_or(global_timeout),
+        folder_http.unwrap_or(global_http),
+        folder_headers,
+    ))
+}
+
 #[tauri::command]
-pub async fn send_http_request(db: State<'_, Db>, args: SendRequestArgs) -> AppResult<SendResponse> {
-    let timeout_secs = db.with_conn(|conn| {
-        let secs = get_setting(conn, "request_timeout_secs")?
-            .and_then(|s| s.parse::<u64>().ok())
-            .unwrap_or(DEFAULT_TIMEOUT_SECS)
-            .clamp(1, 600);
-        Ok(secs)
+pub fn cancel_http_request(hub: State<'_, HttpRequestHub>, request_id: String) -> AppResult<()> {
+    let id = request_id.trim();
+    if id.is_empty() {
+        return Err(AppError::msg("request_id is required"));
+    }
+    let _ = hub.cancel(id);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn send_http_request(
+    db: State<'_, Db>,
+    hub: State<'_, HttpRequestHub>,
+    args: SendRequestArgs,
+) -> AppResult<SendResponse> {
+    let (timeout_secs, http_version, folder_headers) = db.with_conn(|conn| {
+        resolve_request_options(conn, args.folder_id, args.interface_id)
     })?;
 
-    let prepared = prepare_request(&args, timeout_secs)?;
+    let mut args = args;
+    args.headers = merge_headers(&folder_headers, &args.headers);
+
+    let prepared = prepare_request(&args, timeout_secs, http_version)?;
     let method = args.method.clone();
     let interface_id = args.interface_id;
     let url = prepared.url.clone();
     let stored_headers = prepared.stored_headers.clone();
     let request_body = prepared.body_text.clone();
     let form_data = args.form_data.clone();
+    let request_id = args
+        .request_id
+        .as_ref()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
 
-    let (status_code, status_text, resp_headers, resp_body, duration_ms) =
-        tauri::async_runtime::spawn_blocking(move || execute_http_request(prepared))
-            .await
-            .map_err(|e| AppError::msg(format!("request task failed: {e}")))??;
+    let cancel_rx = request_id.as_ref().map(|id| hub.register(id));
+
+    let send_result = if let Some(rx) = cancel_rx {
+        tokio::select! {
+            biased;
+            _ = rx => Err(AppError::msg(REQUEST_CANCELLED)),
+            res = execute_http_request(prepared) => res,
+        }
+    } else {
+        execute_http_request(prepared).await
+    };
+
+    if let Some(id) = request_id.as_ref() {
+        hub.unregister(id);
+    }
+
+    let (status_code, status_text, resp_headers, resp_body, duration_ms) = send_result?;
 
     let request_json = if let Some(ref fields) = form_data {
         serde_json::to_string(&serde_json::json!({

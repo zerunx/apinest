@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="settings">
     <header class="bar">
       <button class="btn" type="button" @click="router.push({ name: 'main' })">
@@ -37,13 +37,20 @@
           <p class="muted">{{ session?.account || '' }}</p>
           <p class="muted">{{ t('settings.syncHint') }}</p>
 
-          <div class="row">
-            <button class="btn" type="button" :disabled="busy" @click="onTest">
-              {{ testing ? t('settings.testing') : t('settings.test') }}
-            </button>
-            <button class="btn btn-primary" type="button" :disabled="busy" @click="onSync">
-              {{ syncing ? t('settings.syncing') : t('settings.syncNow') }}
-            </button>
+          <div class="sync-actions">
+            <div class="row">
+              <button class="btn" type="button" :disabled="busy" @click="onTest">
+                {{ testing ? t('settings.testing') : t('settings.test') }}
+              </button>
+            </div>
+            <div class="row">
+              <button class="btn btn-primary" type="button" :disabled="busy" @click="onSyncDownload">
+                {{ syncingDownload ? t('settings.syncingDownload') : t('settings.syncDownload') }}
+              </button>
+              <button class="btn btn-primary" type="button" :disabled="busy" @click="onSyncUpload">
+                {{ syncingUpload ? t('settings.syncingUpload') : t('settings.syncUpload') }}
+              </button>
+            </div>
           </div>
         </div>
         <aside class="sync-aside">
@@ -62,16 +69,30 @@
       </section>
 
       <section class="card">
+        <h2>{{ t('settings.dbPath') }}</h2>
+        <code class="path">{{ dbPath }}</code>
+        <p class="muted">{{ t('settings.dbBackupHint') }}</p>
+        <div class="row">
+          <button class="btn" type="button" :disabled="busy || dbBusy" @click="onExportDb">
+            {{ dbExporting ? t('settings.exportingDb') : t('settings.exportDb') }}
+          </button>
+          <button
+            class="btn"
+            type="button"
+            :disabled="busy || dbBusy"
+            @click="importConfirmOpen = true"
+          >
+            {{ t('settings.importDb') }}
+          </button>
+        </div>
+      </section>
+
+      <section class="card">
         <h2>{{ t('settings.clearCache') }}</h2>
         <p class="muted">{{ t('settings.clearHint') }}</p>
         <button class="btn btn-danger" type="button" :disabled="busy" @click="onClear">
           {{ t('settings.clearCache') }}
         </button>
-      </section>
-
-      <section class="card">
-        <h2>{{ t('settings.dbPath') }}</h2>
-        <code class="path">{{ dbPath }}</code>
       </section>
     </div>
 
@@ -82,6 +103,14 @@
       :confirm-label="t('settings.clearCache')"
       variant="danger"
       @confirm="confirmClearCache"
+    />
+    <ConfirmDialog
+      v-model:open="importConfirmOpen"
+      :title="t('settings.importDb')"
+      :message="t('settings.importDbHint')"
+      :confirm-label="t('settings.importDb')"
+      variant="danger"
+      @confirm="confirmImportDb"
     />
   </div>
 </template>
@@ -106,14 +135,21 @@ const router = useRouter()
 
 const session = ref<SessionInfo | null>(null)
 const testing = ref(false)
-const syncing = ref(false)
+const syncingDownload = ref(false)
+const syncingUpload = ref(false)
+const dbExporting = ref(false)
+const dbImporting = ref(false)
 const lastSync = ref('')
 const lastSyncStats = ref<SyncStats | null>(null)
 const dbPath = ref('')
 const clearConfirmOpen = ref(false)
+const importConfirmOpen = ref(false)
 const { showToast } = useToast()
 
-const busy = computed(() => testing.value || syncing.value)
+const busy = computed(
+  () => testing.value || syncingDownload.value || syncingUpload.value,
+)
+const dbBusy = computed(() => dbExporting.value || dbImporting.value)
 
 const syncStatItems = computed(() => {
   const stats = lastSyncStats.value
@@ -174,29 +210,49 @@ async function onTest() {
   }
 }
 
-async function onSync() {
-  syncing.value = true
+async function applySyncResult(result: SyncResult) {
+  lastSync.value = result.synced_at
+  lastSyncStats.value = {
+    workspaces: result.workspaces,
+    projects: result.projects,
+    folders: result.folders,
+    interfaces: result.interfaces,
+    environments: result.environments,
+  }
+  await invoke('set_setting_value', { key: 'last_sync_at', value: result.synced_at })
+  await invoke('set_setting_value', {
+    key: 'last_sync_stats',
+    value: JSON.stringify(lastSyncStats.value),
+  })
+}
+
+async function onSyncDownload() {
+  syncingDownload.value = true
   try {
     const result = await invoke<SyncResult>('sync_now', {
       args: { workspace_id: null },
     })
-    lastSync.value = result.synced_at
-    lastSyncStats.value = {
-      workspaces: result.workspaces,
-      projects: result.projects,
-      folders: result.folders,
-      interfaces: result.interfaces,
-      environments: result.environments,
-    }
-    await invoke('set_setting_value', { key: 'last_sync_at', value: result.synced_at })
-    await invoke('set_setting_value', {
-      key: 'last_sync_stats',
-      value: JSON.stringify(lastSyncStats.value),
-    })
+    await applySyncResult(result)
+    showToast(t('settings.syncDownloadDone'), 1600, 'success')
   } catch (e) {
     showToast(String(e), undefined, 'error')
   } finally {
-    syncing.value = false
+    syncingDownload.value = false
+  }
+}
+
+async function onSyncUpload() {
+  syncingUpload.value = true
+  try {
+    const result = await invoke<SyncResult>('sync_upload', {
+      args: { workspace_id: null },
+    })
+    await applySyncResult(result)
+    showToast(t('settings.syncUploadDone'), 1600, 'success')
+  } catch (e) {
+    showToast(String(e), undefined, 'error')
+  } finally {
+    syncingUpload.value = false
   }
 }
 
@@ -211,8 +267,39 @@ async function confirmClearCache() {
     lastSyncStats.value = null
     await invoke('set_setting_value', { key: 'last_sync_at', value: '' })
     await invoke('set_setting_value', { key: 'last_sync_stats', value: '' })
+    showToast(t('settings.clearDone'), 1500, 'success')
   } catch (e) {
     showToast(String(e), undefined, 'error')
+  }
+}
+
+async function onExportDb() {
+  dbExporting.value = true
+  try {
+    const ok = await invoke<boolean>('export_local_database')
+    if (ok) showToast(t('settings.exportDbDone'), 1600, 'success')
+  } catch (e) {
+    showToast(String(e), undefined, 'error')
+  } finally {
+    dbExporting.value = false
+  }
+}
+
+async function confirmImportDb() {
+  dbImporting.value = true
+  try {
+    const ok = await invoke<boolean>('import_local_database')
+    if (!ok) return
+    dbPath.value = await invoke('get_db_path')
+    lastSync.value = (await invoke<string | null>('get_setting_value', { key: 'last_sync_at' })) || ''
+    lastSyncStats.value = parseSyncStats(
+      await invoke<string | null>('get_setting_value', { key: 'last_sync_stats' }),
+    )
+    showToast(t('settings.importDbDone'), 1800, 'success')
+  } catch (e) {
+    showToast(String(e), undefined, 'error')
+  } finally {
+    dbImporting.value = false
   }
 }
 </script>
@@ -347,6 +434,12 @@ h1 {
   color: var(--color-text-secondary);
   background: color-mix(in srgb, var(--color-text-secondary) 10%, transparent);
   font-weight: 500;
+}
+
+.sync-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .row {

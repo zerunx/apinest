@@ -16,14 +16,14 @@ import (
 
 type Service struct{}
 
-func (Service) Create(ctx context.Context, userID int64, params CreateRequest) error {
+func (Service) Create(ctx context.Context, userID int64, params CreateRequest) (int64, error) {
 	ws, err := database.DB.Workspace.
 		Create().
 		SetName(params.Name).
 		SetOwnerID(userID).
 		Save(ctx)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	_, err = database.DB.WorkspaceMember.
@@ -33,16 +33,19 @@ func (Service) Create(ctx context.Context, userID int64, params CreateRequest) e
 		SetRole(RoleOwner).
 		Save(ctx)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
-	return nil
+	return ws.ID, nil
 }
 
 func (Service) List(ctx context.Context, userID int64) ([]Item, error) {
 	members, err := database.DB.WorkspaceMember.
 		Query().
-		Where(workspacemember.UserIDEQ(userID)).
+		Where(
+			workspacemember.UserIDEQ(userID),
+			workspacemember.HasWorkspace(),
+		).
 		WithWorkspace(func(q *ent.WorkspaceQuery) {
 			q.WithOwner()
 		}).
@@ -91,6 +94,7 @@ func (Service) Update(ctx context.Context, userID int64, params UpdateRequest) e
 
 	_, err := database.DB.Workspace.
 		UpdateOneID(params.WorkspaceID).
+		Where(workspace.DeletedAtIsNil()).
 		SetName(params.Name).
 		Save(ctx)
 	if err != nil {
@@ -107,7 +111,25 @@ func (Service) Delete(ctx context.Context, userID int64, params DeleteRequest) e
 		return err
 	}
 
-	return database.DB.Workspace.DeleteOneID(params.WorkspaceID).Exec(ctx)
+	tx, err := database.DB.Tx(ctx)
+	if err != nil {
+		return err
+	}
+
+	// Soft-delete memberships first so list queries never see orphan member rows.
+	if _, err := tx.WorkspaceMember.
+		Delete().
+		Where(workspacemember.WorkspaceIDEQ(params.WorkspaceID)).
+		Exec(ctx); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+
+	if err := tx.Workspace.DeleteOneID(params.WorkspaceID).Exec(ctx); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	return tx.Commit()
 }
 
 func (Service) TransferOwner(ctx context.Context, userID int64, params TransferOwnerRequest) error {

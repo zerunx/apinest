@@ -4,29 +4,32 @@
 
 [English](README.md) | [中文](README_zh.md)
 
-**Apinest**（ApiNest）是一套可自托管的 API 协作管理平台，用于集中管理接口文档，适合作为 Postman / Apifox 等等工具的轻量自托管替代方案。
+**Apinest**（ApiNest）是一套可自托管的 API 协作与调试平台，覆盖接口文档、环境配置与本地发请求。
 
-## 它是做什么的
+## 主要特性
 
-把团队放进同一个工作空间，按项目、文件夹组织接口，配置多套环境与变量，邀请成员共同编辑，再通过分享链接把指定接口开放给无需登录的访问者。
+- **双端同步**：Web 与 Desktop 可同步，避免本地测试后需要再写一份文档
+- **绝对安全**：请求在本机发出，密钥与接口明细不必依赖第三方云端
+- **自主可控**：Docker 配置，账号、权限与数据都在自己服务器
+- **开放互通**：支持 Postman、OpenApi、Eolink、YApi 等格式导入，以及 Apinest 自身导入导出
+- **团队协作**：工作空间邀请与角色权限；分享链接可让访客免登录查看指定接口
 
-适合替代零散的文档表格或私有接口清单，让接口定义、环境切换与协作权限落在同一处。
+## 展示
 
-## 在线演示
-
-- 地址：[https://nest.lengyuye.top/login](https://nest.lengyuye.top/login)
-- 账号：`admin`
-- 密码：`123123`
-
-## 截图
-
-### Web
-
-<img src="docs/images/web.png" alt="ApiNest Web" width="800" />
-
-### Desktop
-
-<img src="docs/images/desktop.png" alt="ApiNest Desktop" width="800" />
+<table>
+  <tr>
+    <th align="center">Web</th>
+    <th align="center">Desktop</th>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <img src="docs/images/web.png" alt="ApiNest Web" />
+    </td>
+    <td width="50%" align="center">
+      <img src="docs/images/desktop.png" alt="ApiNest Desktop" />
+    </td>
+  </tr>
+</table>
 
 ## 快速开始
 
@@ -137,14 +140,11 @@ docker compose up -d
 | 桌面端 | Tauri 2 · Rust · Vue 3 · SQLite |
 | 基础设施 | Docker · PostgreSQL · Valkey · Caddy |
 
-## 特性
+## 更多能力
 
-- **Web 桌面双端同步**：Web 与桌面客户端共用同一套工作空间与接口数据
-- **成员协作**：邀请加入工作空间，按角色控制编辑权限
-- **桌面客户端**：本地同步与发请求，支持环境变量替换与请求历史
-- **接口文档**：文件夹分层、接口 CRUD、请求/响应相关字段管理
-- **环境与变量**：多环境配置，便于本地 / 测试 / 生产切换
-- **项目分享**：生成分享记录，访客无需登录即可查看勾选接口
+- **接口文档**：文件夹分层、接口 CRUD、请求/响应字段与示例管理
+- **桌面客户端**：环境变量替换、请求历史、文件夹级 Headers / Authorization 继承
+- **环境与变量**：多套环境配置，便于本地 / 测试 / 生产切换
 - **系统能力**：安装向导、用户鉴权、管理后台、中英双语
 
 ## 打包 Desktop
@@ -162,9 +162,8 @@ pnpm run tauri:build
 
 ## 路线图
 
-- [x] 桌面端对接
+- [x] desktop 端
 - [x] 粘贴、复制 CURL
-- [x] mac 优化
 - [x] raw 采用 CodeMirror
 - [x] ws grpc 协议
 - [x] proto 文件导入参数，自动生成模拟参数
@@ -173,6 +172,8 @@ pnpm run tauri:build
 - [x] Web端接口查看的样式
 - [ ] 内置 / 多数据库支持（当前仅外部 PostgreSQL）
 - [x] 字典库 
+- [ ] tcp udp 方式
+- [ ] 请求接口的前置和后置脚本
 
 ## License
 

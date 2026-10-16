@@ -36,8 +36,8 @@ func (InterfaceRequestHeader) Fields() []ent.Field {
 		field.String("type").MaxLen(50).Default("string").Comment("类型"),
 		field.Bool("required").Default(false).Comment("是否必填"),
 		field.Bool("enabled").Default(true).Comment("是否启用"),
-		field.String("description").MaxLen(500).Default("").Comment("说明"),
-		field.String("example").MaxLen(500).Default("").Comment("参数示例"),
+		field.String("description").MaxLen(1024).Default("").Comment("说明"),
+		field.String("example").MaxLen(1024).Default("").Comment("参数示例"),
 		field.Int("sort_order").Default(0).Comment("排序"),
 		field.Time("created_at").GoType(utils.DateTime{}).Default(utils.Now).
 			SchemaType(map[string]string{dialect.Postgres: "timestamp(0) without time zone"}).Comment("创建时间"),

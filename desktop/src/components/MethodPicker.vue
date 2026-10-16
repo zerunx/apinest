@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="method-picker" ref="rootRef">
     <button
       type="button"
@@ -133,12 +133,11 @@ onUnmounted(() => {
   min-width: 0;
   display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 2px;
+  gap: 0;
   border: 0;
   border-radius: 0;
   background: transparent;
-  padding: 0 8px 0 10px;
+  padding: 0 8px 0 14px;
   box-shadow: none;
   outline: none;
   cursor: pointer;
@@ -151,7 +150,10 @@ onUnmounted(() => {
   background: transparent;
 }
 
-.method {
+.method-trigger > .method {
+  flex: 1 1 auto;
+  min-width: 0 !important;
+  text-align: left;
   font-family: var(--font-mono);
   font-size: 13px;
   font-weight: 700;
@@ -200,6 +202,9 @@ onUnmounted(() => {
 
 .chevron {
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
   color: var(--color-text-secondary);
   opacity: 0.7;
   transition: transform 0.15s ease;
@@ -231,6 +236,11 @@ onUnmounted(() => {
   border-radius: 6px;
   text-align: left;
   cursor: pointer;
+}
+
+.method-item .method {
+  flex: none;
+  text-align: left;
 }
 
 .method-item:hover,

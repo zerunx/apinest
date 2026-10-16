@@ -116,6 +116,7 @@ func (Repo) CreateTx(ctx context.Context, tx *ent.Tx, projectID, parentID, userI
 func (Repo) UpdateName(ctx context.Context, folderID int64, name string) error {
 	_, err := database.DB.Folder.
 		UpdateOneID(folderID).
+		Where(entfolder.DeletedAtIsNil()).
 		SetName(name).
 		Save(ctx)
 	return err

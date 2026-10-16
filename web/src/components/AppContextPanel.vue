@@ -46,6 +46,7 @@ const {
   parseFolderId,
   parseApiId,
   refreshApiData,
+  workspaces,
   activeWorkspace,
   activeWorkspaceId,
   activeProjectId,
@@ -174,7 +175,11 @@ function renderNodes(
 const flatApiNodes = computed(() => renderNodes(filteredApiTree.value))
 
 const spaceNavItems = computed(() => {
-  const role = activeWorkspace.value?.role
+  // Prefer active workspace role; if active is briefly unset after delete/switch,
+  // fall back to any membership so the space-manage nav does not vanish.
+  const role =
+    activeWorkspace.value?.role ??
+    workspaces.value.find((item) => item.role === 1 || item.role === 2 || item.role === 3)?.role
   const isAdmin = role === 1 || role === 2
   const isEditor = role === 3
   const items: { id: string; label: string; icon: typeof Folder }[] = []

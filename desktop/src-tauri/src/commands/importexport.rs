@@ -134,7 +134,7 @@ fn is_local_project(db: &Db, server_id: i64, project_id: i64) -> AppResult<bool>
     })
 }
 
-fn export_local(
+pub(crate) fn export_local(
     conn: &Connection,
     server_id: i64,
     workspace_id: i64,

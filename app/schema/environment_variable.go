@@ -50,7 +50,7 @@ func (EnvironmentVariable) Fields() []ent.Field {
 			Comment("变量值"),
 
 		field.String("description").
-			MaxLen(500).
+			MaxLen(1024).
 			Default("").
 			Comment("描述"),
 

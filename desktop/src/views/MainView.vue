@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="shell">
     <aside class="sidebar" :style="{ width: `${sidebarWidth}px` }">
       <div class="project-bar">
@@ -26,16 +26,18 @@
           @input="reloadTree"
         />
         <SplitCreateButton
-          :create-title="t('create.folder')"
+          :add-api-label="t('tree.addApi')"
+          :add-folder-label="t('tree.addFolder')"
           :import-label="t('importExport.import')"
           :export-label="t('importExport.export')"
-          @create="openCreateFolder(0, $event)"
+          @add-api="openCreateApi(0)"
+          @add-folder="openCreateFolder(0, $event, t('tree.addFolder'))"
           @import="openImportDialog"
           @export="exportCurrentProject"
         />
       </div>
 
-      <div class="tree-wrap">
+      <div class="tree-wrap" @contextmenu.prevent="openTreeBlankContextMenu">
         <TreeList
           v-if="tree.length"
           :items="tree"
@@ -133,6 +135,7 @@
             :mode="editorMode"
             :workspace-id="workspaceId"
             :project-id="projectId"
+            :tab-id="activeTabId"
             :interface-id="activeInterfaceId"
             :initial="(editorInitial as any)"
             @saved="onInterfaceSaved"
@@ -215,6 +218,11 @@
       @dismiss="abortSaveBeforeClose"
     />
     <EnvironmentManageDialog v-model:open="envManageOpen" />
+    <FolderSettingsDialog
+      v-model:open="folderSettingsOpen"
+      :folder-id="folderSettingsId"
+      @saved="reloadTree"
+    />
     <ImportApiDialog
       ref="importDialogRef"
       v-model:open="importDialogOpen"
@@ -258,6 +266,23 @@
         </button>
       </div>
     </Teleport>
+
+    <Teleport to="body">
+      <div
+        v-if="treeBlankMenu.visible"
+        class="req-tab-menu"
+        :style="{ left: `${treeBlankMenu.x}px`, top: `${treeBlankMenu.y}px` }"
+        @click.stop
+        @contextmenu.prevent
+      >
+        <button type="button" class="req-tab-menu-item" @click="runTreeBlankMenuAction('add-api')">
+          {{ t('tree.addApi') }}
+        </button>
+        <button type="button" class="req-tab-menu-item" @click="runTreeBlankMenuAction('add-folder')">
+          {{ t('tree.addFolder') }}
+        </button>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -275,7 +300,9 @@ import ImportApiDialog from '../components/ImportApiDialog.vue'
 import SplitCreateButton from '../components/SplitCreateButton.vue'
 import InterfaceEditor from '../components/InterfaceEditor.vue'
 import CodeSnippetPanel from '../components/CodeSnippetPanel.vue'
+import FolderSettingsDialog from '../components/FolderSettingsDialog.vue'
 import { useToast } from '../composables/useToast'
+import { disposeAllWsTabs, disposeWsTab } from '../composables/wsSessionRegistry'
 import type { TreeAction, TreeApiDragPayload } from '../components/TreeNode.vue'
 import type { HeaderPair, InterfaceRow, SendResponse, TreeItem } from '../types'
 import { useSaveShortcut } from '../composables/useSaveShortcut'
@@ -410,6 +437,8 @@ const folderDialogInitial = ref('')
 const renameDialogOpen = ref(false)
 const renameDialogInitial = ref('')
 const renameTarget = ref<TreeAction | null>(null)
+const folderSettingsOpen = ref(false)
+const folderSettingsId = ref<number | null>(null)
 const deleteDialogOpen = ref(false)
 const deleteDialogTitle = ref('')
 const deleteDialogMessage = ref('')
@@ -430,6 +459,11 @@ const tabMenu = reactive({
   x: 0,
   y: 0,
   tabId: '',
+})
+const treeBlankMenu = reactive({
+  visible: false,
+  x: 0,
+  y: 0,
 })
 
 const reqName = ref('')
@@ -631,6 +665,7 @@ function startCodePanelDrag(e: MouseEvent) {
 }
 
 function clearTabs() {
+  void disposeAllWsTabs()
   tabs.value = []
   activeTabId.value = ''
   activeInterfaceId.value = null
@@ -1050,16 +1085,19 @@ function openDeleteProject(item: { id: number; name: string }, event: MouseEvent
   projectDeleteOpen.value = true
 }
 
-function openCreateFolder(parentId = 0, event?: MouseEvent) {
+function openCreateFolder(
+  parentId = 0,
+  event?: MouseEvent,
+  title?: string,
+) {
   if (!workspaceId.value || !projectId.value) {
     showToast(t('create.needProjectFirst'), 1500, 'warning')
     return
   }
   setDialogAnchor(event)
   folderParentId.value = parentId
-  folderDialogTitle.value = parentId
-    ? t('tree.addSubFolder')
-    : t('create.folder')
+  folderDialogTitle.value =
+    title ?? (parentId ? t('tree.addSubFolder') : t('create.folder'))
   folderDialogInitial.value = ''
   folderDialogOpen.value = true
 }
@@ -1240,6 +1278,11 @@ async function onTreeAction(action: TreeAction) {
       await exportFolder(action.id, action.name)
       return
     }
+    if (action.action === 'settings') {
+      folderSettingsId.value = action.id
+      folderSettingsOpen.value = true
+      return
+    }
     if (action.action === 'rename') {
       renameTarget.value = action
       renameDialogInitial.value = action.name
@@ -1259,11 +1302,43 @@ async function onTreeAction(action: TreeAction) {
     await onSelectApi(action.id)
     return
   }
+  if (action.action === 'clone') {
+    await cloneApi(action.id)
+    return
+  }
   if (action.action === 'delete') {
     deleteTarget.value = action
     deleteDialogTitle.value = t('tree.delete')
     deleteDialogMessage.value = t('tree.deleteApiConfirm')
     deleteDialogOpen.value = true
+  }
+}
+
+async function cloneApi(interfaceId: number) {
+  if (!workspaceId.value || !projectId.value) return
+  try {
+    const row = await invoke<InterfaceRow>('get_interface', {
+      workspaceId: workspaceId.value,
+      projectId: projectId.value,
+      interfaceId,
+      refresh: false,
+    })
+    const created = await invoke<InterfaceRow>('create_local_interface', {
+      args: {
+        workspace_id: workspaceId.value,
+        project_id: projectId.value,
+        folder_id: row.folder_id,
+        name: t('tree.cloneName', { name: row.name }),
+        method: row.method || 'GET',
+        url: row.url || '',
+        status: 3,
+        detail: row.detail ?? {},
+      },
+    })
+    await reloadTree()
+    await onSelectApi(created.id)
+  } catch (e) {
+    showToast(String(e) || t('tree.cloneFailed'), 1800, 'error')
   }
 }
 
@@ -1400,6 +1475,7 @@ async function confirmSaveBeforeClose() {
 function closeTab(id: string) {
   const idx = tabs.value.findIndex((x) => x.id === id)
   if (idx < 0) return
+  void disposeWsTab(id)
   tabs.value.splice(idx, 1)
   if (!tabs.value.length) {
     clearTabsAndPersist()
@@ -1414,6 +1490,7 @@ function closeTab(id: string) {
 }
 
 function openTabContextMenu(event: MouseEvent, tabId: string) {
+  hideTreeBlankContextMenu()
   tabMenu.visible = true
   tabMenu.x = event.clientX
   tabMenu.y = event.clientY
@@ -1424,8 +1501,31 @@ function hideTabContextMenu() {
   tabMenu.visible = false
 }
 
+function openTreeBlankContextMenu(event: MouseEvent) {
+  hideTabContextMenu()
+  treeBlankMenu.visible = true
+  treeBlankMenu.x = event.clientX
+  treeBlankMenu.y = event.clientY
+}
+
+function hideTreeBlankContextMenu() {
+  treeBlankMenu.visible = false
+}
+
+function runTreeBlankMenuAction(action: 'add-api' | 'add-folder') {
+  hideTreeBlankContextMenu()
+  if (action === 'add-api') {
+    void openCreateApi(0)
+    return
+  }
+  openCreateFolder(0, undefined, t('tree.addFolder'))
+}
+
 function closeOtherTabs(tabId: string) {
   if (!tabs.value.some((x) => x.id === tabId)) return
+  for (const tab of tabs.value) {
+    if (tab.id !== tabId) void disposeWsTab(tab.id)
+  }
   tabs.value = tabs.value.filter((x) => x.id === tabId)
   if (activeTabId.value !== tabId) {
     const tab = tabs.value[0]
@@ -1438,7 +1538,9 @@ function closeOtherTabs(tabId: string) {
 function closeTabsLeft(tabId: string) {
   const index = tabs.value.findIndex((x) => x.id === tabId)
   if (index <= 0) return
-  const removedActive = tabs.value.slice(0, index).some((x) => x.id === activeTabId.value)
+  const removed = tabs.value.slice(0, index)
+  const removedActive = removed.some((x) => x.id === activeTabId.value)
+  for (const tab of removed) void disposeWsTab(tab.id)
   tabs.value = tabs.value.slice(index)
   if (removedActive) {
     const tab = tabs.value[0]
@@ -1451,7 +1553,9 @@ function closeTabsLeft(tabId: string) {
 function closeTabsRight(tabId: string) {
   const index = tabs.value.findIndex((x) => x.id === tabId)
   if (index < 0 || index >= tabs.value.length - 1) return
-  const removedActive = tabs.value.slice(index + 1).some((x) => x.id === activeTabId.value)
+  const removed = tabs.value.slice(index + 1)
+  const removedActive = removed.some((x) => x.id === activeTabId.value)
+  for (const tab of removed) void disposeWsTab(tab.id)
   tabs.value = tabs.value.slice(0, index + 1)
   if (removedActive) {
     const tab = tabs.value[tabs.value.length - 1]
@@ -1503,6 +1607,7 @@ watch([environmentId, envVarsRevision], () => {
 
 onMounted(async () => {
   document.addEventListener('click', hideTabContextMenu)
+  document.addEventListener('click', hideTreeBlankContextMenu)
   await initWorkspaceContext()
   await ensureWorkspaceBootstrapped()
   // Let the restored editor paint under the splash before revealing.
@@ -1513,6 +1618,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', hideTabContextMenu)
+  document.removeEventListener('click', hideTreeBlankContextMenu)
 })
 
 async function onPickProject(id: number | null) {

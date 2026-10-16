@@ -1,24 +1,31 @@
 <template>
-  <ul class="tree" :class="{ 'tree--dragging': draggingApiId != null }">
-    <TreeNode
-      v-for="item in items"
-      :key="itemKey(item)"
-      :item="item"
-      :active-id="activeId"
-      :parent-folder-id="0"
-      :can-drag="canDrag"
-      :dragging-api-id="draggingApiId"
-      :drag-over-key="dragOverKey"
-      :reordering="reordering"
-      @select="$emit('select', $event)"
-      @action="$emit('action', $event)"
-      @api-drag-start="$emit('api-drag-start', $event)"
-      @api-drag-over="$emit('api-drag-over', $event)"
-      @api-drag-leave="$emit('api-drag-leave')"
-      @api-drop="$emit('api-drop', $event)"
-      @api-drag-end="$emit('api-drag-end')"
+  <div class="tree-list" :class="{ 'tree-list--dragging': draggingApiId != null }">
+    <ul class="tree" :class="{ 'tree--dragging': draggingApiId != null }">
+      <TreeNode
+        v-for="item in items"
+        :key="itemKey(item)"
+        :item="item"
+        :active-id="activeId"
+        :parent-folder-id="0"
+        :can-drag="canDrag"
+        :dragging-api-id="draggingApiId"
+        :drag-over-key="dragOverKey"
+        :reordering="reordering"
+        @select="$emit('select', $event)"
+        @action="$emit('action', $event)"
+        @api-drag-start="$emit('api-drag-start', $event)"
+        @api-drag-over="$emit('api-drag-over', $event)"
+        @api-drag-leave="$emit('api-drag-leave')"
+        @api-drop="$emit('api-drop', $event)"
+        @api-drag-end="$emit('api-drag-end')"
+      />
+    </ul>
+    <div
+      v-if="dragOverKey === 'root'"
+      class="tree-root-drop-line"
+      aria-hidden="true"
     />
-  </ul>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -51,13 +58,26 @@ function itemKey(item: TreeItem) {
 </script>
 
 <style scoped>
+.tree-list {
+  position: relative;
+}
+
 .tree {
   list-style: none;
   margin: 0;
   padding: 0;
 }
 
-.tree--dragging {
+.tree--dragging,
+.tree-list--dragging {
   user-select: none;
+}
+
+.tree-root-drop-line {
+  height: 2px;
+  margin-top: 0;
+  background: var(--color-primary);
+  border-radius: 0;
+  pointer-events: none;
 }
 </style>

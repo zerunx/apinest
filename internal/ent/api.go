@@ -15,44 +15,81 @@ import (
 	"entgo.io/ent/dialect/sql"
 )
 
+// API is the model entity for the API schema.
 type API struct {
-	config              `json:"-"`
-	ID                  int64           `json:"id,omitempty"`
-	ProjectID           int64           `json:"project_id,omitempty"`
-	FolderID            int64           `json:"folder_id,omitempty"`
-	Name                string          `json:"name,omitempty"`
-	Method              string          `json:"method,omitempty"`
-	Protocol            string          `json:"protocol,omitempty"`
-	URL                 string          `json:"url,omitempty"`
-	Status              uint8           `json:"status,omitempty"`
-	RequestBodyFormat   string          `json:"request_body_format,omitempty"`
-	RequestBodyDataType string          `json:"request_body_data_type,omitempty"`
-	RequestBodyRaw      string          `json:"request_body_raw,omitempty"`
-	SortOrder           int             `json:"sort_order,omitempty"`
-	CreatedBy           int64           `json:"created_by,omitempty"`
-	UpdatedBy           int64           `json:"updated_by,omitempty"`
-	CreatedAt           utils.DateTime  `json:"created_at,omitempty"`
-	UpdatedAt           utils.DateTime  `json:"updated_at,omitempty"`
-	DeletedAt           *utils.DateTime `json:"deleted_at,omitempty"`
-	Edges               APIEdges        `json:"edges"`
-	selectValues        sql.SelectValues
+	config `json:"-"`
+	// ID of the ent.
+	// ä¸»é®
+	ID int64 `json:"id,omitempty"`
+	// é¡¹ç® ID
+	ProjectID int64 `json:"project_id,omitempty"`
+	// æå±æä»¶å¤¹ ID
+	FolderID int64 `json:"folder_id,omitempty"`
+	// æ¥å£åç§°
+	Name string `json:"name,omitempty"`
+	// HTTP æ¹æ³
+	Method string `json:"method,omitempty"`
+	// è¯·æ±åè®®ï¼HTTP, HTTPS, WS, TCP, UDP, GRPC
+	Protocol string `json:"protocol,omitempty"`
+	// æ¥å£è·¯å¾
+	URL string `json:"url,omitempty"`
+	// ç¶æï¼1: å·²åå¸, 2: èè°ä¸­, 3: å¼åä¸­, 6: å·²åºå¼
+	Status uint8 `json:"status,omitempty"`
+	// è¯·æ±ä½æ ¼å¼ï¼form-data, json, xml, raw, binary
+	RequestBodyFormat string `json:"request_body_format,omitempty"`
+	// è¯·æ±ä½æ°æ®ç±»å
+	RequestBodyDataType string `json:"request_body_data_type,omitempty"`
+	// Raw è¯·æ±ä½åå®¹
+	RequestBodyRaw string `json:"request_body_raw,omitempty"`
+	// æåº
+	SortOrder int `json:"sort_order,omitempty"`
+	// åå»ºèç¨æ· ID
+	CreatedBy int64 `json:"created_by,omitempty"`
+	// æåä¿®æ¹èç¨æ· ID
+	UpdatedBy int64 `json:"updated_by,omitempty"`
+	// åå»ºæ¶é´
+	CreatedAt utils.DateTime `json:"created_at,omitempty"`
+	// æ´æ°æ¶é´
+	UpdatedAt utils.DateTime `json:"updated_at,omitempty"`
+	// å é¤æ¶é´
+	DeletedAt *utils.DateTime `json:"deleted_at,omitempty"`
+	// Edges holds the relations/edges for other nodes in the graph.
+	// The values are being populated by the APIQuery when eager-loading is set.
+	Edges        APIEdges `json:"edges"`
+	selectValues sql.SelectValues
 }
 
+// APIEdges holds the relations/edges for other nodes in the graph.
 type APIEdges struct {
-	Project          *Project                  `json:"project,omitempty"`
-	Folder           *Folder                   `json:"folder,omitempty"`
-	Creator          *User                     `json:"creator,omitempty"`
-	Updater          *User                     `json:"updater,omitempty"`
-	ResponseHeaders  []*InterfaceHeader        `json:"response_headers,omitempty"`
-	ResponseResults  []*InterfaceResult        `json:"response_results,omitempty"`
-	ResponseExamples []*InterfaceExample       `json:"response_examples,omitempty"`
-	RequestHeaders   []*InterfaceRequestHeader `json:"request_headers,omitempty"`
-	QueryParams      []*InterfaceQueryParam    `json:"query_params,omitempty"`
-	BodyFields       []*InterfaceBodyField     `json:"body_fields,omitempty"`
-	ShareItems       []*ProjectShareInterface  `json:"share_items,omitempty"`
-	loadedTypes      [11]bool
+	// Project holds the value of the project edge.
+	Project *Project `json:"project,omitempty"`
+	// Folder holds the value of the folder edge.
+	Folder *Folder `json:"folder,omitempty"`
+	// Creator holds the value of the creator edge.
+	Creator *User `json:"creator,omitempty"`
+	// Updater holds the value of the updater edge.
+	Updater *User `json:"updater,omitempty"`
+	// ResponseHeaders holds the value of the response_headers edge.
+	ResponseHeaders []*InterfaceHeader `json:"response_headers,omitempty"`
+	// ResponseResults holds the value of the response_results edge.
+	ResponseResults []*InterfaceResult `json:"response_results,omitempty"`
+	// ResponseExamples holds the value of the response_examples edge.
+	ResponseExamples []*InterfaceExample `json:"response_examples,omitempty"`
+	// RequestHeaders holds the value of the request_headers edge.
+	RequestHeaders []*InterfaceRequestHeader `json:"request_headers,omitempty"`
+	// QueryParams holds the value of the query_params edge.
+	QueryParams []*InterfaceQueryParam `json:"query_params,omitempty"`
+	// BodyFields holds the value of the body_fields edge.
+	BodyFields []*InterfaceBodyField `json:"body_fields,omitempty"`
+	// ShareItems holds the value of the share_items edge.
+	ShareItems []*ProjectShareInterface `json:"share_items,omitempty"`
+	// loadedTypes holds the information for reporting if a
+	// type was loaded (or requested) in eager-loading or not.
+	loadedTypes [11]bool
 }
 
+// ProjectOrErr returns the Project value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
 func (e APIEdges) ProjectOrErr() (*Project, error) {
 	if e.Project != nil {
 		return e.Project, nil
@@ -62,6 +99,8 @@ func (e APIEdges) ProjectOrErr() (*Project, error) {
 	return nil, &NotLoadedError{edge: "project"}
 }
 
+// FolderOrErr returns the Folder value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
 func (e APIEdges) FolderOrErr() (*Folder, error) {
 	if e.Folder != nil {
 		return e.Folder, nil
@@ -71,6 +110,8 @@ func (e APIEdges) FolderOrErr() (*Folder, error) {
 	return nil, &NotLoadedError{edge: "folder"}
 }
 
+// CreatorOrErr returns the Creator value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
 func (e APIEdges) CreatorOrErr() (*User, error) {
 	if e.Creator != nil {
 		return e.Creator, nil
@@ -80,6 +121,8 @@ func (e APIEdges) CreatorOrErr() (*User, error) {
 	return nil, &NotLoadedError{edge: "creator"}
 }
 
+// UpdaterOrErr returns the Updater value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
 func (e APIEdges) UpdaterOrErr() (*User, error) {
 	if e.Updater != nil {
 		return e.Updater, nil
@@ -89,6 +132,8 @@ func (e APIEdges) UpdaterOrErr() (*User, error) {
 	return nil, &NotLoadedError{edge: "updater"}
 }
 
+// ResponseHeadersOrErr returns the ResponseHeaders value or an error if the edge
+// was not loaded in eager-loading.
 func (e APIEdges) ResponseHeadersOrErr() ([]*InterfaceHeader, error) {
 	if e.loadedTypes[4] {
 		return e.ResponseHeaders, nil
@@ -96,6 +141,8 @@ func (e APIEdges) ResponseHeadersOrErr() ([]*InterfaceHeader, error) {
 	return nil, &NotLoadedError{edge: "response_headers"}
 }
 
+// ResponseResultsOrErr returns the ResponseResults value or an error if the edge
+// was not loaded in eager-loading.
 func (e APIEdges) ResponseResultsOrErr() ([]*InterfaceResult, error) {
 	if e.loadedTypes[5] {
 		return e.ResponseResults, nil
@@ -103,6 +150,8 @@ func (e APIEdges) ResponseResultsOrErr() ([]*InterfaceResult, error) {
 	return nil, &NotLoadedError{edge: "response_results"}
 }
 
+// ResponseExamplesOrErr returns the ResponseExamples value or an error if the edge
+// was not loaded in eager-loading.
 func (e APIEdges) ResponseExamplesOrErr() ([]*InterfaceExample, error) {
 	if e.loadedTypes[6] {
 		return e.ResponseExamples, nil
@@ -110,6 +159,8 @@ func (e APIEdges) ResponseExamplesOrErr() ([]*InterfaceExample, error) {
 	return nil, &NotLoadedError{edge: "response_examples"}
 }
 
+// RequestHeadersOrErr returns the RequestHeaders value or an error if the edge
+// was not loaded in eager-loading.
 func (e APIEdges) RequestHeadersOrErr() ([]*InterfaceRequestHeader, error) {
 	if e.loadedTypes[7] {
 		return e.RequestHeaders, nil
@@ -117,6 +168,8 @@ func (e APIEdges) RequestHeadersOrErr() ([]*InterfaceRequestHeader, error) {
 	return nil, &NotLoadedError{edge: "request_headers"}
 }
 
+// QueryParamsOrErr returns the QueryParams value or an error if the edge
+// was not loaded in eager-loading.
 func (e APIEdges) QueryParamsOrErr() ([]*InterfaceQueryParam, error) {
 	if e.loadedTypes[8] {
 		return e.QueryParams, nil
@@ -124,6 +177,8 @@ func (e APIEdges) QueryParamsOrErr() ([]*InterfaceQueryParam, error) {
 	return nil, &NotLoadedError{edge: "query_params"}
 }
 
+// BodyFieldsOrErr returns the BodyFields value or an error if the edge
+// was not loaded in eager-loading.
 func (e APIEdges) BodyFieldsOrErr() ([]*InterfaceBodyField, error) {
 	if e.loadedTypes[9] {
 		return e.BodyFields, nil
@@ -131,6 +186,8 @@ func (e APIEdges) BodyFieldsOrErr() ([]*InterfaceBodyField, error) {
 	return nil, &NotLoadedError{edge: "body_fields"}
 }
 
+// ShareItemsOrErr returns the ShareItems value or an error if the edge
+// was not loaded in eager-loading.
 func (e APIEdges) ShareItemsOrErr() ([]*ProjectShareInterface, error) {
 	if e.loadedTypes[10] {
 		return e.ShareItems, nil
@@ -138,6 +195,7 @@ func (e APIEdges) ShareItemsOrErr() ([]*ProjectShareInterface, error) {
 	return nil, &NotLoadedError{edge: "share_items"}
 }
 
+// scanValues returns the types for scanning values from sql.Rows.
 func (*API) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
@@ -157,6 +215,8 @@ func (*API) scanValues(columns []string) ([]any, error) {
 	return values, nil
 }
 
+// assignValues assigns the values that were returned from sql.Rows (after scanning)
+// to the API fields.
 func (_m *API) assignValues(columns []string, values []any) error {
 	if m, n := len(values), len(columns); m < n {
 		return fmt.Errorf("mismatch number of scan values: %d != %d", m, n)
@@ -273,58 +333,76 @@ func (_m *API) assignValues(columns []string, values []any) error {
 	return nil
 }
 
+// Value returns the ent.Value that was dynamically selected and assigned to the API.
+// This includes values selected through modifiers, order, etc.
 func (_m *API) Value(name string) (ent.Value, error) {
 	return _m.selectValues.Get(name)
 }
 
+// QueryProject queries the "project" edge of the API entity.
 func (_m *API) QueryProject() *ProjectQuery {
 	return NewAPIClient(_m.config).QueryProject(_m)
 }
 
+// QueryFolder queries the "folder" edge of the API entity.
 func (_m *API) QueryFolder() *FolderQuery {
 	return NewAPIClient(_m.config).QueryFolder(_m)
 }
 
+// QueryCreator queries the "creator" edge of the API entity.
 func (_m *API) QueryCreator() *UserQuery {
 	return NewAPIClient(_m.config).QueryCreator(_m)
 }
 
+// QueryUpdater queries the "updater" edge of the API entity.
 func (_m *API) QueryUpdater() *UserQuery {
 	return NewAPIClient(_m.config).QueryUpdater(_m)
 }
 
+// QueryResponseHeaders queries the "response_headers" edge of the API entity.
 func (_m *API) QueryResponseHeaders() *InterfaceHeaderQuery {
 	return NewAPIClient(_m.config).QueryResponseHeaders(_m)
 }
 
+// QueryResponseResults queries the "response_results" edge of the API entity.
 func (_m *API) QueryResponseResults() *InterfaceResultQuery {
 	return NewAPIClient(_m.config).QueryResponseResults(_m)
 }
 
+// QueryResponseExamples queries the "response_examples" edge of the API entity.
 func (_m *API) QueryResponseExamples() *InterfaceExampleQuery {
 	return NewAPIClient(_m.config).QueryResponseExamples(_m)
 }
 
+// QueryRequestHeaders queries the "request_headers" edge of the API entity.
 func (_m *API) QueryRequestHeaders() *InterfaceRequestHeaderQuery {
 	return NewAPIClient(_m.config).QueryRequestHeaders(_m)
 }
 
+// QueryQueryParams queries the "query_params" edge of the API entity.
 func (_m *API) QueryQueryParams() *InterfaceQueryParamQuery {
 	return NewAPIClient(_m.config).QueryQueryParams(_m)
 }
 
+// QueryBodyFields queries the "body_fields" edge of the API entity.
 func (_m *API) QueryBodyFields() *InterfaceBodyFieldQuery {
 	return NewAPIClient(_m.config).QueryBodyFields(_m)
 }
 
+// QueryShareItems queries the "share_items" edge of the API entity.
 func (_m *API) QueryShareItems() *ProjectShareInterfaceQuery {
 	return NewAPIClient(_m.config).QueryShareItems(_m)
 }
 
+// Update returns a builder for updating this API.
+// Note that you need to call API.Unwrap() before calling this method if this API
+// was returned from a transaction, and the transaction was committed or rolled back.
 func (_m *API) Update() *APIUpdateOne {
 	return NewAPIClient(_m.config).UpdateOne(_m)
 }
 
+// Unwrap unwraps the API entity that was returned from a transaction after it was closed,
+// so that all future queries will be executed through the driver which created the transaction.
 func (_m *API) Unwrap() *API {
 	_tx, ok := _m.config.driver.(*txDriver)
 	if !ok {
@@ -334,6 +412,7 @@ func (_m *API) Unwrap() *API {
 	return _m
 }
 
+// String implements the fmt.Stringer.
 func (_m *API) String() string {
 	var builder strings.Builder
 	builder.WriteString("API(")
@@ -391,4 +470,5 @@ func (_m *API) String() string {
 	return builder.String()
 }
 
+// APIs is a parsable slice of API.
 type APIs []*API

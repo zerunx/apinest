@@ -26,16 +26,19 @@
         :style="menuStyle"
         @click.stop
       >
-        <button
-          v-for="opt in options"
-          :key="String(opt.value)"
-          type="button"
-          class="menu-select__item"
-          :class="{ active: opt.value === modelValue }"
-          @click="pick(opt.value)"
-        >
-          {{ opt.label }}
-        </button>
+        <template v-for="(opt, idx) in options" :key="opt.separator ? `sep-${idx}` : String(opt.value)">
+          <div v-if="opt.separator" class="menu-select__separator" role="separator" />
+          <button
+            v-else
+            type="button"
+            class="menu-select__item"
+            :class="{ active: opt.value === modelValue }"
+            :disabled="opt.disabled"
+            @click="pick(opt.value)"
+          >
+            {{ opt.label }}
+          </button>
+        </template>
       </div>
     </Teleport>
   </div>
@@ -45,7 +48,12 @@
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { bindOutsidePointerDismiss } from '../composables/useOverlayDismiss'
 
-export type MenuOption = { value: string | number | null; label: string }
+export type MenuOption = {
+  value?: string | number | null
+  label?: string
+  separator?: boolean
+  disabled?: boolean
+}
 
 const props = withDefaults(
   defineProps<{
@@ -91,7 +99,7 @@ const menuStyle = reactive({
 })
 
 const currentLabel = computed(() => {
-  const hit = props.options.find((o) => o.value === props.modelValue)
+  const hit = props.options.find((o) => !o.separator && o.value === props.modelValue)
   return hit?.label ?? props.placeholder
 })
 
@@ -145,7 +153,8 @@ async function toggle() {
   }
 }
 
-function pick(value: string | number | null) {
+function pick(value: string | number | null | undefined) {
+  if (value === undefined) return
   emit('update:modelValue', value)
   open.value = false
 }
@@ -242,7 +251,7 @@ onUnmounted(() => {
 }
 
 .menu-select__label {
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -252,6 +261,9 @@ onUnmounted(() => {
 
 .menu-select__chevron {
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
   color: var(--color-text-secondary);
   transition: transform 0.15s ease;
   flex-shrink: 0;
@@ -264,7 +276,7 @@ onUnmounted(() => {
 .menu-select__menu {
   position: fixed;
   z-index: 4000;
-  max-height: 240px;
+  max-height: min(360px, calc(100vh - 24px));
   overflow: auto;
   padding: 6px;
   border-radius: 8px;
@@ -307,6 +319,17 @@ onUnmounted(() => {
 .menu-select__item:hover,
 .menu-select__item.active {
   background: var(--color-menu-hover);
+}
+
+.menu-select__item:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.menu-select__separator {
+  height: 1px;
+  margin: 6px 4px;
+  background: var(--color-border);
 }
 
 .menu-select.dense .menu-select__menu {

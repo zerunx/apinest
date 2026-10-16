@@ -582,6 +582,10 @@
   cursor: progress;
 }
 
+.interface-url-actions__send.is-cancel {
+  cursor: pointer;
+}
+
 .interface-url-actions__save.is-busy {
   opacity: 0.85;
 }
@@ -666,6 +670,50 @@
 .interface-url-bar__protocol,
 .interface-url-bar__method {
   height: 100%;
+}
+
+/* Left-align labels; same left inset for protocol / method / folder.
+   Note: this file is global CSS — do not use Vue :deep(). */
+.interface-url-bar__protocol .menu-select,
+.interface-url-bar__protocol .menu-select__trigger {
+  width: 100%;
+  height: 100%;
+}
+
+.interface-url-bar__protocol .menu-select__trigger {
+  padding: 0 8px 0 14px;
+  gap: 0;
+}
+
+.interface-url-bar__protocol .menu-select__label {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: left;
+}
+
+.interface-url-bar__protocol .menu-select__chevron {
+  display: inline-flex;
+  width: 12px;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.interface-url-bar__method .method-trigger {
+  padding: 0 8px 0 14px;
+  gap: 0;
+}
+
+.interface-url-bar__method .method-trigger > .method {
+  flex: 1 1 auto;
+  min-width: 0 !important;
+  text-align: left;
+}
+
+.interface-url-bar__method .method-trigger > .chevron {
+  display: inline-flex;
+  width: 12px;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .interface-url-bar__url-wrap {
@@ -780,20 +828,24 @@
   border-right: 1px solid var(--color-interface-bar-border);
 }
 
-.interface-meta-row__folder :deep(.menu-select),
-.interface-meta-row__folder :deep(.menu-select.compact) {
+.interface-meta-row__folder .menu-select,
+.interface-meta-row__folder .menu-select.compact {
   height: 100%;
 }
 
-.interface-meta-row__folder :deep(.menu-select__trigger),
-.interface-meta-row__folder :deep(.menu-select.compact .menu-select__trigger) {
+.interface-meta-row__folder .menu-select__trigger,
+.interface-meta-row__folder .menu-select.compact .menu-select__trigger {
   border: 0 !important;
   border-radius: 0 !important;
   box-shadow: none !important;
   min-height: 34px;
   height: 100%;
-  padding: 0 6px 0 10px;
+  padding: 0 8px 0 14px;
   background: transparent !important;
+}
+
+.interface-meta-row__folder .menu-select__label {
+  text-align: left;
 }
 
 .interface-meta-row__name {

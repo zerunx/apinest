@@ -49,12 +49,21 @@ func (SoftDeleteMixin) Hooks() []ent.Hook {
 						Client() *gen.Client
 						SetDeletedAt(utils.DateTime)
 						WhereP(...func(*sql.Selector))
+						Op() ent.Op
+						ID() (id int64, exists bool)
 					})
 					if !ok {
 						return nil, fmt.Errorf("unexpected mutation type %T", m)
 					}
 					filterNotDeleted(mx)
-					mx.SetOp(ent.OpUpdate)
+
+					op := ent.OpUpdate
+					if mx.Op().Is(ent.OpDeleteOne) {
+						if _, exists := mx.ID(); exists {
+							op = ent.OpUpdateOne
+						}
+					}
+					mx.SetOp(op)
 					mx.SetDeletedAt(utils.Now())
 					return mx.Client().Mutate(ctx, m)
 				})

@@ -75,6 +75,8 @@ const createApiSessionKey = ref(0)
 const createFormSessionByApiId = reactive<Record<number, number>>({})
 let navigationHydrated = false
 let bootstrapComplete = false
+/** Skip watch(activeWorkspaceId) while refreshWorkspaces drives its own loadProjects. */
+let suppressWorkspaceIdWatch = false
 
 export function parseFolderId(nodeId: string): number | null {
   const match = nodeId.match(/^folder-(\d+)$/)
@@ -791,26 +793,37 @@ export function useWorkspaceContext() {
     await loadEnvironments()
   }
 
-  async function loadWorkspaces() {
-    loadingWorkspaces.value = true
+  async function loadWorkspaces(options?: { silent?: boolean }) {
+    const silent = options?.silent === true
+    if (!silent) loadingWorkspaces.value = true
     try {
       const list = await fetchWorkspaces()
+
+      let nextWorkspaceId = activeWorkspaceId.value
+      if (!list.length) {
+        nextWorkspaceId = null
+      } else if (
+        nextWorkspaceId == null ||
+        !list.some((item) => item.id === nextWorkspaceId)
+      ) {
+        nextWorkspaceId = list[0].id
+      }
+
+      // Assign together so we never render with a stale active id missing from the list
+      // (that briefly nulls activeWorkspace and makes space-nav / panels look "refreshed").
       workspaces.value = list
+      if (activeWorkspaceId.value !== nextWorkspaceId) {
+        activeWorkspaceId.value = nextWorkspaceId
+      }
 
       if (!list.length) {
-        activeWorkspaceId.value = null
         activeProjectId.value = null
         projects.value = []
         apiTree.value = []
         interfaces.value = []
-        return
-      }
-
-      if (!activeWorkspaceId.value || !list.some((item) => item.id === activeWorkspaceId.value)) {
-        activeWorkspaceId.value = list[0].id
       }
     } finally {
-      loadingWorkspaces.value = false
+      if (!silent) loadingWorkspaces.value = false
     }
   }
 
@@ -1058,11 +1071,18 @@ export function useWorkspaceContext() {
     persistLayoutState()
   }
 
-  async function refreshWorkspaces() {
-    await loadWorkspaces()
-    await loadProjects()
-    await refreshApiData()
-    await loadEnvironments()
+  async function refreshWorkspaces(options?: { silent?: boolean }) {
+    // loadWorkspaces may change activeWorkspaceId; suppress the watch-driven loadProjects
+    // so we don't double-fetch and flash the UI.
+    suppressWorkspaceIdWatch = true
+    try {
+      await loadWorkspaces({ silent: options?.silent })
+      await loadProjects()
+      await refreshApiData()
+      await loadEnvironments()
+    } finally {
+      suppressWorkspaceIdWatch = false
+    }
   }
 
   async function refreshProjects() {
@@ -1308,7 +1328,7 @@ export function useWorkspaceContext() {
   }
 
   watch(activeWorkspaceId, () => {
-    if (!bootstrapComplete) return
+    if (!bootstrapComplete || suppressWorkspaceIdWatch) return
     loadProjects()
   })
 

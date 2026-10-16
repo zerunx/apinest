@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <li class="node">
     <template v-if="item.type === 'folder'">
       <div
@@ -9,6 +9,7 @@
         }"
         :data-folder-id="item.id"
         @click="open = !open"
+        @contextmenu.prevent.stop="onRowContextMenu"
       >
         <span class="expand-zone" :style="expandZoneStyle" @click.stop="open = !open">
           <svg
@@ -64,7 +65,7 @@
               <span class="row-menu-sep" aria-hidden="true" />
               <button type="button" @click="emitAction('export')">{{ t('tree.exportFolder') }}</button>
               <span class="row-menu-sep" aria-hidden="true" />
-              <button type="button" @click="emitAction('rename')">{{ t('tree.rename') }}</button>
+              <button type="button" @click="emitAction('settings')">{{ t('tree.folderSettings') }}</button>
               <button type="button" class="danger" @click="emitAction('delete')">
                 {{ t('tree.delete') }}
               </button>
@@ -108,6 +109,7 @@
       :data-folder-id="parentFolderId"
       @click="onApiClick"
       @pointerdown="onApiPointerDown"
+      @contextmenu.prevent.stop="onRowContextMenu"
     >
       <span class="expand-zone leaf" :style="expandZoneStyle" />
       <span class="method-wrap">
@@ -136,6 +138,7 @@
             @click.stop
           >
             <button type="button" @click="emitAction('edit')">{{ t('tree.edit') }}</button>
+            <button type="button" @click="emitAction('clone')">{{ t('tree.clone') }}</button>
             <button type="button" class="danger" @click="emitAction('delete')">
               {{ t('tree.delete') }}
             </button>
@@ -159,14 +162,14 @@ export type TreeAction =
       type: 'folder'
       id: number
       name: string
-      action: 'add-api' | 'add-subfolder' | 'export' | 'rename' | 'delete'
+      action: 'add-api' | 'add-subfolder' | 'export' | 'settings' | 'rename' | 'delete'
       anchor?: DialogAnchor | null
     }
   | {
       type: 'api'
       id: number
       name: string
-      action: 'edit' | 'delete'
+      action: 'edit' | 'clone' | 'delete'
       anchor?: DialogAnchor | null
     }
 
@@ -179,7 +182,7 @@ export type TreeApiDragPayload = {
   /** Hovered API: insert after this id; null means append to folder end. */
   targetApiId?: number | null
   /** Drop/over target kind. */
-  targetKind?: 'api' | 'folder'
+  targetKind?: 'api' | 'folder' | 'root'
   /** Stable key for leave tracking. */
   targetKey?: string
 }
@@ -275,9 +278,64 @@ function onApiPointerDown(event: PointerEvent) {
   window.addEventListener('pointercancel', onWindowPointerUp)
 }
 
+function getTreeWrapAt(clientX: number, clientY: number): HTMLElement | null {
+  const el = document.elementFromPoint(clientX, clientY)
+  return (el?.closest('.tree-wrap') as HTMLElement | null) ?? null
+}
+
+/** Bottommost row in the sidebar tree (for root-drop zone). */
+function getLastTreeRowBounds(treeWrap: HTMLElement) {
+  const rows = treeWrap.querySelectorAll('.row')
+  let best: { top: number; bottom: number; midY: number } | null = null
+  for (const row of rows) {
+    const r = row.getBoundingClientRect()
+    if (!best || r.bottom > best.bottom) {
+      best = { top: r.top, bottom: r.bottom, midY: r.top + r.height / 2 }
+    }
+  }
+  return best
+}
+
+/**
+ * Drop to project root when the pointer is in the lower half of the last row
+ * or in the blank area below the tree (so the last API in the last folder can
+ * be moved out to the outermost level).
+ */
+function resolveRootDropTarget(clientX: number, clientY: number) {
+  const treeWrap = getTreeWrapAt(clientX, clientY)
+  if (!treeWrap) return null
+  const wrapRect = treeWrap.getBoundingClientRect()
+  if (
+    clientX < wrapRect.left ||
+    clientX > wrapRect.right ||
+    clientY < wrapRect.top ||
+    clientY > wrapRect.bottom
+  ) {
+    return null
+  }
+  const last = getLastTreeRowBounds(treeWrap)
+  if (!last) {
+    return {
+      folderId: 0,
+      targetApiId: null,
+      targetKind: 'root' as const,
+      targetKey: 'root',
+    }
+  }
+  if (clientY < last.midY) return null
+  return {
+    folderId: 0,
+    targetApiId: null,
+    targetKind: 'root' as const,
+    targetKey: 'root',
+  }
+}
+
 function resolveDropTarget(clientX: number, clientY: number, dragApiId: number) {
-  // Match web: only highlight when pointer is actually over another row.
-  // No neighbor snapping while still on the dragged item / empty gap.
+  // Prefer root when dragging past the midpoint of the bottommost row / into blank.
+  const rootTarget = resolveRootDropTarget(clientX, clientY)
+  if (rootTarget) return rootTarget
+
   const el = document.elementFromPoint(clientX, clientY)
   const apiRow = el?.closest('.row.api') as HTMLElement | null
   if (apiRow) {
@@ -392,41 +450,70 @@ function cleanupPressListeners() {
   window.removeEventListener('pointercancel', onWindowPointerUp)
 }
 
+/** Where the open menu should appear: ··· button or right-click cursor. */
+let menuOrigin: { kind: 'btn' } | { kind: 'cursor'; x: number; y: number } | null = null
+
 function placeMenu() {
-  const btn = menuBtnRef.value
-  if (!btn) return
-  const rect = btn.getBoundingClientRect()
   const menuEl = menuPopRef.value
   const menuWidth = menuEl?.offsetWidth ?? 132
   const menuHeight = menuEl?.offsetHeight ?? 120
   const padding = 8
 
-  let left = rect.right - menuWidth
-  let top = rect.bottom + 4
+  let left: number
+  let top: number
+  let flipAboveFrom = 0
+
+  if (menuOrigin?.kind === 'cursor') {
+    left = menuOrigin.x
+    top = menuOrigin.y
+    flipAboveFrom = menuOrigin.y
+  } else {
+    const btn = menuBtnRef.value
+    if (!btn) return
+    const rect = btn.getBoundingClientRect()
+    left = rect.right - menuWidth
+    top = rect.bottom + 4
+    flipAboveFrom = rect.top
+  }
 
   if (left < padding) left = padding
   if (left + menuWidth > window.innerWidth - padding) {
     left = window.innerWidth - menuWidth - padding
   }
   if (top + menuHeight > window.innerHeight - padding) {
-    top = Math.max(padding, rect.top - menuHeight - 4)
+    top = Math.max(padding, flipAboveFrom - menuHeight - 4)
   }
 
   menuStyle.top = `${top}px`
   menuStyle.left = `${left}px`
 }
 
+async function openMenu(origin: typeof menuOrigin) {
+  menuOrigin = origin
+  menuOpen.value = true
+  await nextTick()
+  placeMenu()
+  await nextTick()
+  placeMenu()
+}
+
 async function toggleMenu() {
-  menuOpen.value = !menuOpen.value
   if (menuOpen.value) {
-    await nextTick()
-    placeMenu()
-    await nextTick()
-    placeMenu()
+    menuOpen.value = false
+    menuOrigin = null
+    return
   }
+  await openMenu({ kind: 'btn' })
+}
+
+function onRowContextMenu(event: MouseEvent) {
+  void openMenu({ kind: 'cursor', x: event.clientX, y: event.clientY })
 }
 
 function actionAnchor(): DialogAnchor | null {
+  if (menuOrigin?.kind === 'cursor') {
+    return { x: menuOrigin.x, y: menuOrigin.y }
+  }
   const btn = menuBtnRef.value
   if (!btn) return null
   const rect = btn.getBoundingClientRect()
@@ -434,14 +521,21 @@ function actionAnchor(): DialogAnchor | null {
 }
 
 function emitAction(action: TreeAction['action']) {
-  menuOpen.value = false
   const anchor = actionAnchor()
+  menuOpen.value = false
+  menuOrigin = null
   if (props.item.type === 'folder') {
     emit('action', {
       type: 'folder',
       id: props.item.id,
       name: props.item.name,
-      action: action as 'add-api' | 'add-subfolder' | 'export' | 'rename' | 'delete',
+      action: action as
+        | 'add-api'
+        | 'add-subfolder'
+        | 'export'
+        | 'settings'
+        | 'rename'
+        | 'delete',
       anchor,
     })
   } else {
@@ -449,7 +543,7 @@ function emitAction(action: TreeAction['action']) {
       type: 'api',
       id: props.item.id,
       name: props.item.name,
-      action: action as 'edit' | 'delete',
+      action: action as 'edit' | 'clone' | 'delete',
       anchor,
     })
   }
@@ -467,6 +561,7 @@ onMounted(() => {
     () => [menuRef.value, menuPopRef.value],
     () => {
       menuOpen.value = false
+      menuOrigin = null
     },
   )
   window.addEventListener('resize', onReposition)
@@ -534,7 +629,21 @@ export default {
 .row.api.drag-over,
 .row.folder.drag-over {
   background: var(--color-active);
-  box-shadow: inset 0 -2px 0 var(--color-primary);
+}
+
+/* Straight drop line — avoid inset box-shadow which follows border-radius. */
+.row.api.drag-over::after,
+.row.folder.drag-over::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--color-primary);
+  border-radius: 0;
+  pointer-events: none;
+  z-index: 1;
 }
 
 .method-wrap {

@@ -36,6 +36,7 @@ pub fn run() {
             let database = Db::open(data_dir).map_err(|e| e.to_string())?;
             app.manage(database);
             app.manage(WsHub::new());
+            app.manage(HttpRequestHub::new());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -44,6 +45,7 @@ pub fn run() {
             logout,
             test_connection,
             sync_now,
+            sync_upload,
             clear_local_cache,
             list_local_workspaces,
             list_local_projects,
@@ -73,6 +75,8 @@ pub fn run() {
             move_reorder_local_interfaces,
             list_local_folders,
             rename_local_folder,
+            get_folder_settings,
+            update_folder_settings,
             delete_local_folder,
             rename_local_interface,
             delete_local_interface,
@@ -89,6 +93,7 @@ pub fn run() {
             delete_workspace_dictionary,
             import_system_dictionary,
             send_http_request,
+            cancel_http_request,
             ws_connect,
             ws_send,
             ws_disconnect,
@@ -96,6 +101,8 @@ pub fn run() {
             get_setting_value,
             set_setting_value,
             get_db_path,
+            export_local_database,
+            import_local_database,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -33,65 +33,65 @@ func (API) Fields() []ent.Field {
 		field.Int64("id").
 			Positive().
 			Unique().
-			Comment("主键"),
+			Comment("ä¸»é®"),
 
 		field.Int64("project_id").
 			Default(0).
-			Comment("项目 ID"),
+			Comment("é¡¹ç® ID"),
 
 		field.Int64("folder_id").
 			Default(0).
-			Comment("所属文件夹 ID"),
+			Comment("æå±æä»¶å¤¹ ID"),
 
 		field.String("name").
 			MaxLen(100).
 			Default("").
-			Comment("接口名称"),
+			Comment("æ¥å£åç§°"),
 
 		field.String("method").
 			MaxLen(10).
 			Default("").
-			Comment("HTTP 方法"),
+			Comment("HTTP æ¹æ³"),
 
 		field.String("protocol").
 			MaxLen(10).
 			Default("").
-			Comment("请求协议：HTTP, HTTPS, WS, TCP, UDP, GRPC"),
+			Comment("è¯·æ±åè®®ï¼HTTP, HTTPS, WS, TCP, UDP, GRPC"),
 
 		field.String("url").
-			MaxLen(500).
+			MaxLen(1024).
 			Default("").
-			Comment("接口路径"),
+			Comment("æ¥å£è·¯å¾"),
 
 		field.Uint8("status").
 			Default(3).
-			Comment("状态：1: 已发布, 2: 联调中, 3: 开发中, 6: 已废弃"),
+			Comment("ç¶æï¼1: å·²åå¸, 2: èè°ä¸­, 3: å¼åä¸­, 6: å·²åºå¼"),
 
 		field.String("request_body_format").
 			MaxLen(20).
 			Default("json").
-			Comment("请求体格式：form-data, json, xml, raw, binary"),
+			Comment("è¯·æ±ä½æ ¼å¼ï¼form-data, json, xml, raw, binary"),
 
 		field.String("request_body_data_type").
 			MaxLen(20).
 			Default("Object").
-			Comment("请求体数据类型"),
+			Comment("è¯·æ±ä½æ°æ®ç±»å"),
 
 		field.Text("request_body_raw").
 			Default("").
-			Comment("Raw 请求体内容"),
+			Comment("Raw è¯·æ±ä½åå®¹"),
 
 		field.Int("sort_order").
 			Default(0).
-			Comment("排序"),
+			Comment("æåº"),
 
 		field.Int64("created_by").
 			Default(0).
-			Comment("创建者用户 ID"),
+			Comment("åå»ºèç¨æ· ID"),
 
 		field.Int64("updated_by").
 			Default(0).
-			Comment("最后修改者用户 ID"),
+			Comment("æåä¿®æ¹èç¨æ· ID"),
 
 		field.Time("created_at").
 			GoType(utils.DateTime{}).
@@ -99,7 +99,7 @@ func (API) Fields() []ent.Field {
 			SchemaType(map[string]string{
 				dialect.Postgres: "timestamp(0) without time zone",
 			}).
-			Comment("创建时间"),
+			Comment("åå»ºæ¶é´"),
 
 		field.Time("updated_at").
 			GoType(utils.DateTime{}).
@@ -108,7 +108,7 @@ func (API) Fields() []ent.Field {
 			SchemaType(map[string]string{
 				dialect.Postgres: "timestamp(0) without time zone",
 			}).
-			Comment("更新时间"),
+			Comment("æ´æ°æ¶é´"),
 
 		field.Time("deleted_at").
 			Optional().
@@ -117,7 +117,7 @@ func (API) Fields() []ent.Field {
 			SchemaType(map[string]string{
 				dialect.Postgres: "timestamp(0) without time zone",
 			}).
-			Comment("删除时间"),
+			Comment("å é¤æ¶é´"),
 	}
 }
 

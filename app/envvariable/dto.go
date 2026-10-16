@@ -22,7 +22,7 @@ type CreateRequest struct {
 	EnvironmentID int64  `json:"environment_id" binding:"required,min=1"`
 	Key           string `json:"key" binding:"required,min=1,max=200"`
 	Value         string `json:"value" binding:"max=2000"`
-	Description   string `json:"description" binding:"max=500"`
+	Description   string `json:"description" binding:"max=1024"`
 }
 
 type UpdateRequest struct {
@@ -32,7 +32,7 @@ type UpdateRequest struct {
 	VariableID    int64  `json:"variable_id" binding:"required,min=1"`
 	Key           string `json:"key" binding:"required,min=1,max=200"`
 	Value         string `json:"value" binding:"max=2000"`
-	Description   string `json:"description" binding:"max=500"`
+	Description   string `json:"description" binding:"max=1024"`
 }
 
 type DeleteRequest struct {

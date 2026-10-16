@@ -18,6 +18,9 @@ use crate::error::{AppError, AppResult};
 
 use super::http_send::{apply_vars, HeaderPair, CONNECT_TIMEOUT_SECS, DEFAULT_TIMEOUT_SECS};
 
+/// Protocol-level ping interval so idle connections are not reset by proxies/NAT.
+const WS_PING_INTERVAL: Duration = Duration::from_secs(30);
+
 static SESSION_SEQ: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Debug, Clone, Serialize)]
@@ -196,7 +199,7 @@ pub async fn ws_connect(
         let secs = get_setting(conn, "request_timeout_secs")?
             .and_then(|s| s.parse::<u64>().ok())
             .unwrap_or(DEFAULT_TIMEOUT_SECS)
-            .clamp(1, 600);
+            .min(crate::commands::http_send::MAX_TIMEOUT_SECS);
         Ok(secs)
     })?;
 
@@ -239,7 +242,11 @@ pub async fn ws_connect(
         }
     }
 
-    let connect_timeout = Duration::from_secs(CONNECT_TIMEOUT_SECS.min(timeout_secs));
+    let connect_timeout = Duration::from_secs(if timeout_secs == 0 {
+        CONNECT_TIMEOUT_SECS
+    } else {
+        CONNECT_TIMEOUT_SECS.min(timeout_secs).max(1)
+    });
     let (ws_stream, response) = tokio::time::timeout(connect_timeout, connect_async(request))
         .await
         .map_err(|_| AppError::msg("websocket connect timed out"))?
@@ -291,6 +298,12 @@ pub async fn ws_connect(
         );
 
         let mut close_reason = String::new();
+        let mut ping_tick = tokio::time::interval_at(
+            tokio::time::Instant::now() + WS_PING_INTERVAL,
+            WS_PING_INTERVAL,
+        );
+        ping_tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+
         loop {
             tokio::select! {
                 cmd = cmd_rx.recv() => {
@@ -330,9 +343,51 @@ pub async fn ws_connect(
                         }
                     }
                 }
+                _ = ping_tick.tick() => {
+                    // Keepalive only — do not surface in the message list.
+                    if let Err(e) = write.send(Message::Ping(Vec::new().into())).await {
+                        close_reason = format!("connection error: {e}");
+                        emit_event(
+                            &app_reader,
+                            WsSessionEvent {
+                                session_id: session_for_task.clone(),
+                                kind: WsEventKind::Error,
+                                direction: "system".into(),
+                                data: close_reason.clone(),
+                                message_type: "error".into(),
+                                at_ms: now_ms(started),
+                            },
+                        );
+                        break;
+                    }
+                }
                 incoming = read.next() => {
                     match incoming {
                         Some(Ok(msg)) => {
+                            // Server ping must be answered or the peer may drop the socket.
+                            if let Message::Ping(payload) = &msg {
+                                if let Err(e) =
+                                    write.send(Message::Pong(payload.clone())).await
+                                {
+                                    close_reason = format!("connection error: {e}");
+                                    emit_event(
+                                        &app_reader,
+                                        WsSessionEvent {
+                                            session_id: session_for_task.clone(),
+                                            kind: WsEventKind::Error,
+                                            direction: "system".into(),
+                                            data: close_reason.clone(),
+                                            message_type: "error".into(),
+                                            at_ms: now_ms(started),
+                                        },
+                                    );
+                                    break;
+                                }
+                            }
+                            // Hide protocol keepalive frames from the UI.
+                            if matches!(msg, Message::Ping(_) | Message::Pong(_)) {
+                                continue;
+                            }
                             let is_close = matches!(msg, Message::Close(_));
                             let (data, message_type) = message_payload(msg);
                             if is_close {

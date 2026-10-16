@@ -64,7 +64,8 @@ async function handleDelete(workspaceId: number, name: string) {
   try {
     await deleteWorkspace(workspaceId)
     ElMessage.success(t('workspace.deleteWorkspaceSuccess'))
-    await refreshWorkspaces()
+    // Silent refresh: avoid table loading flash that looks like a full page reload.
+    await refreshWorkspaces({ silent: true })
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : t('workspace.deleteWorkspaceFailed'))
   } finally {
