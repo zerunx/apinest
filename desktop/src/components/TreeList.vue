@@ -6,6 +6,7 @@
         :key="itemKey(item)"
         :item="item"
         :active-id="activeId"
+        :expanded-folder-ids="expandedFolderIds"
         :parent-folder-id="0"
         :can-drag="canDrag"
         :dragging-api-id="draggingApiId"
@@ -13,6 +14,7 @@
         :reordering="reordering"
         @select="$emit('select', $event)"
         @action="$emit('action', $event)"
+        @toggle-expand="$emit('toggle-expand', $event)"
         @api-drag-start="$emit('api-drag-start', $event)"
         @api-drag-over="$emit('api-drag-over', $event)"
         @api-drag-leave="$emit('api-drag-leave')"
@@ -36,6 +38,7 @@ import type { TreeAction, TreeApiDragPayload } from './TreeNode.vue'
 defineProps<{
   items: TreeItem[]
   activeId: number | null
+  expandedFolderIds: number[]
   canDrag?: boolean
   draggingApiId?: number | null
   dragOverKey?: string | null
@@ -45,6 +48,7 @@ defineProps<{
 defineEmits<{
   select: [id: number]
   action: [TreeAction]
+  'toggle-expand': [folderId: number]
   'api-drag-start': [payload: TreeApiDragPayload]
   'api-drag-over': [payload: TreeApiDragPayload]
   'api-drag-leave': []

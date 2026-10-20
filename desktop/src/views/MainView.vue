@@ -42,12 +42,14 @@
           v-if="tree.length"
           :items="tree"
           :active-id="activeInterfaceId"
+          :expanded-folder-ids="expandedFolderIds"
           :can-drag="canDragApis"
           :dragging-api-id="dragApiState?.apiId ?? null"
           :drag-over-key="dragOverKey"
           :reordering="reorderingApis"
           @select="onSelectApi"
           @action="onTreeAction"
+          @toggle-expand="toggleFolderExpand"
           @api-drag-start="onApiDragStart"
           @api-drag-over="onApiDragOver"
           @api-drag-leave="onApiDragLeave"
@@ -73,12 +75,19 @@
             type="button"
             class="req-tab"
             :class="{ active: tab.id === activeTabId, dirty: tab.dirty }"
+            :title="tab.interfaceId != null ? t('request.locateInTree') : undefined"
             @click="activateTab(tab.id)"
+            @dblclick="onTabDblClick(tab, $event)"
             @contextmenu.prevent="openTabContextMenu($event, tab.id)"
           >
             <span class="method" :class="tab.method.toLowerCase()">{{ tab.method }}</span>
             <span class="req-tab-name">{{ tab.name || t('request.untitled') }}</span>
-            <span class="req-tab-close" title="Close" @click.stop="requestCloseTab(tab.id)">
+            <span
+              class="req-tab-close"
+              title="Close"
+              @click.stop="requestCloseTab(tab.id)"
+              @dblclick.stop
+            >
               <span class="req-tab-close-x">×</span>
             </span>
           </button>
@@ -414,6 +423,8 @@ const {
 
 const tree = ref<TreeItem[]>([])
 const search = ref('')
+/** Folder ids currently expanded in the sidebar tree (array for reliable Vue updates). */
+const expandedFolderIds = ref<number[]>([])
 const dragApiState = ref<{ apiId: number; folderId: number } | null>(null)
 const dragOverKey = ref<string | null>(null)
 const reorderingApis = ref(false)
@@ -584,7 +595,7 @@ function createApiTab(folderId?: number): RequestTab {
   }
 }
 
-function applyTabToForm(tab: RequestTab, options?: { remount?: boolean }) {
+function applyTabToForm(tab: RequestTab, options?: { remount?: boolean; skipReveal?: boolean }) {
   reqName.value = tab.name
   reqMethod.value = tab.method
   reqUrl.value = tab.url
@@ -614,6 +625,10 @@ function applyTabToForm(tab: RequestTab, options?: { remount?: boolean }) {
   // method/url/name/folder/body while the editor tears down and remounts.
   if (options?.remount === true) {
     editorKey.value += 1
+  }
+  // During bulk tab restore, reveal once at the end for the active tab.
+  if (!restoringTabs && !options?.skipReveal && tab.interfaceId != null) {
+    void revealApiInTree(tab.interfaceId, { folderId: tab.folderId ?? folderId })
   }
 }
 
@@ -670,6 +685,7 @@ function clearTabs() {
   activeTabId.value = ''
   activeInterfaceId.value = null
   editorInitial.value = null
+  expandedFolderIds.value = []
 }
 
 async function persistTabLayout() {
@@ -713,6 +729,8 @@ async function restoreTabLayout() {
   }
 
   restoringTabs = true
+  let revealId: number | null = null
+  let revealFolderId: number | null = null
   try {
     clearTabs()
     for (const id of layout.openInterfaceIds) {
@@ -726,11 +744,28 @@ async function restoreTabLayout() {
       layout.activeInterfaceId != null ? Number(layout.activeInterfaceId) : null
     if (activeId != null) {
       const tab = tabs.value.find((x) => x.interfaceId === activeId)
-      if (tab) activateTab(tab.id)
+      if (tab) {
+        if (tab.id !== activeTabId.value) {
+          // applyTabToForm skips reveal while restoringTabs — reveal after.
+          persistActiveTab()
+          activeTabId.value = tab.id
+          applyTabToForm(tab, { skipReveal: true })
+        }
+        revealId = activeId
+        revealFolderId = tab.folderId
+      }
+    } else if (activeInterfaceId.value != null) {
+      revealId = activeInterfaceId.value
+      revealFolderId = activeTab.value?.folderId ?? null
     }
   } finally {
     restoringTabs = false
     await persistTabLayout()
+  }
+  // Reveal after restore flag clears and the tree has painted.
+  if (revealId != null) {
+    await nextTick()
+    await revealApiInTree(revealId, { folderId: revealFolderId })
   }
 }
 
@@ -759,6 +794,171 @@ function findFolderNode(nodes: TreeItem[], folderId: number): Extract<TreeItem, 
     }
   }
   return null
+}
+
+/** Ancestor folder ids from root → parent of the API (nested folders included). */
+function findFolderPathToApi(
+  nodes: TreeItem[],
+  apiId: number,
+  trail: number[] = [],
+): number[] | null {
+  const target = Number(apiId)
+  for (const node of nodes) {
+    if (node.type === 'api' && Number(node.id) === target) return trail
+    if (node.type === 'folder') {
+      const found = findFolderPathToApi(node.children, target, [...trail, Number(node.id)])
+      if (found) return found
+    }
+  }
+  return null
+}
+
+/** Path from root → folder (inclusive), used when the API row is filtered out of the tree. */
+function findFolderPathToFolder(
+  nodes: TreeItem[],
+  folderId: number,
+  trail: number[] = [],
+): number[] | null {
+  const target = Number(folderId)
+  if (!Number.isFinite(target) || target === 0) return []
+  for (const node of nodes) {
+    if (node.type !== 'folder') continue
+    const nextTrail = [...trail, Number(node.id)]
+    if (Number(node.id) === target) return nextTrail
+    const found = findFolderPathToFolder(node.children, target, nextTrail)
+    if (found) return found
+  }
+  return null
+}
+
+function resolveExpandPath(apiId: number, folderId?: number | null): number[] {
+  const byApi = findFolderPathToApi(tree.value, apiId)
+  if (byApi) return byApi
+  if (folderId != null && Number(folderId) !== 0) {
+    return findFolderPathToFolder(tree.value, Number(folderId)) ?? []
+  }
+  return []
+}
+
+function toggleFolderExpand(folderId: number) {
+  const id = Number(folderId)
+  if (expandedFolderIds.value.some((x) => Number(x) === id)) {
+    expandedFolderIds.value = expandedFolderIds.value.filter((x) => Number(x) !== id)
+  } else {
+    expandedFolderIds.value = [...expandedFolderIds.value, id]
+  }
+}
+
+function applyExpandedPath(path: number[]) {
+  if (!path.length) return
+  const next = new Set(expandedFolderIds.value.map(Number))
+  for (const id of path) next.add(Number(id))
+  expandedFolderIds.value = [...next]
+}
+
+function expandFoldersToApi(apiId: number, folderId?: number | null) {
+  applyExpandedPath(resolveExpandPath(apiId, folderId))
+}
+
+function sleep(ms: number) {
+  return new Promise<void>((resolve) => {
+    window.setTimeout(resolve, ms)
+  })
+}
+
+/** Nested folders mount only after parents open — wait until the row exists. */
+async function waitForApiRow(apiId: number, timeoutMs = 1500): Promise<HTMLElement | null> {
+  const selector = `.tree-wrap .row.api[data-api-id="${apiId}"]`
+  const deadline = performance.now() + timeoutMs
+  while (performance.now() < deadline) {
+    const el = document.querySelector(selector) as HTMLElement | null
+    if (el) return el
+    await nextTick()
+    await sleep(16)
+  }
+  return document.querySelector(selector) as HTMLElement | null
+}
+
+async function expandFoldersToApiAnimated(apiId: number, folderId?: number | null) {
+  const path = resolveExpandPath(apiId, folderId)
+  if (!path.length) return
+  for (const id of path) {
+    if (expandedFolderIds.value.some((x) => Number(x) === Number(id))) continue
+    expandedFolderIds.value = [...expandedFolderIds.value, Number(id)]
+    // Nested TreeNodes only exist after the parent opens — flush before next level.
+    await nextTick()
+    await nextTick()
+    // Match TreeNode FOLDER_MOTION_MS so nested levels cascade cleanly.
+    await sleep(180)
+  }
+  // Guarantee full path in case a tick was skipped.
+  applyExpandedPath(path)
+  await nextTick()
+}
+
+/** Scroll inside `.tree-wrap` — scrollIntoView is unreliable with nested overflow. */
+function scrollApiRowIntoView(el: HTMLElement, animated: boolean) {
+  const container = el.closest('.tree-wrap') as HTMLElement | null
+  if (!container) {
+    el.scrollIntoView({ block: 'center', behavior: animated ? 'smooth' : 'auto' })
+    return
+  }
+  const containerRect = container.getBoundingClientRect()
+  const elRect = el.getBoundingClientRect()
+  const elCenter = elRect.top + elRect.height / 2
+  const containerCenter = containerRect.top + containerRect.height / 2
+  const nextTop = container.scrollTop + (elCenter - containerCenter)
+  container.scrollTo({
+    top: Math.max(0, nextTop),
+    behavior: animated ? 'smooth' : 'auto',
+  })
+}
+
+async function revealApiInTree(
+  apiId: number | null,
+  options?: { animated?: boolean; folderId?: number | null },
+) {
+  if (apiId == null) return
+  const animated = options?.animated === true
+  const folderId = options?.folderId
+  if (animated) {
+    await expandFoldersToApiAnimated(apiId, folderId)
+  } else {
+    expandFoldersToApi(apiId, folderId)
+    await nextTick()
+    await nextTick()
+  }
+
+  const el = await waitForApiRow(apiId)
+  if (!el) return
+
+  // Let enter transition settle so layout height is final before measuring scroll.
+  if (animated) await sleep(40)
+  scrollApiRowIntoView(el, animated)
+
+  if (!animated) return
+  el.classList.remove('reveal-flash')
+  void el.offsetWidth
+  el.classList.add('reveal-flash')
+  window.setTimeout(() => el.classList.remove('reveal-flash'), 900)
+}
+
+/** Double-click tab (except close ×) → expand ancestors and scroll the API into view. */
+function onTabDblClick(tab: RequestTab, event: MouseEvent) {
+  const target = event.target as HTMLElement | null
+  if (target?.closest('.req-tab-close')) return
+  if (tab.interfaceId == null) return
+  if (tab.id !== activeTabId.value) {
+    persistActiveTab()
+    activeTabId.value = tab.id
+    applyTabToForm(tab, { skipReveal: true })
+    void persistTabLayout()
+    void nextTick().then(refreshCurlText)
+  }
+  void revealApiInTree(tab.interfaceId, {
+    animated: true,
+    folderId: tab.folderId,
+  })
 }
 
 function getSiblingItems(folderId: number): TreeItem[] {
@@ -1416,6 +1616,9 @@ async function onInterfaceSaved(id: number) {
     }
     void persistTabLayout()
     await reloadTree()
+    void revealApiInTree(id, {
+      folderId: activeTab.value?.folderId ?? active.folderId,
+    })
     return
   }
   await reloadTree()
@@ -1854,6 +2057,7 @@ async function onSelectApi(id: number, options?: { restore?: boolean }) {
   overflow: hidden;
   text-overflow: ellipsis;
   line-height: 1.2;
+  user-select: none;
 }
 
 .req-tab-close {

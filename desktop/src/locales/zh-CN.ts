@@ -321,6 +321,7 @@ export default {
   'request.name': '接口名称',
   'request.untitled': '未命名请求',
   'request.newTab': '新建请求',
+  'request.locateInTree': '双击在左侧定位',
   'request.tabCloseOthers': '关闭其他',
   'request.tabCloseLeft': '关闭左侧',
   'request.tabCloseRight': '关闭右侧',

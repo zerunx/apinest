@@ -333,6 +333,7 @@ export default {
   'request.name': 'Request name',
   'request.untitled': 'Untitled request',
   'request.newTab': 'New request',
+  'request.locateInTree': 'Double-click to locate in sidebar',
   'request.tabCloseOthers': 'Close others',
   'request.tabCloseLeft': 'Close left',
   'request.tabCloseRight': 'Close right',

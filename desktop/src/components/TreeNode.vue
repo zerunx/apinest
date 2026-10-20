@@ -8,10 +8,10 @@
           'drag-over': dragOverKey === `folder-${item.id}`,
         }"
         :data-folder-id="item.id"
-        @click="open = !open"
+        @click="toggleOpen"
         @contextmenu.prevent.stop="onRowContextMenu"
       >
-        <span class="expand-zone" :style="expandZoneStyle" @click.stop="open = !open">
+        <span class="expand-zone" :style="expandZoneStyle" @click.stop="toggleOpen">
           <svg
             class="expand-icon"
             :class="{ open }"
@@ -73,27 +73,34 @@
           </Teleport>
         </div>
       </div>
-      <ul v-if="open" class="children">
-        <TreeNode
-          v-for="child in item.children"
-          :key="`${child.type}-${child.id}`"
-          :item="child"
-          :active-id="activeId"
-          :depth="depth + 1"
-          :parent-folder-id="item.id"
-          :can-drag="canDrag"
-          :dragging-api-id="draggingApiId"
-          :drag-over-key="dragOverKey"
-          :reordering="reordering"
-          @select="$emit('select', $event)"
-          @action="$emit('action', $event)"
-          @api-drag-start="$emit('api-drag-start', $event)"
-          @api-drag-over="$emit('api-drag-over', $event)"
-          @api-drag-leave="$emit('api-drag-leave')"
-          @api-drop="$emit('api-drop', $event)"
-          @api-drag-end="$emit('api-drag-end')"
-        />
-      </ul>
+      <!-- CSS grid rows + keep-alive mount: avoids JS height reflow jank. -->
+      <div class="folder-body" :class="{ open }" :aria-hidden="!open">
+        <div class="folder-body-inner">
+          <ul v-if="childrenMounted" class="children">
+            <TreeNode
+              v-for="child in item.children"
+              :key="`${child.type}-${child.id}`"
+              :item="child"
+              :active-id="activeId"
+              :expanded-folder-ids="expandedFolderIds"
+              :depth="depth + 1"
+              :parent-folder-id="item.id"
+              :can-drag="canDrag"
+              :dragging-api-id="draggingApiId"
+              :drag-over-key="dragOverKey"
+              :reordering="reordering"
+              @select="$emit('select', $event)"
+              @action="$emit('action', $event)"
+              @toggle-expand="$emit('toggle-expand', $event)"
+              @api-drag-start="$emit('api-drag-start', $event)"
+              @api-drag-over="$emit('api-drag-over', $event)"
+              @api-drag-leave="$emit('api-drag-leave')"
+              @api-drop="$emit('api-drop', $event)"
+              @api-drag-end="$emit('api-drag-end')"
+            />
+          </ul>
+        </div>
+      </div>
     </template>
     <div
       v-else
@@ -150,7 +157,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import type { TreeItem } from '../types'
 import type { DialogAnchor } from '../composables/useDialogAnchor'
 import { bindOutsidePointerDismiss } from '../composables/useOverlayDismiss'
@@ -191,6 +198,7 @@ const props = withDefaults(
   defineProps<{
     item: TreeItem
     activeId: number | null
+    expandedFolderIds?: number[]
     depth?: number
     parentFolderId?: number
     canDrag?: boolean
@@ -199,6 +207,7 @@ const props = withDefaults(
     reordering?: boolean
   }>(),
   {
+    expandedFolderIds: () => [],
     depth: 0,
     parentFolderId: 0,
     canDrag: false,
@@ -211,6 +220,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   select: [id: number]
   action: [TreeAction]
+  'toggle-expand': [folderId: number]
   'api-drag-start': [payload: TreeApiDragPayload]
   'api-drag-over': [payload: TreeApiDragPayload]
   'api-drag-leave': []
@@ -219,7 +229,23 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
-const open = ref(false)
+const open = computed(
+  () =>
+    props.item.type === 'folder' &&
+    props.expandedFolderIds.some((id) => Number(id) === Number(props.item.id)),
+)
+
+/** Mount children once opened so later toggles only animate CSS (no remount jank). */
+const childrenMounted = ref(open.value)
+watch(open, (isOpen) => {
+  if (isOpen) childrenMounted.value = true
+})
+
+function toggleOpen() {
+  if (props.item.type !== 'folder') return
+  emit('toggle-expand', props.item.id)
+}
+
 const menuOpen = ref(false)
 const menuRef = ref<HTMLElement | null>(null)
 const menuBtnRef = ref<HTMLButtonElement | null>(null)
@@ -593,6 +619,46 @@ export default {
   padding: 0;
 }
 
+/*
+ * Smooth expand/collapse via grid-template-rows (no per-frame height writes).
+ * Duration: change FOLDER_MOTION_MS in script + --folder-motion here together.
+ */
+.folder-body {
+  --folder-motion: 150ms;
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows var(--folder-motion) cubic-bezier(0.22, 1, 0.36, 1),
+    opacity var(--folder-motion) cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.folder-body.open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.folder-body-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+
+.row.api.reveal-flash {
+  animation: tree-reveal-flash 0.85s ease;
+}
+
+@keyframes tree-reveal-flash {
+  0% {
+    background: var(--color-active);
+  }
+  30% {
+    background: color-mix(in srgb, var(--color-primary) 32%, var(--color-active));
+  }
+  100% {
+    background: var(--color-active);
+  }
+}
+
 .row {
   width: 100%;
   height: 30px;
@@ -702,7 +768,7 @@ export default {
 
 .expand-icon {
   display: block;
-  transition: transform 0.15s ease;
+  transition: transform 150ms cubic-bezier(0.22, 1, 0.36, 1);
   transform: rotate(-90deg);
 }
 
